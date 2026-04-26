@@ -1,0 +1,25 @@
+# Never commit these
+node_modules/
+worktrack-electron/node_modules/
+worktrack-electron/out/
+worktrack-electron/release/
+worktrack-electron/dist/
+worktrack-electron/dist-electron/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env files with secrets
+.env
+.env.local
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo

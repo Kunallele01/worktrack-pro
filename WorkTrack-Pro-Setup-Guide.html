@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WorkTrack Pro — Setup & Distribution Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13.5px;
+    line-height: 1.7;
+    color: #1e293b;
+    background: #ffffff;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 48px 56px;
+  }
+
+  /* ── Cover ── */
+  .cover {
+    text-align: center;
+    padding: 64px 0 56px;
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 48px;
+  }
+  .cover-badge {
+    display: inline-block;
+    background: #4F86F7;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 999px;
+    margin-bottom: 20px;
+  }
+  .cover h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 6px;
+  }
+  .cover p {
+    color: #64748b;
+    font-size: 14px;
+    margin-top: 8px;
+  }
+  .cover .meta {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-top: 28px;
+    font-size: 12px;
+    color: #94a3b8;
+  }
+
+  /* ── TOC ── */
+  .toc {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 40px;
+  }
+  .toc h2 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #94a3b8;
+    margin-bottom: 14px;
+  }
+  .toc ol { padding-left: 18px; }
+  .toc li {
+    margin: 5px 0;
+    font-size: 13px;
+    color: #334155;
+  }
+  .toc a { color: #4F86F7; text-decoration: none; }
+
+  /* ── Sections ── */
+  .section { margin-bottom: 44px; }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .section-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #4F86F7;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    margin: 16px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  p { margin-bottom: 10px; color: #475569; }
+
+  /* ── Steps ── */
+  .steps { list-style: none; padding: 0; }
+  .steps li {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .step-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #eff6ff;
+    border: 1.5px solid #bdd0ff;
+    color: #4F86F7;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-content { flex: 1; }
+  .step-content strong { color: #0f172a; font-weight: 600; }
+
+  /* ── Code ── */
+  code {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 12px;
+    background: #f1f5f9;
+    color: #0369a1;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 12px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    overflow-x: auto;
+  }
+  pre .comment { color: #64748b; }
+  pre .cmd     { color: #93c5fd; }
+  pre .path    { color: #86efac; }
+  pre .string  { color: #fde68a; }
+
+  /* ── Callouts ── */
+  .callout {
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 14px 0;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .callout-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .callout p    { margin: 0; font-size: 13px; }
+  .callout-blue  { background: #eff6ff; border: 1px solid #bdd0ff; }
+  .callout-green { background: #f0fdf4; border: 1px solid #86efac; }
+  .callout-amber { background: #fffbeb; border: 1px solid #fde68a; }
+  .callout-red   { background: #fff1f2; border: 1px solid #fecdd3; }
+
+  /* ── Table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    margin: 12px 0;
+  }
+  th {
+    background: #f1f5f9;
+    color: #475569;
+    font-weight: 600;
+    text-align: left;
+    padding: 9px 14px;
+    border: 1px solid #e2e8f0;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  td {
+    padding: 9px 14px;
+    border: 1px solid #e2e8f0;
+    color: #334155;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+
+  /* ── Checklist ── */
+  .checklist { list-style: none; padding: 0; }
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 7px;
+    font-size: 13px;
+    color: #475569;
+  }
+  .check-box {
+    width: 16px; height: 16px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  /* ── Badge ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-blue   { background:#dbeafe; color:#1d4ed8; }
+  .badge-green  { background:#dcfce7; color:#15803d; }
+  .badge-purple { background:#ede9fe; color:#6d28d9; }
+  .badge-gray   { background:#f1f5f9; color:#475569; }
+
+  /* ── Print ── */
+  @media print {
+    body { padding: 32px 40px; font-size: 12.5px; }
+    .cover { padding: 40px 0 36px; }
+    .section { page-break-inside: avoid; }
+    pre { font-size: 11px; }
+    a { color: #1d4ed8; }
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-badge">Internal Documentation</div>
+  <h1>WorkTrack Pro v2</h1>
+  <div style="font-size:15px; color:#64748b; margin-top:4px;">Setup, Build &amp; Distribution Guide</div>
+  <p>Complete instructions for packaging the desktop app as a <code>.exe</code><br>and deploying it to every employee's Windows PC.</p>
+  <div class="meta">
+    <span>Platform: Windows 10 / 11 (64-bit)</span>
+    <span>Database: Supabase (free tier)</span>
+    <span>Tech: Electron 32 + React</span>
+    <span>April 2026</span>
+  </div>
+</div>
+
+<!-- TOC -->
+<div class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#s1">Prerequisites &amp; One-Time Setup</a></li>
+    <li><a href="#s2">Building the .exe Installer</a></li>
+    <li><a href="#s3">Admin First-Time Configuration</a></li>
+    <li><a href="#s4">Distributing to Employees</a></li>
+    <li><a href="#s5">Employee Setup (per PC)</a></li>
+    <li><a href="#s6">Network &amp; Security Requirements</a></li>
+    <li><a href="#s7">Troubleshooting Reference</a></li>
+  </ol>
+</div>
+
+<!-- SECTION 1 -->
+<div class="section" id="s1">
+  <div class="section-header">
+    <div class="section-num">1</div>
+    <h2>Prerequisites &amp; One-Time Setup</h2>
+  </div>
+
+  <p>These tools are only needed on <strong>your development machine</strong> (the laptop where you built the app). Employees need nothing installed — they receive a single <code>.exe</code> file.</p>
+
+  <table>
+    <tr><th>Tool</th><th>Version</th><th>You Have It?</th><th>Purpose</th></tr>
+    <tr><td><strong>Node.js</strong></td><td>v24.7.0+</td><td><span class="badge badge-green">✓ Installed</span></td><td>Build toolchain</td></tr>
+    <tr><td><strong>Python</strong></td><td>3.10+</td><td><span class="badge badge-green">✓ Installed</span></td><td>GPS via winsdk (dev machine only)</td></tr>
+    <tr><td><strong>Supabase project</strong></td><td>Free tier</td><td><span class="badge badge-green">✓ Created</span></td><td>Cloud database</td></tr>
+    <tr><td><strong>Internet connection</strong></td><td>Any</td><td><span class="badge badge-green">✓</span></td><td>Supabase connectivity</td></tr>
+  </table>
+
+  <div class="callout callout-blue">
+    <div class="callout-icon">💡</div>
+    <p>The Supabase database and project are already live. You do not need to redo any database setup. The schema is already applied.</p>
+  </div>
+
+  <h3>Project Location on Your Machine</h3>
+  <pre><span class="path">C:\Users\KUNAL LELE\Desktop\Attendance App 2\worktrack-electron\</span></pre>
+  <p>All commands in this guide are run from inside this folder.</p>
+</div>
+
+<!-- SECTION 2 -->
+<div class="section" id="s2">
+  <div class="section-header">
+    <div class="section-num">2</div>
+    <h2>Building the .exe Installer</h2>
+  </div>
+
+  <p>This produces a <code>WorkTrack Pro Setup.exe</code> Windows installer. Employees run this once to install the app on their PC. The installer is roughly 150–200 MB and bundles everything — no Python, no Node, nothing else needed.</p>
+
+  <h3>Step 1 — Open a terminal in the project folder</h3>
+  <p>Open <strong>Windows Terminal</strong> or <strong>PowerShell</strong> (not VS Code's terminal — that sets an environment variable that interferes with Electron). Navigate to the project:</p>
+  <pre><span class="cmd">cd</span> <span class="path">"C:\Users\KUNAL LELE\Desktop\Attendance App 2\worktrack-electron"</span></pre>
+
+  <h3>Step 2 — Run the build command</h3>
+  <pre><span class="cmd">npm run build</span>
+
+<span class="comment"># This does two things:
+# 1. Compiles the React app (the UI) into optimised JS/CSS
+# 2. electron-builder packages everything into a Windows installer</span></pre>
+
+  <div class="callout callout-amber">
+    <div class="callout-icon">⏱</div>
+    <p>The first build takes 3–6 minutes. Subsequent builds are faster. A progress bar will appear in the terminal.</p>
+  </div>
+
+  <h3>Step 3 — Find the installer</h3>
+  <p>After the build finishes, the installer will be at:</p>
+  <pre><span class="path">worktrack-electron\release\WorkTrack Pro Setup 2.0.0.exe</span></pre>
+
+  <p>This is the only file you need to distribute. Everything else (Chromium, Node runtime, all npm packages) is bundled inside it.</p>
+
+  <div class="callout callout-green">
+    <div class="callout-icon">✅</div>
+    <p><strong>What employees receive:</strong> A single <code>WorkTrack Pro Setup 2.0.0.exe</code> file (~160 MB). They double-click it, it installs silently in their user profile (no admin rights required), and creates a desktop shortcut.</p>
+  </div>
+
+  <h3>Rebuild after updates</h3>
+  <p>Whenever you change the code and want to push an update to employees, run <code>npm run build</code> again and distribute the new installer. Employees run the new installer over the old one — it updates cleanly.</p>
+</div>
+
+<!-- SECTION 3 -->
+<div class="section" id="s3">
+  <div class="section-header">
+    <div class="section-num">3</div>
+    <h2>Admin First-Time Configuration</h2>
+  </div>
+
+  <p>These steps only need to be done once, by you, before distributing to employees.</p>
+
+  <ol class="steps">
+    <li>
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <strong>Install and open the app on your machine.</strong><br>
+        Run the installer you just built. Launch "WorkTrack Pro" from the desktop shortcut.
+      </div>
+    </li>
+    <li>
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <strong>Register the first account — this becomes the admin.</strong><br>
+        Click "Register" and fill in your details. The very first account registered is automatically promoted to Admin. Use your own name and email.
+      </div>
+    </li>
+    <li>
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <strong>Sign in and go to Settings → Office Location &amp; Hours.</strong><br>
+        Your office coordinates are already pre-filled (<code>18.460204, 73.798938</code> — Pune). Adjust the radius slider if needed (default: 200 m). Set the office start time (default: 09:30).
+      </div>
+    </li>
+    <li>
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <strong>Set your office WiFi network name.</strong><br>
+        In "Office WiFi Network Names", type the exact name (SSID) of your office WiFi — e.g. <code>OfficeWiFi</code>. This is the most reliable way to detect who is in the office on a desktop PC. If your WiFi has multiple bands (2.4 GHz and 5 GHz), add both names, one per line.
+      </div>
+    </li>
+    <li>
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <strong>Set your company name.</strong><br>
+        Change "Your Company" to your actual startup name. It appears in the sidebar and reports.
+      </div>
+    </li>
+    <li>
+      <div class="step-num">6</div>
+      <div class="step-content">
+        <strong>Click "Save Office Settings".</strong><br>
+        These settings are stored in the cloud and are shared with everyone automatically.
+      </div>
+    </li>
+    <li>
+      <div class="step-num">7</div>
+      <div class="step-content">
+        <strong>(Optional) Configure email notifications.</strong><br>
+        Go to Settings → Email. Enter your Gmail SMTP credentials to get WFH alerts and reports by email. See Section 6 for Gmail setup instructions.
+      </div>
+    </li>
+  </ol>
+
+  <div class="callout callout-blue">
+    <div class="callout-icon">🔑</div>
+    <p><strong>Admin account is permanent.</strong> You can later promote other employees to Admin from the Employees tab. Having two admins is recommended (you + one other person).</p>
+  </div>
+</div>
+
+<!-- SECTION 4 -->
+<div class="section" id="s4">
+  <div class="section-header">
+    <div class="section-num">4</div>
+    <h2>Distributing to Employees</h2>
+  </div>
+
+  <p>Each employee needs to:</p>
+  <ol class="steps">
+    <li>
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <strong>Receive the installer file.</strong><br>
+        Share <code>WorkTrack Pro Setup 2.0.0.exe</code> via WhatsApp, email attachment, Google Drive, or a shared folder on the office network. The file is ~160 MB.
+      </div>
+    </li>
+    <li>
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <strong>Run the installer.</strong><br>
+        Double-click the .exe. Windows may show a "Windows protected your PC" warning — click "More info" then "Run anyway". Installation takes under 30 seconds and requires no admin rights.
+      </div>
+    </li>
+    <li>
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <strong>Launch WorkTrack Pro from the desktop shortcut.</strong><br>
+        A "WorkTrack Pro" icon appears on the desktop automatically.
+      </div>
+    </li>
+    <li>
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <strong>Click "Register" and create their account.</strong><br>
+        Each employee enters their own Employee ID, full name, company email, department, and a password. They choose their own password — you never see it.
+      </div>
+    </li>
+    <li>
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <strong>Sign in and start using it.</strong><br>
+        Once registered and signed in, the dashboard is fully functional. The Check-In button becomes active once the app detects their location.
+      </div>
+    </li>
+  </ol>
+
+  <div class="callout callout-amber">
+    <div class="callout-icon">⚠️</div>
+    <p><strong>Windows SmartScreen warning:</strong> Because the installer isn't from a paid code-signing certificate, Windows shows a blue "Windows protected your PC" screen. Employees must click <strong>"More info"</strong> and then <strong>"Run anyway"</strong>. This is safe — it's just Windows being cautious about unsigned software.</p>
+  </div>
+
+  <h3>Recommended Distribution Method</h3>
+  <table>
+    <tr><th>Method</th><th>Best For</th><th>Notes</th></tr>
+    <tr><td>WhatsApp / Telegram</td><td>Small teams, quick rollout</td><td>Works great for 50 people. May compress the file — use "Document" not "Photo"</td></tr>
+    <tr><td>Google Drive link</td><td>Clean, trackable</td><td>Upload once, share the link. Employees download directly</td></tr>
+    <tr><td>Shared office folder</td><td>No internet dependency</td><td>Put on a network share drive; employees browse to it and run</td></tr>
+    <tr><td>Email attachment</td><td>Works if file size allows</td><td>Some email providers block .exe attachments — zip it first</td></tr>
+  </table>
+</div>
+
+<!-- SECTION 5 -->
+<div class="section" id="s5">
+  <div class="section-header">
+    <div class="section-num">5</div>
+    <h2>Employee Setup (per PC)</h2>
+  </div>
+
+  <p>Each employee needs to do these two things on their PC after installing the app. Takes about 2 minutes.</p>
+
+  <h3>Enable Windows Location Services</h3>
+  <p>This lets the app detect whether they're at the office or working from home.</p>
+  <ol class="steps">
+    <li>
+      <div class="step-num">1</div>
+      <div class="step-content">Press <strong>Windows key</strong> → type <strong>"Location privacy settings"</strong> → press Enter</div>
+    </li>
+    <li>
+      <div class="step-num">2</div>
+      <div class="step-content">Turn <strong>"Location services"</strong> → <strong>ON</strong></div>
+    </li>
+    <li>
+      <div class="step-num">3</div>
+      <div class="step-content">Turn <strong>"Let apps access your location"</strong> → <strong>ON</strong></div>
+    </li>
+    <li>
+      <div class="step-num">4</div>
+      <div class="step-content">Scroll down and turn <strong>"Let desktop apps access your location"</strong> → <strong>ON</strong></div>
+    </li>
+  </ol>
+
+  <div class="callout callout-blue">
+    <div class="callout-icon">📍</div>
+    <p><strong>How location detection works:</strong> The app uses three methods in order — browser geolocation, Windows Location API, and finally IP-based location. Even on desktop PCs without GPS hardware, the app always resolves a location. Employees connected to the office WiFi (the network name you configured in Settings) are automatically marked as "In Office" regardless of GPS accuracy.</p>
+  </div>
+
+  <h3>Enable Auto-Start (Recommended)</h3>
+  <p>So the app launches automatically every morning when Windows starts:</p>
+  <ol class="steps">
+    <li>
+      <div class="step-num">1</div>
+      <div class="step-content">Open WorkTrack Pro → click <strong>Settings</strong> in the sidebar</div>
+    </li>
+    <li>
+      <div class="step-num">2</div>
+      <div class="step-content">Under <strong>"System"</strong>, toggle <strong>"Launch on Windows startup"</strong> → ON</div>
+    </li>
+  </ol>
+
+  <div class="callout callout-green">
+    <div class="callout-icon">✅</div>
+    <p>Once auto-start is on, the app launches with Windows, minimises to the system tray, and is ready for check-in every morning without the employee needing to think about it.</p>
+  </div>
+
+  <h3>Employee Quick Reference Card</h3>
+  <table>
+    <tr><th>Action</th><th>How</th></tr>
+    <tr><td>Check in</td><td>Open app → Dashboard → click <strong>"Mark Check-In"</strong> button</td></tr>
+    <tr><td>Check out</td><td>Open app → Dashboard → click <strong>"Mark Check-Out"</strong> button</td></tr>
+    <tr><td>View my history</td><td>Calendar on the left side of the Dashboard</td></tr>
+    <tr><td>Open from tray</td><td>Click the WorkTrack icon in the system tray (bottom-right)</td></tr>
+    <tr><td>Forgot password</td><td>Login screen → "Forgot password?" → enter email → check inbox for 6-digit code</td></tr>
+    <tr><td>Login with Employee ID</td><td>Enter <code>EMP001</code> (their ID) instead of email in the login field</td></tr>
+  </table>
+</div>
+
+<!-- SECTION 6 -->
+<div class="section" id="s6">
+  <div class="section-header">
+    <div class="section-num">6</div>
+    <h2>Network &amp; Security Requirements</h2>
+  </div>
+
+  <h3>Internet Connectivity</h3>
+  <p>WorkTrack Pro requires an internet connection to function. All data is stored in the cloud (Supabase, hosted in Mumbai/South Asia region).</p>
+
+  <table>
+    <tr><th>Feature</th><th>Requires Internet?</th><th>Notes</th></tr>
+    <tr><td>Login / Register</td><td>Yes</td><td>Authentication via Supabase</td></tr>
+    <tr><td>Check-In / Check-Out</td><td>Yes</td><td>Writes to cloud database in real-time</td></tr>
+    <tr><td>Admin Overview</td><td>Yes</td><td>Live data via WebSocket connection</td></tr>
+    <tr><td>Reports (Excel download)</td><td>Yes</td><td>Fetches data then generates Excel locally</td></tr>
+    <tr><td>Location detection</td><td>Partially</td><td>WiFi SSID check is local; IP geolocation needs internet</td></tr>
+  </table>
+
+  <h3>Firewall / Proxy Considerations</h3>
+  <p>If your office uses a firewall or proxy, ensure outbound HTTPS (port 443) is allowed to:</p>
+  <pre><span class="string">*.supabase.co</span>          <span class="comment"># Database and authentication</span>
+<span class="string">ip-api.com</span>              <span class="comment"># IP geolocation fallback (optional)</span>
+<span class="string">unpkg.com</span>               <span class="comment"># Map tile CDN (only used in Map tab)</span></pre>
+
+  <h3>(Optional) Gmail SMTP for Email Notifications</h3>
+  <p>To receive WFH alerts and send monthly reports by email:</p>
+  <ol class="steps">
+    <li>
+      <div class="step-num">1</div>
+      <div class="step-content">Go to <strong>myaccount.google.com</strong> → Security → 2-Step Verification → make sure it's ON</div>
+    </li>
+    <li>
+      <div class="step-num">2</div>
+      <div class="step-content">Still in Security, scroll to <strong>App passwords</strong> → create one named "WorkTrack" → copy the 16-character password</div>
+    </li>
+    <li>
+      <div class="step-num">3</div>
+      <div class="step-content">In WorkTrack Pro admin → Settings → Email: set Host = <code>smtp.gmail.com</code>, Port = <code>587</code>, Your email, and paste the app password</div>
+    </li>
+    <li>
+      <div class="step-num">4</div>
+      <div class="step-content">Click "Send Test Email" to confirm it works</div>
+    </li>
+  </ol>
+
+  <div class="callout callout-amber">
+    <div class="callout-icon">⚠️</div>
+    <p>Use a <strong>Google App Password</strong>, not your regular Gmail password. App passwords are 16 characters with no spaces and work even with 2FA enabled.</p>
+  </div>
+
+  <h3>Data Privacy</h3>
+  <table>
+    <tr><th>What is stored</th><th>Where</th><th>Who can see it</th></tr>
+    <tr><td>Check-in/out times</td><td>Supabase (cloud, Mumbai)</td><td>Admin + the employee themselves</td></tr>
+    <tr><td>GPS coordinates</td><td>Supabase (cloud)</td><td>Admin only (visible in Attendance tab)</td></tr>
+    <tr><td>Passwords</td><td>Supabase Auth (hashed)</td><td>Nobody — not even the admin</td></tr>
+    <tr><td>Email addresses</td><td>Supabase</td><td>Admin only</td></tr>
+  </table>
+</div>
+
+<!-- SECTION 7 -->
+<div class="section" id="s7">
+  <div class="section-header">
+    <div class="section-num">7</div>
+    <h2>Troubleshooting Reference</h2>
+  </div>
+
+  <table>
+    <tr>
+      <th>Problem</th>
+      <th>Likely Cause</th>
+      <th>Solution</th>
+    </tr>
+    <tr>
+      <td>"Cannot connect to server"</td>
+      <td>No internet connection</td>
+      <td>Check WiFi / ethernet. The app needs internet to work.</td>
+    </tr>
+    <tr>
+      <td>Login shows blank / nothing loads</td>
+      <td>First launch, slow connection</td>
+      <td>Wait 10 seconds. If still blank, close and reopen the app.</td>
+    </tr>
+    <tr>
+      <td>"Location Unavailable" — check-in greyed out</td>
+      <td>Windows Location Services off</td>
+      <td>Settings → Privacy → Location → turn everything ON. Then click "Refresh" in the app.</td>
+    </tr>
+    <tr>
+      <td>Checked in as WFH when at office</td>
+      <td>Office WiFi SSID not configured, or GPS inaccurate</td>
+      <td>Admin must set the office WiFi name in Settings. Once set, being connected to office WiFi automatically means "In Office".</td>
+    </tr>
+    <tr>
+      <td>"Already checked in today"</td>
+      <td>Check-in already recorded</td>
+      <td>Normal — you can only check in once per day. Use Check-Out when leaving.</td>
+    </tr>
+    <tr>
+      <td>Windows SmartScreen blocks installer</td>
+      <td>No code signing certificate</td>
+      <td>Click "More info" → "Run anyway". This is safe. It only appears because the installer isn't from a paid certificate.</td>
+    </tr>
+    <tr>
+      <td>App doesn't start on Windows startup</td>
+      <td>Startup toggle wasn't set</td>
+      <td>Open the app → Settings → System → toggle "Launch on Windows startup" ON.</td>
+    </tr>
+    <tr>
+      <td>Emails not sending</td>
+      <td>SMTP not configured or wrong password</td>
+      <td>Admin: Settings → Email → verify SMTP host, port, and App Password. Click "Send Test Email".</td>
+    </tr>
+    <tr>
+      <td>Forgot password</td>
+      <td>—</td>
+      <td>Login screen → "Forgot password?" → enter email → a 6-digit code is sent → enter code → set new password.</td>
+    </tr>
+    <tr>
+      <td>Employee account deactivated</td>
+      <td>Admin deactivated the account</td>
+      <td>Admin → Employees tab → find the user → click "Activate".</td>
+    </tr>
+    <tr>
+      <td>App shows "GPU Cache Creation failed"</td>
+      <td>Harmless error — VS Code also uses Electron</td>
+      <td>Ignore. Doesn't affect functionality. Disappears on employee machines (they won't have VS Code running).</td>
+    </tr>
+  </table>
+
+  <h3>Admin Quick Actions Reference</h3>
+  <table>
+    <tr><th>Task</th><th>Where in App</th></tr>
+    <tr><td>See who's in office right now</td><td>Admin → Overview (live feed, updates in real-time)</td></tr>
+    <tr><td>See full attendance records</td><td>Admin → Attendance (filter by date, employee, status)</td></tr>
+    <tr><td>Make someone an admin</td><td>Admin → Employees → find card → click "Make Admin"</td></tr>
+    <tr><td>Deactivate a departed employee</td><td>Admin → Employees → find card → click "Deactivate"</td></tr>
+    <tr><td>Download monthly attendance Excel</td><td>Admin → Reports → Monthly Report → select month → Download</td></tr>
+    <tr><td>View map of check-ins</td><td>Admin → Map (shows in-office + WFH pins on a live map)</td></tr>
+    <tr><td>Change office location/radius</td><td>Admin → Settings → Office Location</td></tr>
+    <tr><td>Reset an employee's password</td><td>Admin → Settings → User Management → enter their email → Send Reset Email</td></tr>
+  </table>
+
+  <div style="margin-top:40px; padding-top:24px; border-top:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:12px;">
+    <p><strong style="color:#334155;">WorkTrack Pro v2.0</strong> &nbsp;·&nbsp; Built with Electron + React + Supabase &nbsp;·&nbsp; Database: <code>lwnuunwxfgvketjtmreo.supabase.co</code></p>
+    <p style="margin-top:4px;">For support, contact the person who set this up. This document covers all common scenarios.</p>
+  </div>
+</div>
+
+</body>
+</html>

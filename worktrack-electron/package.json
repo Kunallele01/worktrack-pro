@@ -1,0 +1,56 @@
+{
+  "name": "worktrack-pro",
+  "version": "2.0.0",
+  "description": "WorkTrack Pro — Professional Attendance Tracking",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite build --config vite.renderer.config.mjs && node scripts/fix-html.js && node scripts/launch.js",
+    "build": "vite build --config vite.renderer.config.mjs && node scripts/fix-html.js",
+    "preview": "node scripts/launch.js",
+    "package": "vite build --config vite.renderer.config.mjs && electron-builder"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.20",
+    "cross-env": "^10.1.0",
+    "electron": "^32.2.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "vite": "^5.4.9"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.1.0",
+    "@fontsource/jetbrains-mono": "^5.1.0",
+    "@supabase/supabase-js": "^2.46.1",
+    "@tanstack/react-table": "^8.20.5",
+    "date-fns": "^4.1.0",
+    "exceljs": "^4.4.0",
+    "framer-motion": "^11.11.10",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.460.0",
+    "nodemailer": "^6.9.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-leaflet": "^4.2.1",
+    "react-router-dom": "^6.27.0",
+    "recharts": "^2.13.3",
+    "zustand": "^5.0.1"
+  },
+  "build": {
+    "appId": "com.worktrack.pro",
+    "productName": "WorkTrack Pro",
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    }
+  }
+}
