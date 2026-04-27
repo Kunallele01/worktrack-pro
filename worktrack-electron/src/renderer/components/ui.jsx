@@ -224,6 +224,28 @@ export function GpsWidget({ onReady }) {
       if (onReady) onReady(lat, lon, accuracy)
     }
 
+    // Stage 4: WiFi SSID fallback — office detection via network name
+    const tryWifiSSID = () => {
+      const p = window.api?.getWifiSSID?.()
+      if (!p) {
+        setStatus('error')
+        setError('Location unavailable. Enable: Windows Settings → Privacy → Location → ON')
+        return
+      }
+      p.then(ssid => {
+        if (ssid) {
+          setWifi(ssid)
+          applyLocation(0, 0, -1)
+        } else {
+          setStatus('error')
+          setError('Location unavailable. Enable: Windows Settings → Privacy → Location → ON')
+        }
+      }).catch(() => {
+        setStatus('error')
+        setError('Location unavailable. Enable: Windows Settings → Privacy → Location → ON')
+      })
+    }
+
     // Stage 3: IP geolocation — always works, ~city-level accuracy
     const tryIPGeolocation = () => {
       fetch('https://ip-api.com/json/?fields=lat,lon,status,message')
@@ -236,8 +258,7 @@ export function GpsWidget({ onReady }) {
           }
         })
         .catch(() => {
-          setStatus('error')
-          setError('Location unavailable. Enable: Windows Settings → Privacy → Location → ON')
+          tryWifiSSID()
         })
     }
 
@@ -277,14 +298,16 @@ export function GpsWidget({ onReady }) {
   useEffect(() => { acquire() }, [])
 
   const tier = !coords ? null
+    : coords.accuracy < 0      ? 'wifi'
     : coords.accuracy <= 500   ? 'good'
     : coords.accuracy <= 5000  ? 'fair'
     : 'poor'
 
   const tierConfig = {
-    good: { dot: 'bg-emerald-400', text: 'GPS / WiFi Active',          sub: `Accuracy: ±${Math.round(coords?.accuracy)}m` },
-    fair: { dot: 'bg-amber-400',   text: 'Location Active (Low)',       sub: `Accuracy: ±${Math.round((coords?.accuracy||0)/1000)}km` },
-    poor: { dot: 'bg-red-400',     text: 'IP-Based Location (Very Low)', sub: `Accuracy: ±${Math.round((coords?.accuracy||0)/1000)}km — office WiFi SSID detection active` },
+    wifi: { dot: 'bg-blue-400',    text: 'WiFi Detection Active',        sub: `Network: ${wifi || 'detected'} — office match verified at check-in` },
+    good: { dot: 'bg-emerald-400', text: 'GPS / WiFi Active',            sub: `Accuracy: ±${Math.round(coords?.accuracy)}m` },
+    fair: { dot: 'bg-amber-400',   text: 'Location Active (Low)',        sub: `Accuracy: ±${Math.round((coords?.accuracy||0)/1000)}km` },
+    poor: { dot: 'bg-red-400',     text: 'IP-Based Location (Very Low)', sub: `Accuracy: ±${Math.round((coords?.accuracy||0)/1000)}km — WiFi SSID detection active` },
   }
 
   return (

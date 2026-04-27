@@ -4,10 +4,10 @@
   "description": "WorkTrack Pro — Professional Attendance Tracking",
   "main": "electron/main.cjs",
   "scripts": {
-    "dev": "vite build --config vite.renderer.config.mjs && node scripts/fix-html.js && node scripts/launch.js",
-    "build": "vite build --config vite.renderer.config.mjs && node scripts/fix-html.js",
+    "dev": "node scripts/build-preload.cjs && vite build --config vite.renderer.config.mjs && node scripts/fix-html.js && node scripts/launch.js",
+    "build": "node scripts/build-preload.cjs && vite build --config vite.renderer.config.mjs && node scripts/fix-html.js",
     "preview": "node scripts/launch.js",
-    "package": "vite build --config vite.renderer.config.mjs && electron-builder"
+    "package": "node scripts/build-preload.cjs && vite build --config vite.renderer.config.mjs && node scripts/fix-html.js && electron-builder"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.0",
@@ -16,6 +16,7 @@
     "electron": "^32.2.0",
     "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",
+    "esbuild": "^0.28.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
     "vite": "^5.4.9"
@@ -41,12 +42,15 @@
   "build": {
     "appId": "com.worktrack.pro",
     "productName": "WorkTrack Pro",
+    "asar": true,
     "directories": {
       "output": "release"
     },
     "win": {
       "target": "nsis",
-      "icon": "resources/icon.ico"
+      "icon": "resources/icon.ico",
+      "signAndEditExecutable": false,
+      "signtoolOptions": null
     },
     "nsis": {
       "oneClick": true,

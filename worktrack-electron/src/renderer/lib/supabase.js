@@ -200,9 +200,9 @@ export async function checkIn(userId, latitude, longitude, accuracy) {
     check_in_time: new Date().toISOString(),
     status,
     is_late,
-    latitude,
-    longitude,
-    accuracy_m:   accuracy,
+    latitude:   (wifiHit && accuracy < 0) ? offLat : latitude,
+    longitude:  (wifiHit && accuracy < 0) ? offLon : longitude,
+    accuracy_m: (wifiHit && accuracy < 0) ? 50 : accuracy,
   }
 
   const { data, error } = await supabase.from('attendance').upsert(row).select().single()
@@ -441,4 +441,59 @@ export async function runAutoCheckout() {
     .update({ check_out_time: checkoutTime.toISOString(), status: 'auto_checkout' })
     .in('id', data.map(r => r.id))
   return data.length
+}
+
+// ── Holidays ─────────────────────────────────────────────────────────────── //
+
+export async function getHolidays() {
+  const s = await getSettings()
+  try { return JSON.parse(s.company_holidays || '[]') } catch { return [] }
+}
+
+export async function saveHolidays(holidays) {
+  await updateSettings({ company_holidays: JSON.stringify(holidays) })
+}
+
+// ── Delete user ───────────────────────────────────────────────────────────── //
+
+export async function deleteUser(userId, sendNotificationEmail = true) {
+  // Fetch user details before deletion
+  const { data: profile } = await supabase.from('profiles')
+    .select('full_name,email,is_admin').eq('id', userId).single()
+  if (!profile) throw new Error('User not found.')
+
+  // Prevent deleting the last admin
+  if (profile.is_admin) {
+    const { count } = await supabase.from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_admin', true).eq('is_active', true)
+    if ((count || 0) <= 1) throw new Error('Cannot delete the last admin account. Promote another admin first.')
+  }
+
+  // Send notification email before deletion
+  if (sendNotificationEmail) {
+    const settings = await getSettings()
+    const host = settings.smtp_host?.trim()
+    const user = settings.smtp_username?.trim()
+    const pass = settings.smtp_password?.trim()
+    if (host && user && pass && profile.email) {
+      await window.api?.sendEmail({
+        host, port: settings.smtp_port || '587', user, pass,
+        fromName: settings.smtp_from_name || 'WorkTrack Pro',
+        to: [profile.email],
+        subject: 'Your WorkTrack Pro account has been removed',
+        html: `<div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+          <h2 style="color:#1e293b;">WorkTrack Pro — Account Removed</h2>
+          <p style="color:#475569;">Hi ${profile.full_name},</p>
+          <p style="color:#475569;">Your WorkTrack Pro account has been removed by the administrator. You will no longer be able to access the system.</p>
+          <p style="color:#475569;">If you believe this is a mistake, please contact your administrator.</p>
+        </div>`,
+      }).catch(e => console.warn('[Delete email] Failed:', e.message))
+    }
+  }
+
+  // Delete the profile (cascades to attendance records)
+  const { error } = await supabase.from('profiles').delete().eq('id', userId)
+  if (error) throw new Error(`Could not delete user: ${error.message}`)
+  return true
 }

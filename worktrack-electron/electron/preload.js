@@ -8,5 +8,7 @@ contextBridge.exposeInMainWorld('api', {
   getStartup:  ()                  => ipcRenderer.invoke('get-startup'),
   createTray:  ()                  => ipcRenderer.invoke('create-tray'),
   destroyTray: ()                  => ipcRenderer.invoke('destroy-tray'),
-  getVersion:  ()                  => ipcRenderer.invoke('get-version'),
+  getVersion:         ()        => ipcRenderer.invoke('get-version'),
+  getWifiSSID:        ()        => ipcRenderer.invoke('get-wifi-ssid'),
+  getWindowsLocation: ()        => ipcRenderer.invoke('get-windows-location'),
 })

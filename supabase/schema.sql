@@ -192,3 +192,17 @@ INSERT INTO public.app_settings (key, value) VALUES
     ('resend_api_key',    ''),
     ('from_email',        'noreply@worktrack.app')
 ON CONFLICT (key) DO NOTHING;
+
+-- ============================================================
+-- MIGRATION: Run this in Supabase SQL Editor to enable user deletion
+-- ============================================================
+
+-- Allow admins to delete profiles (cascades to attendance records)
+DROP POLICY IF EXISTS "Admins can delete profiles" ON public.profiles;
+CREATE POLICY "Admins can delete profiles" ON public.profiles
+  FOR DELETE USING (public.is_admin());
+
+-- Add company_holidays to default settings
+INSERT INTO public.app_settings (key, value)
+VALUES ('company_holidays', '[]')
+ON CONFLICT (key) DO NOTHING;

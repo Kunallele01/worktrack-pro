@@ -153,3 +153,80 @@
   transform: translateY(0);
   transition: opacity 200ms ease, transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* ── Light mode overrides ───────────────────────────────────────────────── */
+/* Applied when html.dark class is ABSENT */
+
+html:not(.dark) {
+  color-scheme: light;
+  background: #F8F9FC;
+  color: #1e293b;
+}
+
+html:not(.dark) body,
+html:not(.dark) #root {
+  background: #F8F9FC;
+}
+
+/* Surface backgrounds */
+html:not(.dark) .card                { background: #ffffff; border-color: #e2e8f0; }
+html:not(.dark) .glass               { background: rgba(255,255,255,0.8); border-color: rgba(0,0,0,0.08); }
+html:not(.dark) .input-base          { background: #ffffff; border-color: #e2e8f0; color: #1e293b; }
+html:not(.dark) .input-base::placeholder { color: #94a3b8; }
+
+/* Text colours */
+html:not(.dark) .text-gray-100 { color: #1e293b !important; }
+html:not(.dark) .text-gray-200 { color: #334155 !important; }
+html:not(.dark) .text-gray-300 { color: #475569 !important; }
+html:not(.dark) .text-gray-400 { color: #64748b !important; }
+html:not(.dark) .text-gray-500 { color: #94a3b8 !important; }
+html:not(.dark) .text-gray-600 { color: #cbd5e1 !important; }
+
+/* Background colours */
+html:not(.dark) .bg-surface-900 { background-color: #F8F9FC !important; }
+html:not(.dark) .bg-surface-800 { background-color: #ffffff !important; }
+html:not(.dark) .bg-surface-700 { background-color: #f1f5f9 !important; }
+
+/* Sidebar */
+html:not(.dark) aside              { background-color: #f1f5f9 !important; border-color: #e2e8f0 !important; }
+html:not(.dark) .nav-item          { color: #64748b; }
+html:not(.dark) .nav-item:hover    { background: rgba(79,134,247,0.08); color: #334155; }
+html:not(.dark) .nav-item-active   { background: rgba(79,134,247,0.12) !important; }
+
+/* Borders */
+html:not(.dark) .border-white\/\[0\.06\] { border-color: #e2e8f0 !important; }
+html:not(.dark) .border-white\/10        { border-color: #e2e8f0 !important; }
+
+/* Hover / active */
+html:not(.dark) .hover\:bg-white\/5:hover  { background-color: rgba(0,0,0,0.04) !important; }
+html:not(.dark) .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.07) !important; }
+html:not(.dark) .bg-white\/\[0\.03\]       { background-color: rgba(0,0,0,0.03) !important; }
+html:not(.dark) .bg-white\/\[0\.05\]       { background-color: rgba(0,0,0,0.05) !important; }
+
+/* ── Range slider styles ─────────────────────────────────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.1);
+  outline: none;
+  cursor: pointer;
+}
+html:not(.dark) input[type="range"] {
+  background: #e2e8f0;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #4F86F7;
+  cursor: pointer;
+  border: 2px solid rgba(255,255,255,0.2);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  background: #3A6AE8;
+  transform: scale(1.1);
+}

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { getSettings, updateSettings } from '../../lib/supabase'
+import { getSettings, updateSettings, getHolidays, saveHolidays } from '../../lib/supabase'
 import { Card, Button, Input, PasswordInput } from '../../components/ui'
 import { useToast } from '../../components/ui'
+import { Trash2, Plus } from 'lucide-react'
 
 function Section({ title, children }) {
   return (
@@ -111,6 +112,84 @@ export default function AdminSettings() {
           <Button variant="secondary" onClick={testEmail} loading={saving.test} className="text-sm">Send Test Email</Button>
         </div>
       </Section>
+
+      <HolidaySection />
     </div>
+  )
+}
+
+// ── Holiday Calendar Section ──────────────────────────────────────────────── //
+
+function HolidaySection() {
+  const toast = useToast()
+  const [holidays, setHolidays] = useState([])
+  const [newDate,  setNewDate ] = useState('')
+  const [newName,  setNewName ] = useState('')
+  const [saving,   setSaving  ] = useState(false)
+
+  useEffect(() => { getHolidays().then(setHolidays) }, [])
+
+  const add = () => {
+    if (!newDate || !newName.trim()) { toast('Enter both a date and a holiday name.', 'warning'); return }
+    if (holidays.some(h => h.date === newDate)) { toast('That date is already a holiday.', 'warning'); return }
+    const sorted = [...holidays, { date: newDate, name: newName.trim() }]
+      .sort((a, b) => a.date.localeCompare(b.date))
+    setHolidays(sorted)
+    setNewDate(''); setNewName('')
+  }
+
+  const remove = (date) => setHolidays(h => h.filter(x => x.date !== date))
+
+  const save = async () => {
+    setSaving(true)
+    try { await saveHolidays(holidays); toast('Holidays saved!', 'success') }
+    catch (e) { toast(e.message, 'error') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <Card className="p-5">
+      <h3 className="text-sm font-semibold text-gray-200 mb-1 pb-3 border-b border-white/[0.06]">
+        Company Holidays
+      </h3>
+      <p className="text-xs text-gray-400 mb-4">
+        Holidays are excluded from working day counts. Employees won't be marked absent on these dates.
+      </p>
+
+      {/* Add new holiday */}
+      <div className="flex gap-2 mb-4">
+        <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)}
+          className="input-base py-2 text-sm w-44" />
+        <input placeholder="Holiday name (e.g. Diwali)" value={newName}
+          onChange={e => setNewName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && add()}
+          className="input-base py-2 text-sm flex-1" />
+        <Button onClick={add} variant="secondary" className="text-sm gap-1.5 shrink-0">
+          <Plus size={14} /> Add
+        </Button>
+      </div>
+
+      {/* List */}
+      {holidays.length === 0
+        ? <p className="text-sm text-gray-500 text-center py-4">No holidays added yet.</p>
+        : (
+          <div className="space-y-1.5 mb-4 max-h-64 overflow-y-auto pr-1">
+            {holidays.map(h => (
+              <div key={h.date} className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+                <div>
+                  <p className="text-sm text-gray-200 font-medium">{h.name}</p>
+                  <p className="text-xs text-gray-500 font-mono">{h.date}</p>
+                </div>
+                <button onClick={() => remove(h.date)} className="text-gray-600 hover:text-red-400 transition-colors p-1">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      <Button onClick={save} loading={saving} className="text-sm">Save Holidays</Button>
+    </Card>
   )
 }
