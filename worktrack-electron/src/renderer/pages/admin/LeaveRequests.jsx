@@ -6,7 +6,7 @@ import { getAllLeaveRequests, reviewLeave } from '../../lib/supabase'
 import { useStore } from '../../lib/store'
 import { Card, Button, Avatar } from '../../components/ui'
 import { useToast } from '../../components/ui'
-import { LEAVE_TYPES, LEAVE_COLORS } from '../Leave'
+import { LEAVE_TYPES, LEAVE_COLORS } from '../../lib/leaveConstants'
 
 const STATUS_BADGE = {
   pending:  'bg-amber-500/15 text-amber-400 border border-amber-500/30',

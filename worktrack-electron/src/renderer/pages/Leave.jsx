@@ -3,24 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { format, parseISO, isWeekend } from 'date-fns'
 import { Plus, X, Calendar, FileText, Clock } from 'lucide-react'
 import { applyLeave, getMyLeaves, getLeaveBalance, getSettings, getHolidays } from '../lib/supabase'
+import { LEAVE_TYPES, LEAVE_COLORS } from '../lib/leaveConstants'
 import { useStore } from '../lib/store'
 import Sidebar from '../components/Sidebar'
 import { Page, Card, Button } from '../components/ui'
 import { ToastProvider, useToast } from '../components/ui'
 
-export const LEAVE_TYPES = [
-  { value: 'sick',      label: 'Sick Leave',      icon: '🤒', color: 'rose',   quotaKey: 'leave_sick_quota'    },
-  { value: 'casual',    label: 'Casual Leave',    icon: '☀️', color: 'amber',  quotaKey: 'leave_casual_quota'  },
-  { value: 'planned',   label: 'Planned Leave',   icon: '✈️', color: 'teal',   quotaKey: 'leave_planned_quota' },
-  { value: 'emergency', label: 'Emergency Leave', icon: '⚡', color: 'orange', quotaKey: null                  },
-]
-
-export const LEAVE_COLORS = {
-  sick:      { cell: 'bg-rose-500/80 text-white',    badge: 'bg-rose-500/15 text-rose-400 border-rose-500/30',     ring: 'ring-rose-500/40',   text: 'text-rose-400',   bg: 'bg-rose-500/15',   border: 'border-rose-500/30' },
-  casual:    { cell: 'bg-amber-500/80 text-white',   badge: 'bg-amber-500/15 text-amber-400 border-amber-500/30',  ring: 'ring-amber-500/40',  text: 'text-amber-400',  bg: 'bg-amber-500/15',  border: 'border-amber-500/30' },
-  planned:   { cell: 'bg-teal-500/80 text-white',    badge: 'bg-teal-500/15 text-teal-400 border-teal-500/30',     ring: 'ring-teal-500/40',   text: 'text-teal-400',   bg: 'bg-teal-500/15',   border: 'border-teal-500/30' },
-  emergency: { cell: 'bg-orange-500/80 text-white',  badge: 'bg-orange-500/15 text-orange-400 border-orange-500/30',ring: 'ring-orange-500/40', text: 'text-orange-400', bg: 'bg-orange-500/15', border: 'border-orange-500/30' },
-}
+// Re-export for any imports that still reference this file
+export { LEAVE_TYPES, LEAVE_COLORS }
 
 const STATUS_CONFIG = {
   pending:  { label: 'Pending Review', cls: 'bg-amber-500/15 text-amber-400 border border-amber-500/30'   },
@@ -267,19 +257,23 @@ function LeaveInner() {
 
   const load = useCallback(async () => {
     if (!user) return
-    const year = new Date().getFullYear()
-    const [bal, reqs, hols, s] = await Promise.all([
-      getLeaveBalance(user.id, year),
-      getMyLeaves(user.id, year),
-      getHolidays(),
-      getSettings(),
-    ])
-    setBalance(bal); setRequests(reqs); setHolidays(hols)
-    setQuotas({
-      leave_sick_quota:    parseInt(s.leave_sick_quota    || '10'),
-      leave_casual_quota:  parseInt(s.leave_casual_quota  || '12'),
-      leave_planned_quota: parseInt(s.leave_planned_quota || '5'),
-    })
+    try {
+      const year = new Date().getFullYear()
+      const [bal, reqs, hols, s] = await Promise.all([
+        getLeaveBalance(user.id, year),
+        getMyLeaves(user.id, year),
+        getHolidays(),
+        getSettings(),
+      ])
+      setBalance(bal); setRequests(reqs); setHolidays(hols)
+      setQuotas({
+        leave_sick_quota:    parseInt(s.leave_sick_quota    || '10'),
+        leave_casual_quota:  parseInt(s.leave_casual_quota  || '12'),
+        leave_planned_quota: parseInt(s.leave_planned_quota || '5'),
+      })
+    } catch (e) {
+      toast(`Could not load leaves: ${e.message}`, 'error')
+    }
   }, [user])
 
   useEffect(() => { load() }, [load])

@@ -549,8 +549,9 @@ export async function getLeaveBalance(userId, year) {
 }
 
 export async function getAllLeaveRequests(status = null) {
+  // Use "!user_id" hint to resolve ambiguity — both user_id and reviewed_by point to profiles
   let q = supabase.from('leave_requests')
-    .select('*,profiles(full_name,employee_id,department,email)')
+    .select('*, profiles:user_id(full_name,employee_id,department,email)')
     .order('created_at', { ascending: false })
   if (status) q = q.eq('status', status)
   const { data, error } = await q
@@ -618,8 +619,9 @@ export async function getMyCorrections(userId) {
 }
 
 export async function getAllCorrections(status = null) {
+  // Use "!user_id" hint — both user_id and reviewed_by reference profiles
   let q = supabase.from('correction_requests')
-    .select('*,profiles(full_name,employee_id,department)')
+    .select('*, profiles:user_id(full_name,employee_id,department)')
     .order('created_at', { ascending: false })
   if (status) q = q.eq('status', status)
   const { data, error } = await q
