@@ -6,7 +6,7 @@ import { applyLeave, getMyLeaves, getLeaveBalance, getSettings, getHolidays } fr
 import { LEAVE_TYPES, LEAVE_COLORS } from '../lib/leaveConstants'
 import { useStore } from '../lib/store'
 import Sidebar from '../components/Sidebar'
-import { Page, Card, Button } from '../components/ui'
+import { Page, Card, Button, Select } from '../components/ui'
 import { ToastProvider, useToast } from '../components/ui'
 
 // Re-export for any imports that still reference this file
@@ -40,7 +40,7 @@ function calcWorkDays(start, end, holidays = []) {
 }
 
 function BalanceCard({ type, used, quota }) {
-  const c = LEAVE_COLORS[type.color]
+  const c = LEAVE_COLORS[type.value]
   const remain = quota ? Math.max(0, quota - used) : null
   const pct    = quota ? Math.round((used / quota) * 100) : 0
   return (
@@ -125,7 +125,7 @@ function ApplyModal({ user, holidays, quotas, onClose, onSuccess }) {
             <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2.5 block">Leave Type</label>
             <div className="grid grid-cols-2 gap-2">
               {LEAVE_TYPES.map(t => {
-                const tc  = LEAVE_COLORS[t.color]
+                const tc  = LEAVE_COLORS[t.value]
                 const sel = type === t.value
                 const quota = t.quotaKey ? parseInt(quotas[t.quotaKey] || '0') : null
                 const used  = 0 // simplified — full balance shown in main page
@@ -174,11 +174,14 @@ function ApplyModal({ user, holidays, quotas, onClose, onSuccess }) {
             <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
               <FileText size={11} /> Use a Template <span className="text-gray-600 font-normal normal-case">(optional — auto-fills your name)</span>
             </label>
-            <select value={tmplIdx} onChange={e => pickTemplate(e.target.value)}
-              className="input-base py-2.5 text-sm">
-              <option value="">— Write your own message below —</option>
-              {TEMPLATES.map((t, i) => <option key={i} value={i}>{t.name}</option>)}
-            </select>
+            <Select
+              value={tmplIdx}
+              onChange={v => pickTemplate(v)}
+              options={[
+                { value: '', label: '— Write your own message below —' },
+                ...TEMPLATES.map((t, i) => ({ value: String(i), label: t.name }))
+              ]}
+            />
           </div>
 
           {/* Reason textarea */}
@@ -204,7 +207,7 @@ function ApplyModal({ user, holidays, quotas, onClose, onSuccess }) {
 
 function RequestCard({ req }) {
   const type = LEAVE_TYPES.find(t => t.value === req.type) || LEAVE_TYPES[0]
-  const c    = LEAVE_COLORS[type.color]
+  const c    = LEAVE_COLORS[type.value]
   const st   = STATUS_CONFIG[req.status] || STATUS_CONFIG.pending
   const start = format(parseISO(req.start_date), 'd MMM')
   const end   = format(parseISO(req.end_date),   'd MMM yyyy')

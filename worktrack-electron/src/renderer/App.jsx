@@ -1,4 +1,24 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, Component } from 'react'
+
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(e) { return { error: e } }
+  render() {
+    if (this.state.error) return (
+      <div className="h-screen flex flex-col items-center justify-center p-8 bg-surface-900">
+        <p className="text-red-400 text-xl font-bold mb-4">Render Error</p>
+        <pre className="text-red-300 text-xs bg-red-500/10 border border-red-500/20 rounded-xl p-4 max-w-2xl overflow-auto whitespace-pre-wrap">
+          {this.state.error?.message}{'\n\n'}{this.state.error?.stack}
+        </pre>
+        <button onClick={() => this.setState({ error: null })}
+          className="mt-4 px-4 py-2 bg-accent-500 text-white rounded-xl text-sm">
+          Try Again
+        </button>
+      </div>
+    )
+    return this.props.children
+  }
+}
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { useStore } from './lib/store'
@@ -50,7 +70,7 @@ export default function App() {
 
           {/* Employee */}
           <Route path="/dashboard"   element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-          <Route path="/leaves"      element={<PrivateRoute><Leave /></PrivateRoute>} />
+          <Route path="/leaves"      element={<PrivateRoute><ErrorBoundary><Leave /></ErrorBoundary></PrivateRoute>} />
           <Route path="/corrections" element={<PrivateRoute><Corrections /></PrivateRoute>} />
           <Route path="/settings"    element={<PrivateRoute><EmployeeSettings /></PrivateRoute>} />
 
@@ -59,7 +79,7 @@ export default function App() {
             <Route index element={<Overview />} />
             <Route path="attendance"   element={<Attendance />} />
             <Route path="employees"    element={<Employees />} />
-            <Route path="leaves"       element={<LeaveRequests />} />
+            <Route path="leaves"       element={<ErrorBoundary><LeaveRequests /></ErrorBoundary>} />
             <Route path="corrections"  element={<AdminCorrections />} />
             <Route path="reports"      element={<Reports />} />
             <Route path="map"          element={<MapView />} />

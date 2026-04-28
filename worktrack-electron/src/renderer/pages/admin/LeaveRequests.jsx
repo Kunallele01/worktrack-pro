@@ -19,7 +19,7 @@ function ReviewModal({ req, onClose, onDone }) {
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const type = LEAVE_TYPES.find(t => t.value === req.type) || LEAVE_TYPES[0]
-  const c    = LEAVE_COLORS[type.color]
+  const c    = LEAVE_COLORS[type.value]
 
   const handle = async (approved) => {
     setBusy(true)
@@ -81,7 +81,7 @@ function ReviewModal({ req, onClose, onDone }) {
 
 function PendingCard({ req, onReview }) {
   const type  = LEAVE_TYPES.find(t => t.value === req.type) || LEAVE_TYPES[0]
-  const c     = LEAVE_COLORS[type.color]
+  const c     = LEAVE_COLORS[type.value]
   const start = format(parseISO(req.start_date), 'd MMM')
   const end   = format(parseISO(req.end_date),   'd MMM yyyy')
 
@@ -130,7 +130,7 @@ function PendingCard({ req, onReview }) {
 
 function HistoryCard({ req }) {
   const type     = LEAVE_TYPES.find(t => t.value === req.type) || LEAVE_TYPES[0]
-  const c        = LEAVE_COLORS[type.color]
+  const c        = LEAVE_COLORS[type.value]
   const approved = req.status === 'approved'
   return (
     <Card className="p-4 opacity-80">
