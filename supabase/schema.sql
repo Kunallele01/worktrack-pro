@@ -241,3 +241,66 @@ BEGIN
   RETURN 'ok';
 END;
 $$;
+
+-- ============================================================
+-- MIGRATION: Leave Management + Corrections + Grace Period
+-- Run this in Supabase SQL Editor
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.leave_requests (
+  id           BIGSERIAL    PRIMARY KEY,
+  user_id      UUID         NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  type         VARCHAR(20)  NOT NULL CHECK (type IN ('sick','casual','planned','emergency')),
+  start_date   DATE         NOT NULL,
+  end_date     DATE         NOT NULL,
+  days         INTEGER      NOT NULL,
+  reason       TEXT         NOT NULL,
+  status       VARCHAR(20)  DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+  admin_note   TEXT,
+  reviewed_by  UUID         REFERENCES public.profiles(id),
+  reviewed_at  TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ  DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.correction_requests (
+  id                 BIGSERIAL   PRIMARY KEY,
+  user_id            UUID        NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  date               DATE        NOT NULL,
+  type               VARCHAR(30) NOT NULL,
+  requested_checkin  TIMESTAMPTZ,
+  requested_checkout TIMESTAMPTZ,
+  requested_status   VARCHAR(20),
+  reason             TEXT        NOT NULL,
+  status             VARCHAR(20) DEFAULT 'pending',
+  admin_note         TEXT,
+  reviewed_by        UUID        REFERENCES public.profiles(id),
+  reviewed_at        TIMESTAMPTZ,
+  created_at         TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.leave_requests      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.correction_requests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "leave_select"      ON public.leave_requests;
+DROP POLICY IF EXISTS "leave_insert"      ON public.leave_requests;
+DROP POLICY IF EXISTS "leave_update"      ON public.leave_requests;
+DROP POLICY IF EXISTS "corr_select"       ON public.correction_requests;
+DROP POLICY IF EXISTS "corr_insert"       ON public.correction_requests;
+DROP POLICY IF EXISTS "corr_update"       ON public.correction_requests;
+
+CREATE POLICY "leave_select" ON public.leave_requests FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
+CREATE POLICY "leave_insert" ON public.leave_requests FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "leave_update" ON public.leave_requests FOR UPDATE USING (public.is_admin());
+
+CREATE POLICY "corr_select" ON public.correction_requests FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
+CREATE POLICY "corr_insert" ON public.correction_requests FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "corr_update" ON public.correction_requests FOR UPDATE USING (public.is_admin());
+
+INSERT INTO public.app_settings (key, value) VALUES
+  ('grace_period_minutes', '10'),
+  ('reminder_enabled',     'false'),
+  ('reminder_time',        '10:30'),
+  ('leave_sick_quota',     '10'),
+  ('leave_casual_quota',   '12'),
+  ('leave_planned_quota',  '5')
+ON CONFLICT (key) DO NOTHING;

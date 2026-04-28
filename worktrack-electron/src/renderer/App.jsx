@@ -6,10 +6,14 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import Dashboard from './pages/Dashboard'
+import Leave from './pages/Leave'
+import Corrections from './pages/Corrections'
 import AdminLayout from './pages/admin/AdminLayout'
 import Overview from './pages/admin/Overview'
 import Attendance from './pages/admin/Attendance'
 import Employees from './pages/admin/Employees'
+import LeaveRequests from './pages/admin/LeaveRequests'
+import AdminCorrections from './pages/admin/AdminCorrections'
 import Reports from './pages/admin/Reports'
 import MapView from './pages/admin/MapView'
 import AdminSettings from './pages/admin/Settings'
@@ -30,7 +34,6 @@ function AdminRoute({ children }) {
 
 export default function App() {
   const theme    = useStore(s => s.theme)
-  const setTheme = useStore(s => s.setTheme)
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -46,17 +49,21 @@ export default function App() {
           <Route path="/forgot"   element={<ForgotPassword />} />
 
           {/* Employee */}
-          <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-          <Route path="/settings"  element={<PrivateRoute><EmployeeSettings /></PrivateRoute>} />
+          <Route path="/dashboard"   element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="/leaves"      element={<PrivateRoute><Leave /></PrivateRoute>} />
+          <Route path="/corrections" element={<PrivateRoute><Corrections /></PrivateRoute>} />
+          <Route path="/settings"    element={<PrivateRoute><EmployeeSettings /></PrivateRoute>} />
 
           {/* Admin */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
             <Route index element={<Overview />} />
-            <Route path="attendance" element={<Attendance />} />
-            <Route path="employees"  element={<Employees />} />
-            <Route path="reports"    element={<Reports />} />
-            <Route path="map"        element={<MapView />} />
-            <Route path="settings"   element={<AdminSettings />} />
+            <Route path="attendance"   element={<Attendance />} />
+            <Route path="employees"    element={<Employees />} />
+            <Route path="leaves"       element={<LeaveRequests />} />
+            <Route path="corrections"  element={<AdminCorrections />} />
+            <Route path="reports"      element={<Reports />} />
+            <Route path="map"          element={<MapView />} />
+            <Route path="settings"     element={<AdminSettings />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

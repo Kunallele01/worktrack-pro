@@ -1,22 +1,26 @@
 import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { LayoutDashboard, Settings, BarChart3, Users, Calendar, Map, LogOut, Zap, Sun, Moon } from 'lucide-react'
+import { LayoutDashboard, Settings, BarChart3, Users, Calendar, Map, LogOut, Zap, Sun, Moon, CalendarCheck, ClipboardList } from 'lucide-react'
 import { signOut } from '../lib/supabase'
 import { useStore } from '../lib/store'
 import { Avatar } from './ui'
 
 const EMP_NAV  = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/settings',  label: 'Settings',  icon: Settings },
+  { to: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
+  { to: '/leaves',      label: 'My Leaves',   icon: CalendarCheck },
+  { to: '/corrections', label: 'Corrections', icon: ClipboardList },
+  { to: '/settings',    label: 'Settings',    icon: Settings },
 ]
 const ADMIN_NAV = [
-  { to: '/admin',             label: 'Overview',   icon: LayoutDashboard },
-  { to: '/admin/attendance',  label: 'Attendance', icon: Calendar },
-  { to: '/admin/employees',   label: 'Employees',  icon: Users },
-  { to: '/admin/reports',     label: 'Reports',    icon: BarChart3 },
-  { to: '/admin/map',         label: 'Map',        icon: Map },
-  { to: '/admin/settings',    label: 'Settings',   icon: Settings },
+  { to: '/admin',              label: 'Overview',     icon: LayoutDashboard },
+  { to: '/admin/attendance',   label: 'Attendance',   icon: Calendar },
+  { to: '/admin/employees',    label: 'Employees',    icon: Users },
+  { to: '/admin/leaves',       label: 'Leave Requests', icon: CalendarCheck },
+  { to: '/admin/corrections',  label: 'Corrections',  icon: ClipboardList },
+  { to: '/admin/reports',      label: 'Reports',      icon: BarChart3 },
+  { to: '/admin/map',          label: 'Map',          icon: Map },
+  { to: '/admin/settings',     label: 'Settings',     icon: Settings },
 ]
 
 export default function Sidebar() {

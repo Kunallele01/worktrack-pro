@@ -79,9 +79,65 @@ export default function AdminSettings() {
             placeholder="OfficeWiFi&#10;OfficeWiFi_5G"
             className="input-base resize-none font-mono text-xs" />
         </div>
-        <Button onClick={save(['office_latitude','office_longitude','office_radius_m','office_start_time','company_name','office_wifi_ssid'])}
+        {/* Grace Period */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+            Grace Period — {s.grace_period_minutes || 10} minutes after office start before marking Late
+          </label>
+          <input type="range" min="0" max="30" step="5"
+            value={s.grace_period_minutes || 10}
+            onChange={set('grace_period_minutes')}
+            className="w-full" />
+          <p className="text-xs text-gray-500">0 = strict (9:31 is late) · 10 = relaxed (9:40 is fine) · 30 = very relaxed</p>
+        </div>
+
+        <Button onClick={save(['office_latitude','office_longitude','office_radius_m','office_start_time','grace_period_minutes','company_name','office_wifi_ssid'])}
           loading={saving.office_latitude} className="w-fit text-sm">
           Save Office Settings
+        </Button>
+      </Section>
+
+      <Section title="Leave Quotas (Days per Year)">
+        <div className="grid grid-cols-3 gap-4">
+          <Input label="Sick Leave (SL)" type="number" min="0" max="365"
+            value={s.leave_sick_quota || '10'} onChange={set('leave_sick_quota')} placeholder="10" />
+          <Input label="Casual Leave (CL)" type="number" min="0" max="365"
+            value={s.leave_casual_quota || '12'} onChange={set('leave_casual_quota')} placeholder="12" />
+          <Input label="Planned Leave (PL)" type="number" min="0" max="365"
+            value={s.leave_planned_quota || '5'} onChange={set('leave_planned_quota')} placeholder="5" />
+        </div>
+        <p className="text-xs text-gray-500">Emergency leave has no fixed limit. These quotas are shown to employees on their My Leaves page.</p>
+        <Button onClick={save(['leave_sick_quota','leave_casual_quota','leave_planned_quota'])}
+          loading={saving.leave_sick_quota} className="w-fit text-sm">
+          Save Leave Quotas
+        </Button>
+      </Section>
+
+      <Section title="Check-in Reminders">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-gray-200">Auto-remind employees who haven't checked in</p>
+            <p className="text-xs text-gray-500 mt-0.5">Sends a reminder email at the configured time. Requires SMTP to be set up.</p>
+          </div>
+          <button
+            onClick={() => setS(p => ({ ...p, reminder_enabled: p.reminder_enabled === 'true' ? 'false' : 'true' }))}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+              ${s.reminder_enabled === 'true' ? 'bg-accent-500' : 'bg-gray-600'}`}>
+            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200
+              ${s.reminder_enabled === 'true' ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+        {s.reminder_enabled === 'true' && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Reminder Time (IST)</label>
+            <input type="time" value={s.reminder_time || '10:30'} onChange={set('reminder_time')}
+              className="input-base py-2.5 text-sm w-40" />
+            <p className="text-xs text-gray-500">Reminder fires once per day when the admin app is open past this time.</p>
+          </div>
+        )}
+        <Button onClick={save(['reminder_enabled','reminder_time'])}
+          loading={saving.reminder_enabled} className="w-fit text-sm">
+          Save Reminder Settings
         </Button>
       </Section>
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle, ArrowRightFromLine, Users, Home, Clock, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
-import { getTodayAttendance, getMonthSummary, getMonthHistory, checkIn, checkOut, getSettings, getHolidays } from '../lib/supabase'
+import { getTodayAttendance, getMonthSummary, getMonthHistory, checkIn, checkOut, getSettings, getHolidays, getMyLeaves } from '../lib/supabase'
 import { useStore } from '../lib/store'
 import Sidebar from '../components/Sidebar'
 import { Page, GpsWidget, StatCard, CalendarWidget, Button, Badge, Card } from '../components/ui'
@@ -55,18 +55,20 @@ function DashboardInner() {
   const [summary,  setSummary ] = useState({})
   const [history,  setHistory ] = useState([])
   const [holidays, setHolidays] = useState([])
+  const [leaves,   setLeaves  ] = useState([])
   const [checking, setChecking] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!user) return
     const now = new Date()
-    const [t, s, h, hols] = await Promise.all([
+    const [t, s, h, hols, leavs] = await Promise.all([
       getTodayAttendance(user.id),
       getMonthSummary(user.id, now.getFullYear(), now.getMonth() + 1),
       getMonthHistory(user.id, now.getFullYear(), now.getMonth() + 1),
       getHolidays(),
+      getMyLeaves(user.id, now.getFullYear()),
     ])
-    setToday(t); setSummary(s); setHistory(h); setHolidays(hols)
+    setToday(t); setSummary(s); setHistory(h); setHolidays(hols); setLeaves(leavs)
   }, [user])
 
   useEffect(() => { loadData() }, [loadData])
@@ -122,7 +124,7 @@ function DashboardInner() {
 
           <Card className="p-4">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">This Month</p>
-            <CalendarWidget attendance={history} holidays={holidays} />
+            <CalendarWidget attendance={history} holidays={holidays} leaves={leaves} />
           </Card>
         </div>
 

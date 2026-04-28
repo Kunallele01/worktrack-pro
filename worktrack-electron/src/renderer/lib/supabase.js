@@ -123,20 +123,27 @@ export async function updateUser(userId, fields) {
 // ── Settings ─────────────────────────────────────────────────────────────── //
 
 const DEFAULTS = {
-  office_latitude:  '18.460204818819722',
-  office_longitude: '73.79893806749008',
-  office_radius_m:  '200',
-  office_start_time:'09:30',
-  office_wifi_ssid: '',
-  admin_email:      '',
-  wfh_notify_emails:'',
-  app_name:         'WorkTrack Pro',
-  company_name:     'Your Company',
-  smtp_host:        '',
-  smtp_port:        '587',
-  smtp_username:    '',
-  smtp_password:    '',
-  smtp_from_name:   'WorkTrack Pro',
+  office_latitude:     '18.460204818819722',
+  office_longitude:    '73.79893806749008',
+  office_radius_m:     '200',
+  office_start_time:   '09:30',
+  office_wifi_ssid:    '',
+  admin_email:         '',
+  wfh_notify_emails:   '',
+  app_name:            'WorkTrack Pro',
+  company_name:        'Your Company',
+  smtp_host:           '',
+  smtp_port:           '587',
+  smtp_username:       '',
+  smtp_password:       '',
+  smtp_from_name:      'WorkTrack Pro',
+  grace_period_minutes:'10',
+  reminder_enabled:    'false',
+  reminder_time:       '10:30',
+  leave_sick_quota:    '10',
+  leave_casual_quota:  '12',
+  leave_planned_quota: '5',
+  company_holidays:    '[]',
 }
 
 let settingsCache = null
@@ -195,8 +202,9 @@ export async function checkIn(userId, latitude, longitude, accuracy) {
   }).formatToParts(new Date())
   const nowH      = parseInt(istParts.find(p => p.type === 'hour').value,   10)
   const nowM      = parseInt(istParts.find(p => p.type === 'minute').value, 10)
-  const [sh, sm]  = (settings.office_start_time || '09:30').split(':').map(Number)
-  const is_late   = (nowH * 60 + nowM) > (sh * 60 + sm)
+  const [sh, sm]   = (settings.office_start_time || '09:30').split(':').map(Number)
+  const graceMins  = parseInt(settings.grace_period_minutes || '10', 10)
+  const is_late    = (nowH * 60 + nowM) > (sh * 60 + sm + graceMins)
 
   const row = {
     user_id:      userId,
@@ -510,4 +518,177 @@ export async function deleteUser(userId, sendNotificationEmail = true) {
   if (result === 'error:not_admin')  throw new Error('Permission denied.')
   if (result !== 'ok') throw new Error(`Delete failed: ${result}`)
   return true
+}
+
+// ── Leave Management ──────────────────────────────────────────────────────── //
+
+export async function applyLeave(userId, { type, startDate, endDate, days, reason }) {
+  const { data, error } = await supabase.from('leave_requests').insert({
+    user_id: userId, type, start_date: startDate, end_date: endDate, days, reason,
+  }).select().single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export async function getMyLeaves(userId, year) {
+  const { data, error } = await supabase.from('leave_requests')
+    .select('*').eq('user_id', userId)
+    .gte('start_date', `${year}-01-01`).lte('start_date', `${year}-12-31`)
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function getLeaveBalance(userId, year) {
+  const { data } = await supabase.from('leave_requests')
+    .select('type,days').eq('user_id', userId).eq('status', 'approved')
+    .gte('start_date', `${year}-01-01`).lte('start_date', `${year}-12-31`)
+  const used = { sick: 0, casual: 0, planned: 0, emergency: 0 }
+  for (const r of (data || [])) used[r.type] = (used[r.type] || 0) + r.days
+  return used
+}
+
+export async function getAllLeaveRequests(status = null) {
+  let q = supabase.from('leave_requests')
+    .select('*,profiles(full_name,employee_id,department,email)')
+    .order('created_at', { ascending: false })
+  if (status) q = q.eq('status', status)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function reviewLeave(leaveId, reviewerId, approved, adminNote = '') {
+  const { data, error } = await supabase.from('leave_requests').update({
+    status:      approved ? 'approved' : 'rejected',
+    admin_note:  adminNote,
+    reviewed_by: reviewerId,
+    reviewed_at: new Date().toISOString(),
+  }).eq('id', leaveId).select().single()
+  if (error) throw new Error(error.message)
+
+  // Email the employee about the decision
+  if (data?.profiles?.email) {
+    const s    = await getSettings()
+    const host = s.smtp_host?.trim()
+    const user = s.smtp_username?.trim()
+    const pass = s.smtp_password?.trim()
+    if (host && user && pass) {
+      const statusWord = approved ? 'Approved ✓' : 'Rejected ✕'
+      const color      = approved ? '#10B981' : '#EF4444'
+      window.api?.sendEmail({
+        host, port: s.smtp_port || '587', user, pass,
+        fromName: s.smtp_from_name || 'WorkTrack Pro',
+        to: [data.profiles.email],
+        subject: `Leave Request ${statusWord} — WorkTrack Pro`,
+        html: `<div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;">
+          <div style="background:#1e293b;padding:20px 24px;border-radius:10px 10px 0 0;">
+            <h2 style="color:#fff;margin:0;">WorkTrack Pro — Leave ${statusWord}</h2>
+          </div>
+          <div style="background:#f8fafc;padding:20px 24px;border:1px solid #e2e8f0;border-radius:0 0 10px 10px;">
+            <p style="color:#334155;">Your leave request (${data.type} · ${data.days} day${data.days !== 1 ? 's' : ''}) has been <strong style="color:${color}">${approved ? 'approved' : 'rejected'}</strong>.</p>
+            ${adminNote ? `<p style="color:#64748b;font-style:italic;">"${adminNote}"</p>` : ''}
+          </div>
+        </div>`,
+      }).catch(() => {})
+    }
+  }
+  return data
+}
+
+// ── Correction Requests ───────────────────────────────────────────────────── //
+
+export async function submitCorrection(userId, { date, type, requestedCheckin, requestedCheckout, requestedStatus, reason }) {
+  const { data, error } = await supabase.from('correction_requests').insert({
+    user_id: userId, date, type,
+    requested_checkin:  requestedCheckin  || null,
+    requested_checkout: requestedCheckout || null,
+    requested_status:   requestedStatus   || null,
+    reason,
+  }).select().single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export async function getMyCorrections(userId) {
+  const { data, error } = await supabase.from('correction_requests')
+    .select('*').eq('user_id', userId).order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function getAllCorrections(status = null) {
+  let q = supabase.from('correction_requests')
+    .select('*,profiles(full_name,employee_id,department)')
+    .order('created_at', { ascending: false })
+  if (status) q = q.eq('status', status)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function reviewCorrection(corrId, reviewerId, approved, adminNote = '') {
+  const { data: corr } = await supabase.from('correction_requests')
+    .select('*').eq('id', corrId).single()
+
+  if (approved && corr) {
+    const updates = {}
+    if (corr.requested_checkin)  updates.check_in_time  = corr.requested_checkin
+    if (corr.requested_checkout) updates.check_out_time = corr.requested_checkout
+    if (corr.requested_status)   updates.status         = corr.requested_status
+    if (Object.keys(updates).length > 0) {
+      await supabase.from('attendance').upsert({
+        user_id: corr.user_id, date: corr.date, ...updates,
+      })
+    }
+  }
+
+  const { data, error } = await supabase.from('correction_requests').update({
+    status:      approved ? 'approved' : 'rejected',
+    admin_note:  adminNote,
+    reviewed_by: reviewerId,
+    reviewed_at: new Date().toISOString(),
+  }).eq('id', corrId).select().single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
+// ── Reminder emails ───────────────────────────────────────────────────────── //
+
+export async function sendCheckInReminders() {
+  const today    = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Kolkata' })
+  const settings = await getSettings()
+  const host     = settings.smtp_host?.trim()
+  const user     = settings.smtp_username?.trim()
+  const pass     = settings.smtp_password?.trim()
+  if (!host || !user || !pass) return 0
+
+  const { data: allEmps } = await supabase.from('profiles')
+    .select('id,full_name,email').eq('is_active', true).eq('is_admin', false)
+  const { data: checkins } = await supabase.from('attendance')
+    .select('user_id').eq('date', today).not('check_in_time', 'is', null)
+
+  const checkedIds = new Set((checkins || []).map(r => r.user_id))
+  const missing    = (allEmps || []).filter(e => !checkedIds.has(e.id) && e.email)
+  if (!missing.length) return 0
+
+  await Promise.allSettled(missing.map(emp =>
+    window.api?.sendEmail({
+      host, port: settings.smtp_port || '587', user, pass,
+      fromName: settings.smtp_from_name || 'WorkTrack Pro',
+      to: [emp.email],
+      subject: `Reminder: Don't forget to check in — WorkTrack Pro`,
+      html: `<div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;">
+        <div style="background:#1e293b;padding:20px 24px;border-radius:10px 10px 0 0;">
+          <h2 style="color:#fff;margin:0;">WorkTrack Pro — Check-in Reminder</h2>
+        </div>
+        <div style="background:#f8fafc;padding:20px 24px;border:1px solid #e2e8f0;border-radius:0 0 10px 10px;">
+          <p style="color:#334155;">Hi <strong>${emp.full_name}</strong>,</p>
+          <p style="color:#475569;">It looks like you haven't checked in yet today. Open WorkTrack Pro and mark your attendance!</p>
+          <p style="color:#94a3b8;font-size:12px;">If you are on leave today, please ignore this message.</p>
+        </div>
+      </div>`,
+    })
+  ))
+  return missing.length
 }

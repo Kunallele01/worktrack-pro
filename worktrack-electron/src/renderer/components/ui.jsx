@@ -419,10 +419,29 @@ const STATUS_COLORS = {
   auto_checkout:'bg-gray-500/50 text-gray-300',
 }
 
-export function CalendarWidget({ attendance = [], holidays = [] }) {
+const LEAVE_CELL_COLORS = {
+  sick:      'bg-rose-500/80 text-white',
+  casual:    'bg-amber-500/80 text-white',
+  planned:   'bg-teal-500/80 text-white',
+  emergency: 'bg-orange-500/80 text-white',
+}
+
+export function CalendarWidget({ attendance = [], holidays = [], leaves = [] }) {
   const today   = new Date()
   const [year, setYear]   = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
+
+  // Build leave date map: date → type
+  const leaveMap = {}
+  for (const l of leaves) {
+    if (l.status !== 'approved') continue
+    const cur = new Date(l.start_date + 'T12:00:00')
+    const end = new Date(l.end_date   + 'T12:00:00')
+    while (cur <= end) {
+      leaveMap[cur.toLocaleDateString('sv-SE')] = l.type
+      cur.setDate(cur.getDate() + 1)
+    }
+  }
   const [tooltip, setTooltip] = useState(null) // { date, name }
 
   const byDate   = {}
@@ -457,12 +476,26 @@ export function CalendarWidget({ attendance = [], holidays = [] }) {
           if (!day) return <div key={i} />
           const dateStr   = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
           const status    = byDate[dateStr]
-          const isHoliday = !!holidayMap[dateStr]
-          const isToday   = day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
-          const isWeekend = (i % 7) >= 5
-          const isFuture  = new Date(year, month, day) > today
+          const isHoliday  = !!holidayMap[dateStr]
+          const leaveType  = leaveMap[dateStr]
+          const isToday    = day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
+          const isWeekend  = (i % 7) >= 5
+          const isFuture   = new Date(year, month, day) > today
+          const todayRing  = isToday ? 'ring-2 ring-accent-500 ring-offset-1 ring-offset-surface-800' : ''
 
-          // Holiday overrides all other states (they're not absent on holidays)
+          // Approved leave — show with leave-type color
+          if (leaveType && !isHoliday) {
+            return (
+              <div key={i}
+                className={`relative flex flex-col items-center justify-center w-full aspect-square rounded-lg text-xs font-medium cursor-default
+                  ${LEAVE_CELL_COLORS[leaveType] || 'bg-teal-500/80 text-white'} ${todayRing}`}>
+                <span>{day}</span>
+                <span style={{ fontSize: 7 }}>🏖</span>
+              </div>
+            )
+          }
+
+          // Holiday overrides remaining states
           if (isHoliday) {
             return (
               <div
@@ -511,6 +544,8 @@ export function CalendarWidget({ attendance = [], holidays = [] }) {
           ['bg-blue-500/80','WFH'],
           ['bg-amber-500/80','Late'],
           ['bg-red-500/80','Absent'],
+          ['bg-rose-500/80','Sick Leave'],
+          ['bg-teal-500/80','Planned Leave'],
           ['bg-violet-500/50','Holiday'],
         ].map(([bg,label]) => (
           <div key={label} className="flex items-center gap-1.5">
