@@ -188,11 +188,15 @@ export async function checkIn(userId, latitude, longitude, accuracy) {
 
   const status = (gpsHit || wifiHit) ? 'in_office' : 'wfh'
 
-  // is_late check
-  const nowIST   = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
-  const [sh, sm] = (settings.office_start_time || '09:30').split(':').map(Number)
-  const cutoff   = new Date(nowIST); cutoff.setHours(sh, sm, 0, 0)
-  const is_late  = nowIST > cutoff
+  // is_late check — compare as pure integers to avoid all timezone parsing bugs.
+  // Intl.DateTimeFormat gives the true IST H and M regardless of system timezone.
+  const istParts  = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date())
+  const nowH      = parseInt(istParts.find(p => p.type === 'hour').value,   10)
+  const nowM      = parseInt(istParts.find(p => p.type === 'minute').value, 10)
+  const [sh, sm]  = (settings.office_start_time || '09:30').split(':').map(Number)
+  const is_late   = (nowH * 60 + nowM) > (sh * 60 + sm)
 
   const row = {
     user_id:      userId,
@@ -200,9 +204,14 @@ export async function checkIn(userId, latitude, longitude, accuracy) {
     check_in_time: new Date().toISOString(),
     status,
     is_late,
-    latitude:   (wifiHit && accuracy < 0) ? offLat : latitude,
-    longitude:  (wifiHit && accuracy < 0) ? offLon : longitude,
-    accuracy_m: (wifiHit && accuracy < 0) ? 50 : accuracy,
+    // WiFi office hit → store office coords (person IS at office)
+    // WiFi non-office → store their IP coords (city-level, at least shows on map)
+    // Normal GPS/IP → store as-is
+    latitude:   (wifiHit && accuracy < 0) ? offLat
+              : (accuracy < 0 && latitude  === 0) ? null : latitude,
+    longitude:  (wifiHit && accuracy < 0) ? offLon
+              : (accuracy < 0 && longitude === 0) ? null : longitude,
+    accuracy_m: accuracy < 0 ? 200000 : accuracy,
   }
 
   const { data, error } = await supabase.from('attendance').upsert(row).select().single()
@@ -492,8 +501,13 @@ export async function deleteUser(userId, sendNotificationEmail = true) {
     }
   }
 
-  // Delete the profile (cascades to attendance records)
-  const { error } = await supabase.from('profiles').delete().eq('id', userId)
+  // Delete from auth.users completely (cascades to profiles + attendance).
+  // This also frees the email so the person can re-register with a clean slate.
+  // Requires the delete_user_completely() SQL function in Supabase.
+  const { data: result, error } = await supabase.rpc('delete_user_completely', { p_user_id: userId })
   if (error) throw new Error(`Could not delete user: ${error.message}`)
+  if (result === 'error:last_admin') throw new Error('Cannot delete the last admin account. Promote another admin first.')
+  if (result === 'error:not_admin')  throw new Error('Permission denied.')
+  if (result !== 'ok') throw new Error(`Delete failed: ${result}`)
   return true
 }

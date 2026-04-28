@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle, ArrowRightFromLine, Users, Home, Clock, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
-import { getTodayAttendance, getMonthSummary, getMonthHistory, checkIn, checkOut, getSettings } from '../lib/supabase'
+import { getTodayAttendance, getMonthSummary, getMonthHistory, checkIn, checkOut, getSettings, getHolidays } from '../lib/supabase'
 import { useStore } from '../lib/store'
 import Sidebar from '../components/Sidebar'
 import { Page, GpsWidget, StatCard, CalendarWidget, Button, Badge, Card } from '../components/ui'
@@ -16,9 +16,9 @@ function LiveClock() {
   const s = String(now.getSeconds()).padStart(2,'0')
   return (
     <div className="text-center py-6">
-      <div className="font-mono font-bold text-gray-50 leading-none tabular-nums" style={{ fontSize: 56, letterSpacing: '-3px' }}>
-        {h}<span className="text-gray-600 mx-1 animate-pulse">:</span>{m}
-        <span className="font-mono font-light text-gray-600 ml-2" style={{ fontSize: 28 }}>:{s}</span>
+      <div className="font-mono font-bold text-gray-100 leading-none tabular-nums" style={{ fontSize: 56, letterSpacing: '-3px' }}>
+        {h}<span className="text-gray-400 mx-1 animate-pulse">:</span>{m}
+        <span className="font-mono font-light text-gray-400 ml-2" style={{ fontSize: 28 }}>:{s}</span>
       </div>
       <p className="text-gray-400 text-sm mt-2">{format(now, 'EEEE, d MMMM yyyy')}</p>
     </div>
@@ -51,20 +51,22 @@ function DashboardInner() {
   const gpsStatus   = useStore(s => s.gpsStatus)
   const setGps   = useStore(s => s.setGps)
 
-  const [today,   setToday  ] = useState(null)
-  const [summary, setSummary] = useState({})
-  const [history, setHistory] = useState([])
+  const [today,    setToday   ] = useState(null)
+  const [summary,  setSummary ] = useState({})
+  const [history,  setHistory ] = useState([])
+  const [holidays, setHolidays] = useState([])
   const [checking, setChecking] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!user) return
     const now = new Date()
-    const [t, s, h] = await Promise.all([
+    const [t, s, h, hols] = await Promise.all([
       getTodayAttendance(user.id),
       getMonthSummary(user.id, now.getFullYear(), now.getMonth() + 1),
       getMonthHistory(user.id, now.getFullYear(), now.getMonth() + 1),
+      getHolidays(),
     ])
-    setToday(t); setSummary(s); setHistory(h)
+    setToday(t); setSummary(s); setHistory(h); setHolidays(hols)
   }, [user])
 
   useEffect(() => { loadData() }, [loadData])
@@ -120,7 +122,7 @@ function DashboardInner() {
 
           <Card className="p-4">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">This Month</p>
-            <CalendarWidget attendance={history} />
+            <CalendarWidget attendance={history} holidays={holidays} />
           </Card>
         </div>
 

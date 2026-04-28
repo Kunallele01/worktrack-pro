@@ -1,7 +1,7 @@
 import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { LayoutDashboard, Settings, BarChart3, Users, Calendar, Map, LogOut, Zap } from 'lucide-react'
+import { LayoutDashboard, Settings, BarChart3, Users, Calendar, Map, LogOut, Zap, Sun, Moon } from 'lucide-react'
 import { signOut } from '../lib/supabase'
 import { useStore } from '../lib/store'
 import { Avatar } from './ui'
@@ -25,6 +25,8 @@ export default function Sidebar() {
   const isAdmin   = useStore(s => s.isAdmin)
   const clearUser = useStore(s => s.clearUser)
   const settings  = useStore(s => s.settings)
+  const theme     = useStore(s => s.theme)
+  const setTheme  = useStore(s => s.setTheme)
 
   const companyName = settings?.company_name || 'Your Company'
   const navItems    = isAdmin ? ADMIN_NAV : EMP_NAV
@@ -79,6 +81,21 @@ export default function Sidebar() {
             <p className="text-xs text-gray-500 truncate">{isAdmin ? 'Admin' : 'Employee'}</p>
           </div>
         </div>
+        {/* Theme toggle — accessible to everyone, admin and employee */}
+        <button
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-all mb-1"
+        >
+          <span className="flex items-center gap-2">
+            {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+          </span>
+          {/* Pill toggle */}
+          <div className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${theme === 'dark' ? 'bg-gray-600' : 'bg-accent-500'}`}>
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${theme === 'dark' ? 'translate-x-0.5' : 'translate-x-[22px]'}`} />
+          </div>
+        </button>
+
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-gray-500 hover:text-red-400 hover:bg-red-500/5 transition-all"

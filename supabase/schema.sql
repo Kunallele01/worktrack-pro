@@ -206,3 +206,38 @@ CREATE POLICY "Admins can delete profiles" ON public.profiles
 INSERT INTO public.app_settings (key, value)
 VALUES ('company_holidays', '[]')
 ON CONFLICT (key) DO NOTHING;
+
+-- ============================================================
+-- MIGRATION: Run this to enable proper user deletion
+-- (allows deleted accounts to re-register with the same email)
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.delete_user_completely(p_user_id UUID)
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+  v_is_admin    BOOLEAN;
+  v_admin_count INTEGER;
+BEGIN
+  IF NOT public.is_admin() THEN
+    RETURN 'error:not_admin';
+  END IF;
+
+  SELECT is_admin INTO v_is_admin FROM public.profiles WHERE id = p_user_id;
+
+  IF v_is_admin THEN
+    SELECT COUNT(*) INTO v_admin_count
+    FROM public.profiles WHERE is_admin = TRUE AND is_active = TRUE;
+    IF v_admin_count <= 1 THEN
+      RETURN 'error:last_admin';
+    END IF;
+  END IF;
+
+  -- Deleting from auth.users cascades to profiles and attendance
+  DELETE FROM auth.users WHERE id = p_user_id;
+
+  RETURN 'ok';
+END;
+$$;

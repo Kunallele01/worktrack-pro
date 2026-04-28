@@ -224,7 +224,8 @@ export function GpsWidget({ onReady }) {
       if (onReady) onReady(lat, lon, accuracy)
     }
 
-    // Stage 4: WiFi SSID fallback — office detection via network name
+    // Stage 4: WiFi SSID — detects network name for office matching.
+    // Also fetches IP coordinates so WFH users appear on the map (not 0,0).
     const tryWifiSSID = () => {
       const p = window.api?.getWifiSSID?.()
       if (!p) {
@@ -235,7 +236,18 @@ export function GpsWidget({ onReady }) {
       p.then(ssid => {
         if (ssid) {
           setWifi(ssid)
-          applyLocation(0, 0, -1)
+          // Still get IP-based coordinates so the person appears on the map.
+          // accuracy=-1 signals "WiFi detection mode" to checkIn().
+          fetch('https://ip-api.com/json/?fields=lat,lon,status')
+            .then(r => r.json())
+            .then(d => {
+              applyLocation(
+                d.status === 'success' ? d.lat : 0,
+                d.status === 'success' ? d.lon : 0,
+                -1,
+              )
+            })
+            .catch(() => applyLocation(0, 0, -1))
         } else {
           setStatus('error')
           setError('Location unavailable. Enable: Windows Settings → Privacy → Location → ON')
@@ -407,24 +419,29 @@ const STATUS_COLORS = {
   auto_checkout:'bg-gray-500/50 text-gray-300',
 }
 
-export function CalendarWidget({ attendance = [] }) {
+export function CalendarWidget({ attendance = [], holidays = [] }) {
   const today   = new Date()
   const [year, setYear]   = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
+  const [tooltip, setTooltip] = useState(null) // { date, name }
 
-  const byDate = {}
+  const byDate   = {}
   attendance.forEach(r => { byDate[r.date] = r.status })
 
-  const firstDay   = new Date(year, month, 1).getDay() || 7  // Mon = 1
+  // Build a holiday lookup: date string → holiday name
+  const holidayMap = {}
+  holidays.forEach(h => { holidayMap[h.date] = h.name })
+
+  const firstDay    = new Date(year, month, 1).getDay() || 7
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const blanks     = firstDay - 1
-  const cells      = [...Array(blanks).fill(null), ...Array(daysInMonth).fill(0).map((_,i) => i+1)]
+  const blanks      = firstDay - 1
+  const cells       = [...Array(blanks).fill(null), ...Array(daysInMonth).fill(0).map((_,i) => i+1)]
 
   const prev = () => { if (month === 0) { setYear(y=>y-1); setMonth(11) } else setMonth(m=>m-1) }
   const next = () => { if (month === 11) { setYear(y=>y+1); setMonth(0)  } else setMonth(m=>m+1) }
 
   return (
-    <div>
+    <div className="relative">
       <div className="flex items-center justify-between mb-3">
         <button onClick={prev} className="text-gray-400 hover:text-gray-200 p-1 rounded-lg hover:bg-white/5 transition">←</button>
         <p className="text-sm font-semibold text-gray-200">
@@ -438,11 +455,29 @@ export function CalendarWidget({ attendance = [] }) {
         ))}
         {cells.map((day, i) => {
           if (!day) return <div key={i} />
-          const dateStr  = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-          const status   = byDate[dateStr]
-          const isToday  = day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
+          const dateStr   = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+          const status    = byDate[dateStr]
+          const isHoliday = !!holidayMap[dateStr]
+          const isToday   = day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
           const isWeekend = (i % 7) >= 5
-          const isFuture = new Date(year, month, day) > today
+          const isFuture  = new Date(year, month, day) > today
+
+          // Holiday overrides all other states (they're not absent on holidays)
+          if (isHoliday) {
+            return (
+              <div
+                key={i}
+                className={`relative flex flex-col items-center justify-center w-full aspect-square rounded-lg text-xs font-medium cursor-default
+                  bg-violet-500/20 text-violet-400
+                  ${isToday ? 'ring-2 ring-accent-500 ring-offset-1 ring-offset-surface-800' : ''}`}
+                onMouseEnter={() => setTooltip({ date: dateStr, name: holidayMap[dateStr] })}
+                onMouseLeave={() => setTooltip(null)}
+              >
+                <span>{day}</span>
+                <span style={{ fontSize: 8 }}>🏖</span>
+              </div>
+            )
+          }
 
           return (
             <div
@@ -461,8 +496,23 @@ export function CalendarWidget({ attendance = [] }) {
           )
         })}
       </div>
+
+      {/* Holiday tooltip */}
+      {tooltip && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-surface-700 border border-white/10 rounded-xl px-3 py-2 shadow-xl z-10 whitespace-nowrap text-xs pointer-events-none">
+          <span className="text-violet-400 font-semibold">🏖 {tooltip.name}</span>
+          <span className="text-gray-500 ml-2">{tooltip.date}</span>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2 mt-3">
-        {[['bg-emerald-500/80','In Office'],['bg-blue-500/80','WFH'],['bg-amber-500/80','Late'],['bg-red-500/80','Absent']].map(([bg,label]) => (
+        {[
+          ['bg-emerald-500/80','In Office'],
+          ['bg-blue-500/80','WFH'],
+          ['bg-amber-500/80','Late'],
+          ['bg-red-500/80','Absent'],
+          ['bg-violet-500/50','Holiday'],
+        ].map(([bg,label]) => (
           <div key={label} className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${bg}`} />
             <span className="text-xs text-gray-500">{label}</span>

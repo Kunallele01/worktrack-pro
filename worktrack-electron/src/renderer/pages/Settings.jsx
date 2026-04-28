@@ -82,13 +82,13 @@ function SettingsInner() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-200">Dark Mode</p>
-              <p className="text-xs text-gray-500 mt-0.5">Switch between dark and light theme</p>
+              <p className="text-xs text-gray-500 mt-0.5">Also available via the toggle in the sidebar</p>
             </div>
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${theme === 'dark' ? 'bg-accent-500' : 'bg-gray-600'}`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${theme === 'dark' ? 'bg-accent-500' : 'bg-gray-300'}`}
             >
-              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${theme === 'dark' ? 'translate-x-7' : 'translate-x-1'}`} />
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${theme === 'dark' ? 'translate-x-5' : 'translate-x-0.5'}`} />
             </button>
           </div>
         </Section>

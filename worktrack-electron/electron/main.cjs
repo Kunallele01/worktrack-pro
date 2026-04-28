@@ -168,6 +168,7 @@ asyncio.run(go())
 // ── App lifecycle ─────────────────────────────────────────────────────────── //
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null)  // Remove File/Edit/View/Window/Help bar
   allowGeolocation()
   createWindow()
   app.on('activate', () => {
