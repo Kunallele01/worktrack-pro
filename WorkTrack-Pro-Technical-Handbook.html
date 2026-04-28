@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WorkTrack Pro — Technical Handbook</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --accent: #4F86F7;
+    --accent-light: #EFF6FF;
+    --surface: #F8FAFC;
+    --border: #E2E8F0;
+    --text: #0F172A;
+    --text-muted: #64748B;
+    --text-secondary: #334155;
+    --success: #059669;
+    --warning: #D97706;
+    --danger: #DC2626;
+    --code-bg: #0F172A;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.75;
+    color: var(--text);
+    background: #fff;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 64px 72px;
+  }
+
+  /* Cover */
+  .cover {
+    text-align: center;
+    padding: 80px 0 60px;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 56px;
+  }
+  .cover-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px; height: 56px;
+    background: var(--accent);
+    border-radius: 16px;
+    margin-bottom: 20px;
+    font-size: 26px;
+  }
+  .cover h1 { font-size: 36px; font-weight: 800; color: var(--text); margin-bottom: 6px; letter-spacing: -0.5px; }
+  .cover .subtitle { font-size: 16px; color: var(--text-muted); margin-bottom: 28px; }
+  .cover .meta-grid { display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; }
+  .cover .meta-item { font-size: 12px; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); padding: 6px 14px; border-radius: 999px; }
+  .cover .meta-item strong { color: var(--text-secondary); }
+
+  /* TOC */
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px 32px; margin-bottom: 52px; }
+  .toc-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); margin-bottom: 16px; }
+  .toc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 32px; }
+  .toc a { font-size: 13px; color: var(--accent); text-decoration: none; padding: 3px 0; display: block; }
+  .toc a:hover { text-decoration: underline; }
+  .toc-num { color: var(--text-muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
+
+  /* Sections */
+  .section { margin-bottom: 56px; }
+  .section-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border); }
+  .section-num { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  h2 { font-size: 20px; font-weight: 800; color: var(--text); }
+  h3 { font-size: 14px; font-weight: 700; color: var(--text-secondary); margin: 20px 0 8px; text-transform: uppercase; letter-spacing: .06em; }
+  h4 { font-size: 14px; font-weight: 600; color: var(--text); margin: 14px 0 6px; }
+  p { color: var(--text-secondary); margin-bottom: 10px; font-size: 13.5px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 14px 0; }
+  th { background: #1E293B; color: #fff; font-weight: 600; text-align: left; padding: 10px 14px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  td { padding: 9px 14px; border-bottom: 1px solid var(--border); color: var(--text-secondary); vertical-align: top; }
+  tr:nth-child(even) td { background: var(--surface); }
+  td:first-child { font-weight: 500; color: var(--text); }
+
+  /* Code */
+  code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--surface); color: #0369A1; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); }
+  pre { background: var(--code-bg); color: #E2E8F0; border-radius: 12px; padding: 18px 22px; margin: 14px 0; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.8; overflow-x: auto; }
+  pre .comment { color: #64748B; }
+  pre .key { color: #93C5FD; }
+  pre .val { color: #86EFAC; }
+  pre .str { color: #FDE68A; }
+
+  /* Callouts */
+  .callout { display: flex; gap: 12px; align-items: flex-start; padding: 14px 18px; border-radius: 12px; margin: 14px 0; }
+  .callout-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .callout p { margin: 0; font-size: 13px; }
+  .info  { background: #EFF6FF; border: 1px solid #BFDBFE; }
+  .warn  { background: #FFFBEB; border: 1px solid #FDE68A; }
+  .good  { background: #F0FDF4; border: 1px solid #BBF7D0; }
+  .danger-box { background: #FFF1F2; border: 1px solid #FECDD3; }
+
+  /* Badges */
+  .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 999px; }
+  .b-blue   { background: #DBEAFE; color: #1D4ED8; }
+  .b-green  { background: #DCFCE7; color: #15803D; }
+  .b-purple { background: #EDE9FE; color: #6D28D9; }
+  .b-orange { background: #FFEDD5; color: #C2410C; }
+  .b-gray   { background: #F1F5F9; color: #475569; }
+
+  /* Feature list */
+  .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+  .feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .feature-card .icon { font-size: 20px; margin-bottom: 6px; }
+  .feature-card h4 { margin: 0 0 4px; font-size: 13px; }
+  .feature-card p { margin: 0; font-size: 12px; color: var(--text-muted); }
+
+  /* Architecture box */
+  .arch-box { background: var(--code-bg); color: #E2E8F0; border-radius: 14px; padding: 24px 28px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.9; margin: 16px 0; }
+
+  /* Flow */
+  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 12px 0; font-size: 12px; }
+  .flow-step { background: var(--accent); color: #fff; padding: 4px 12px; border-radius: 6px; font-weight: 600; font-size: 11px; }
+  .flow-arrow { color: var(--text-muted); font-size: 16px; }
+
+  /* File tree */
+  .tree { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.8; }
+  .tree .dir { color: #1D4ED8; font-weight: 600; }
+  .tree .file { color: var(--text-secondary); }
+  .tree .comment { color: var(--text-muted); }
+
+  /* Divider */
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+  /* Print */
+  @media print {
+    body { padding: 32px 40px; font-size: 12.5px; }
+    .cover { padding: 48px 0 40px; }
+    pre { font-size: 10.5px; }
+    .toc-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ COVER ══════════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-logo">⚡</div>
+  <h1>WorkTrack Pro v2.0</h1>
+  <div class="subtitle">Complete Technical Handbook &amp; Architecture Reference</div>
+  <div class="meta-grid">
+    <div class="meta-item"><strong>Platform:</strong> Windows 10 / 11 (64-bit)</div>
+    <div class="meta-item"><strong>Frontend:</strong> Electron 32 + React 18</div>
+    <div class="meta-item"><strong>Database:</strong> Supabase (PostgreSQL 15)</div>
+    <div class="meta-item"><strong>Version:</strong> 2.0.0</div>
+    <div class="meta-item"><strong>Organisation:</strong> Edel Tech Pvt Ltd</div>
+    <div class="meta-item"><strong>Author:</strong> Kunal Vinayak Lele</div>
+  </div>
+</div>
+
+<!-- ══ TOC ════════════════════════════════════════════════════════════════════ -->
+<div class="toc">
+  <div class="toc-title">Table of Contents</div>
+  <div class="toc-grid">
+    <a href="#s1"><span class="toc-num">01</span>Project Overview</a>
+    <a href="#s2"><span class="toc-num">02</span>System Architecture</a>
+    <a href="#s3"><span class="toc-num">03</span>Full Tech Stack</a>
+    <a href="#s4"><span class="toc-num">04</span>Project Directory Structure</a>
+    <a href="#s5"><span class="toc-num">05</span>Database Schema</a>
+    <a href="#s6"><span class="toc-num">06</span>Supabase Configuration</a>
+    <a href="#s7"><span class="toc-num">07</span>Authentication &amp; Security</a>
+    <a href="#s8"><span class="toc-num">08</span>GPS &amp; Location Detection</a>
+    <a href="#s9"><span class="toc-num">09</span>Feature Reference</a>
+    <a href="#s10"><span class="toc-num">10</span>Leave Management System</a>
+    <a href="#s11"><span class="toc-num">11</span>Notification System (SMTP)</a>
+    <a href="#s12"><span class="toc-num">12</span>Auto-Update System</a>
+    <a href="#s13"><span class="toc-num">13</span>Settings Reference</a>
+    <a href="#s14"><span class="toc-num">14</span>Development Guide</a>
+    <a href="#s15"><span class="toc-num">15</span>Build &amp; Distribution</a>
+    <a href="#s16"><span class="toc-num">16</span>Architecture Decisions</a>
+    <a href="#s17"><span class="toc-num">17</span>Troubleshooting</a>
+    <a href="#s18"><span class="toc-num">18</span>Roadmap &amp; Future Work</a>
+  </div>
+</div>
+
+<!-- ══ SECTION 1 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s1">
+  <div class="section-header"><div class="section-num">1</div><h2>Project Overview</h2></div>
+
+  <p>WorkTrack Pro is a professional-grade Windows desktop application for daily employee attendance tracking, designed for small-to-medium teams (up to ~50 employees) operating from a single office. It replaces paper registers and simple spreadsheets with a cloud-backed, real-time system that provides GPS-verified check-in, leave management, attendance reports, and live admin oversight.</p>
+
+  <h3>What Problem Does It Solve</h3>
+  <p>The core problems being solved are: (1) verifying that employees are actually at the office when they check in, (2) giving management real-time visibility of who is present vs WFH vs absent, (3) eliminating manual attendance registers and Excel sheets, and (4) providing an organised leave request and approval workflow.</p>
+
+  <h3>Who Uses It</h3>
+  <table>
+    <tr><th>Role</th><th>Access Level</th><th>Key Actions</th></tr>
+    <tr><td>Employee</td><td>Own data only</td><td>Check in/out, apply for leave, submit corrections, view own calendar</td></tr>
+    <tr><td>Admin</td><td>All employee data</td><td>Live overview, approve leaves/corrections, generate reports, manage settings</td></tr>
+  </table>
+
+  <div class="callout info">
+    <div class="callout-icon">💡</div>
+    <p>The <strong>first account registered</strong> is automatically promoted to Admin via a PostgreSQL trigger. All subsequent accounts are created as Employees. Additional admins can be promoted via the Employees panel.</p>
+  </div>
+
+  <h3>Key Capabilities</h3>
+  <div class="feature-grid">
+    <div class="feature-card"><div class="icon">📍</div><h4>GPS Check-In</h4><p>Three-stage location fallback: browser geolocation → Windows Location API → IP geolocation. Office WiFi SSID detection as primary method.</p></div>
+    <div class="feature-card"><div class="icon">📊</div><h4>Real-Time Overview</h4><p>Admin dashboard with live Supabase WebSocket subscriptions. No polling — updates the moment someone checks in.</p></div>
+    <div class="feature-card"><div class="icon">🏖️</div><h4>Leave Management</h4><p>Full leave request, approval, and balance tracking. Four leave types (SL/CL/PL/EL). Calendar integration with type-specific colours.</p></div>
+    <div class="feature-card"><div class="icon">📁</div><h4>Excel Reports</h4><p>Per-employee sheets in monthly reports. ExcelJS with conditional formatting, status colour coding, and frozen header rows.</p></div>
+    <div class="feature-card"><div class="icon">✏️</div><h4>Corrections</h4><p>Employees flag wrong attendance records. Admin reviews and applies fixes directly to the database.</p></div>
+    <div class="feature-card"><div class="icon">🗺️</div><h4>Live Map</h4><p>Embedded Leaflet map showing today's check-ins with GPS coordinates. Office radius circle overlay.</p></div>
+  </div>
+</div>
+
+<!-- ══ SECTION 2 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s2">
+  <div class="section-header"><div class="section-num">2</div><h2>System Architecture</h2></div>
+
+  <div class="arch-box">
+┌────────────────────────────────────────────────────────────────────┐
+│                    EMPLOYEE / ADMIN PC (Windows)                   │
+│                                                                    │
+│  WorkTrack Pro Desktop App                                         │
+│  ├─ Electron 32 (Main Process)                                     │
+│  │    ├─ Window management, system tray, startup registry          │
+│  │    ├─ IPC handlers (email, Excel save, WiFi SSID, GPS)         │
+│  │    └─ Auto-updater (electron-updater → GitHub Releases)         │
+│  │                                                                  │
+│  └─ Chromium Renderer (React 18 + Vite)                           │
+│       ├─ React Router — SPA with hash routing                      │
+│       ├─ Zustand — global state (user session, theme, GPS)         │
+│       ├─ Framer Motion — page transitions, animations              │
+│       ├─ Recharts — Overview charts (donut, bar)                   │
+│       ├─ React Leaflet — embedded attendance map                   │
+│       └─ @supabase/supabase-js — direct DB connection              │
+│                              │                                     │
+│                    HTTPS / WebSocket                               │
+└──────────────────────────────┼─────────────────────────────────────┘
+                               │
+              ┌────────────────▼────────────────┐
+              │        Supabase (Cloud)          │
+              │  ┌───────────────────────────┐  │
+              │  │   PostgreSQL 15 Database   │  │
+              │  │   ├─ profiles              │  │
+              │  │   ├─ attendance            │  │
+              │  │   ├─ leave_requests        │  │
+              │  │   ├─ correction_requests   │  │
+              │  │   └─ app_settings          │  │
+              │  ├───────────────────────────┤  │
+              │  │   Supabase Auth (GoTrue)   │  │
+              │  │   ├─ Email + password       │  │
+              │  │   └─ OTP for password reset │  │
+              │  ├───────────────────────────┤  │
+              │  │   PostgREST (REST API)     │  │
+              │  │   Realtime (WebSocket)     │  │
+              │  └───────────────────────────┘  │
+              │  Region: ap-south-1 (Mumbai)     │
+              └──────────────────────────────────┘
+  </div>
+
+  <h3>Key Architectural Decisions</h3>
+  <table>
+    <tr><th>Decision</th><th>Choice Made</th><th>Why</th></tr>
+    <tr><td>No custom backend server</td><td>Supabase direct from client</td><td>Zero infrastructure to manage. Free tier handles 50 employees easily.</td></tr>
+    <tr><td>Desktop, not web</td><td>Electron 32</td><td>GPS access, system tray, Windows startup, offline-capable UI.</td></tr>
+    <tr><td>No state persistence</td><td>Session in memory only</td><td>Forces daily login — reinforces the attendance check-in habit.</td></tr>
+    <tr><td>Real-time admin</td><td>Supabase WebSocket subscriptions</td><td>Zero-latency update when employee checks in. No polling.</td></tr>
+    <tr><td>Reports client-side</td><td>ExcelJS in renderer</td><td>No server to generate reports. Faster for small datasets.</td></tr>
+  </table>
+</div>
+
+<!-- ══ SECTION 3 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s3">
+  <div class="section-header"><div class="section-num">3</div><h2>Full Tech Stack</h2></div>
+
+  <h3>Core Runtime</h3>
+  <table>
+    <tr><th>Technology</th><th>Version</th><th>Role</th></tr>
+    <tr><td>Electron</td><td>32.3.x</td><td>Desktop app shell, IPC bridge, system integrations</td></tr>
+    <tr><td>Node.js</td><td>20.18.x (bundled in Electron)</td><td>Main process runtime</td></tr>
+    <tr><td>Chromium</td><td>128.x (bundled in Electron)</td><td>Renderer process — runs the React app</td></tr>
+  </table>
+
+  <h3>Frontend (Renderer Process)</h3>
+  <table>
+    <tr><th>Library</th><th>Purpose</th></tr>
+    <tr><td>React 18.3</td><td>UI component framework</td></tr>
+    <tr><td>React Router DOM 6</td><td>Client-side routing (HashRouter for file:// protocol)</td></tr>
+    <tr><td>Framer Motion 11</td><td>Animations, page transitions, spring physics</td></tr>
+    <tr><td>Zustand 5</td><td>Lightweight global state (user, theme, GPS, settings)</td></tr>
+    <tr><td>Tailwind CSS 3</td><td>Utility-first styling. Custom dark/light colour tokens.</td></tr>
+    <tr><td>Recharts 2</td><td>Donut chart (distribution), stacked bar chart (weekly)</td></tr>
+    <tr><td>React Leaflet 4 + Leaflet 1.9</td><td>Embedded interactive map with check-in pins</td></tr>
+    <tr><td>ExcelJS 4</td><td>Excel report generation with full styling (per-employee sheets)</td></tr>
+    <tr><td>date-fns 4</td><td>Date formatting and manipulation throughout the app</td></tr>
+    <tr><td>Lucide React</td><td>Icon library (consistent, tree-shakeable)</td></tr>
+    <tr><td>@fontsource/inter</td><td>Inter typeface — self-hosted, no CDN dependency</td></tr>
+    <tr><td>@fontsource/jetbrains-mono</td><td>Monospace font for times, IDs, coordinates</td></tr>
+  </table>
+
+  <h3>Backend (Supabase Cloud)</h3>
+  <table>
+    <tr><th>Component</th><th>Purpose</th></tr>
+    <tr><td>PostgreSQL 15</td><td>Primary database. Hosted on Supabase in Mumbai region.</td></tr>
+    <tr><td>PostgREST</td><td>Auto-generated REST API from DB schema. Used by supabase-js client.</td></tr>
+    <tr><td>GoTrue (Supabase Auth)</td><td>Email + password authentication, JWT issuance, OTP for password reset</td></tr>
+    <tr><td>Realtime (Phoenix channels)</td><td>WebSocket subscriptions for live admin overview</td></tr>
+    <tr><td>Row Level Security (RLS)</td><td>Enforces data access at the DB level. Employees can only see their own data.</td></tr>
+  </table>
+
+  <h3>Build Toolchain</h3>
+  <table>
+    <tr><th>Tool</th><th>Role</th></tr>
+    <tr><td>Vite 5</td><td>Bundles the React renderer. Handles imports, CSS, assets.</td></tr>
+    <tr><td>electron-builder 25</td><td>Packages the app into a Windows NSIS installer (.exe)</td></tr>
+    <tr><td>esbuild (via custom script)</td><td>Compiles the preload.js from ES Module to CommonJS</td></tr>
+    <tr><td>PostCSS + Autoprefixer</td><td>Processes Tailwind CSS during build</td></tr>
+  </table>
+</div>
+
+<!-- ══ SECTION 4 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s4">
+  <div class="section-header"><div class="section-num">4</div><h2>Project Directory Structure</h2></div>
+
+  <div class="tree">
+<span class="dir">worktrack-electron/</span>
+├── <span class="dir">electron/</span>
+│   ├── main.cjs           <span class="comment"># Main process: window, tray, IPC handlers</span>
+│   └── preload.js         <span class="comment"># Exposes safe APIs to renderer via contextBridge</span>
+│
+├── <span class="dir">src/renderer/</span>
+│   ├── main.jsx           <span class="comment"># React entry point, DOMContentLoaded guard</span>
+│   ├── App.jsx            <span class="comment"># Router, ErrorBoundary, theme setup</span>
+│   ├── index.css          <span class="comment"># Tailwind base + light/dark mode overrides</span>
+│   ├── index.html         <span class="comment"># HTML shell (Vite root)</span>
+│   │
+│   ├── <span class="dir">lib/</span>
+│   │   ├── supabase.js    <span class="comment"># All Supabase queries, auth, business logic</span>
+│   │   ├── store.js       <span class="comment"># Zustand global state</span>
+│   │   └── leaveConstants.js <span class="comment"># Shared LEAVE_TYPES and LEAVE_COLORS</span>
+│   │
+│   ├── <span class="dir">components/</span>
+│   │   ├── Sidebar.jsx    <span class="comment"># Navigation sidebar with theme toggle</span>
+│   │   └── ui.jsx         <span class="comment"># ALL reusable components (Button, Card, DataTable...)</span>
+│   │
+│   └── <span class="dir">pages/</span>
+│       ├── Login.jsx
+│       ├── Register.jsx
+│       ├── ForgotPassword.jsx
+│       ├── Dashboard.jsx      <span class="comment"># Employee: clock, GPS, check-in, calendar</span>
+│       ├── Leave.jsx          <span class="comment"># Employee: leave balance + apply form</span>
+│       ├── Corrections.jsx    <span class="comment"># Employee: correction request form</span>
+│       ├── Settings.jsx       <span class="comment"># Employee: password, theme, startup</span>
+│       └── <span class="dir">admin/</span>
+│           ├── AdminLayout.jsx    <span class="comment"># Shared layout + reminder background task</span>
+│           ├── Overview.jsx       <span class="comment"># Live stats, donut chart, feed, weekly bar</span>
+│           ├── Attendance.jsx     <span class="comment"># Full attendance table with filters + export</span>
+│           ├── Employees.jsx      <span class="comment"># Employee cards with attendance %, delete</span>
+│           ├── LeaveRequests.jsx  <span class="comment"># Admin: approve/reject leave requests</span>
+│           ├── AdminCorrections.jsx <span class="comment"># Admin: approve/reject corrections</span>
+│           ├── Reports.jsx        <span class="comment"># Excel report generation (4 types)</span>
+│           ├── MapView.jsx        <span class="comment"># Embedded Leaflet map</span>
+│           └── Settings.jsx       <span class="comment"># All admin config: office, email, leaves, reminders</span>
+│
+├── <span class="dir">scripts/</span>
+│   ├── build-preload.cjs  <span class="comment"># Compiles preload ES module → CJS via esbuild</span>
+│   ├── fix-html.js        <span class="comment"># Removes crossorigin attrs post-build</span>
+│   └── launch.js          <span class="comment"># Clears ELECTRON_RUN_AS_NODE then spawns Electron</span>
+│
+├── <span class="dir">out/</span>               <span class="comment"># Build output (generated, not committed)</span>
+│   ├── preload/preload.js
+│   └── renderer/          <span class="comment"># Compiled React app</span>
+│
+├── <span class="dir">release/</span>           <span class="comment"># Packaged installers (generated)</span>
+├── <span class="dir">resources/</span>         <span class="comment"># App icon (icon.ico)</span>
+├── electron.vite.config.mjs
+├── vite.renderer.config.mjs
+├── tailwind.config.js
+├── package.json
+└── DECISIONS.md
+  </div>
+
+  <h3>Important Files Explained</h3>
+  <table>
+    <tr><th>File</th><th>What It Does</th></tr>
+    <tr><td><code>electron/main.cjs</code></td><td>The heart of the desktop app. Creates the browser window, registers all IPC handlers (email, file save, WiFi detection, GPS via Python, tray), sets up geolocation permissions, removes the menu bar.</td></tr>
+    <tr><td><code>electron/preload.js</code></td><td>Runs in a sandboxed context between main and renderer. Exposes exactly the functions the renderer needs via <code>window.api</code>. No raw Node.js access in renderer.</td></tr>
+    <tr><td><code>src/renderer/lib/supabase.js</code></td><td>All data access code. ~700 lines covering auth, attendance, leave, corrections, reminders, settings. The renderer never talks to the DB directly — always through this file.</td></tr>
+    <tr><td><code>scripts/launch.js</code></td><td>Critical workaround: VS Code's terminal sets <code>ELECTRON_RUN_AS_NODE=1</code> which makes Electron run as plain Node.js (breaking everything). This script deletes that env var before spawning Electron.</td></tr>
+    <tr><td><code>scripts/fix-html.js</code></td><td>Vite adds <code>crossorigin=""</code> to script/link tags for CORS compliance on HTTP servers. But Electron uses <code>file://</code> which has no CORS. This script removes those attributes post-build.</td></tr>
+  </table>
+</div>
+
+<!-- ══ SECTION 5 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s5">
+  <div class="section-header"><div class="section-num">5</div><h2>Database Schema</h2></div>
+
+  <h3>profiles</h3>
+  <p>Extends Supabase's <code>auth.users</code> table. Created automatically by a PostgreSQL trigger when a user registers.</p>
+  <table>
+    <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+    <tr><td>id</td><td>UUID PK</td><td>References <code>auth.users(id)</code> — CASCADE on delete</td></tr>
+    <tr><td>email</td><td>VARCHAR(150)</td><td>Unique. Denormalised from auth.users for quick lookup.</td></tr>
+    <tr><td>employee_id</td><td>VARCHAR(20)</td><td>Unique. Format: EMP001. Used as login identifier.</td></tr>
+    <tr><td>full_name</td><td>VARCHAR(100)</td><td>Display name throughout the app</td></tr>
+    <tr><td>department</td><td>VARCHAR(100)</td><td>RPA or SAP (constrained in the UI, not in DB)</td></tr>
+    <tr><td>is_admin</td><td>BOOLEAN</td><td>First registered user auto-set TRUE. Controls all admin access.</td></tr>
+    <tr><td>is_active</td><td>BOOLEAN</td><td>Deactivated employees cannot log in.</td></tr>
+    <tr><td>last_login</td><td>TIMESTAMPTZ</td><td>Updated on every successful login</td></tr>
+  </table>
+
+  <h3>attendance</h3>
+  <table>
+    <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+    <tr><td>user_id</td><td>UUID FK</td><td>References profiles(id) CASCADE</td></tr>
+    <tr><td>date</td><td>DATE</td><td>IST date (not UTC). UNIQUE(user_id, date) — one record per person per day.</td></tr>
+    <tr><td>check_in_time</td><td>TIMESTAMPTZ</td><td>UTC timestamp. Displayed as IST in the UI.</td></tr>
+    <tr><td>check_out_time</td><td>TIMESTAMPTZ</td><td>Auto-set to 20:00 IST if employee forgot</td></tr>
+    <tr><td>status</td><td>VARCHAR(20)</td><td><code>in_office</code> | <code>wfh</code> | <code>absent</code> | <code>auto_checkout</code></td></tr>
+    <tr><td>is_late</td><td>BOOLEAN</td><td>TRUE if check-in after (office_start_time + grace_period)</td></tr>
+    <tr><td>latitude / longitude</td><td>DOUBLE PRECISION</td><td>GPS coords at check-in. Null if unknown. Office coords used for WiFi-detected in-office.</td></tr>
+    <tr><td>accuracy_m</td><td>DOUBLE PRECISION</td><td>GPS accuracy in metres. 200000 = IP-based. 50 = WiFi SSID match. &lt;500 = GPS.</td></tr>
+  </table>
+
+  <h3>leave_requests</h3>
+  <table>
+    <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+    <tr><td>user_id</td><td>UUID FK</td><td>The employee applying</td></tr>
+    <tr><td>type</td><td>VARCHAR(20)</td><td><code>sick</code> | <code>casual</code> | <code>planned</code> | <code>emergency</code></td></tr>
+    <tr><td>start_date / end_date</td><td>DATE</td><td>Inclusive range</td></tr>
+    <tr><td>days</td><td>INTEGER</td><td>Working days count (weekends and holidays excluded)</td></tr>
+    <tr><td>reason</td><td>TEXT</td><td>Employee's message to admin (supports templates)</td></tr>
+    <tr><td>status</td><td>VARCHAR(20)</td><td><code>pending</code> | <code>approved</code> | <code>rejected</code></td></tr>
+    <tr><td>reviewed_by</td><td>UUID FK</td><td>Admin who actioned the request</td></tr>
+    <tr><td>admin_note</td><td>TEXT</td><td>Optional note from admin on approval/rejection</td></tr>
+  </table>
+
+  <h3>correction_requests</h3>
+  <table>
+    <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+    <tr><td>user_id</td><td>UUID FK</td><td>Employee requesting the correction</td></tr>
+    <tr><td>date</td><td>DATE</td><td>Which attendance record to fix</td></tr>
+    <tr><td>type</td><td>VARCHAR(30)</td><td><code>forgot_checkin</code> | <code>forgot_checkout</code> | <code>wrong_status</code> | <code>other</code></td></tr>
+    <tr><td>requested_checkin / checkout</td><td>TIMESTAMPTZ</td><td>The correct times being requested</td></tr>
+    <tr><td>requested_status</td><td>VARCHAR(20)</td><td>Correct status if wrong (e.g. wfh → in_office)</td></tr>
+    <tr><td>status</td><td>VARCHAR(20)</td><td><code>pending</code> | <code>approved</code> | <code>rejected</code></td></tr>
+  </table>
+
+  <h3>app_settings</h3>
+  <p>Key-value store for all configurable settings. Managed by admin via the Settings tab.</p>
+  <table>
+    <tr><th>Key</th><th>Default</th><th>Description</th></tr>
+    <tr><td>office_latitude / longitude</td><td>18.4602, 73.7989</td><td>Pune office GPS coordinates</td></tr>
+    <tr><td>office_radius_m</td><td>200</td><td>Radius in metres for GPS-based in-office detection</td></tr>
+    <tr><td>office_start_time</td><td>09:30</td><td>Work start time in IST (HH:MM)</td></tr>
+    <tr><td>grace_period_minutes</td><td>10</td><td>Minutes after start time before is_late triggers</td></tr>
+    <tr><td>office_wifi_ssid</td><td>(empty)</td><td>Office network names (one per line). If connected = in office.</td></tr>
+    <tr><td>company_name</td><td>Your Company</td><td>Shown in sidebar and reports header</td></tr>
+    <tr><td>company_holidays</td><td>[]</td><td>JSON array of {date, name} objects</td></tr>
+    <tr><td>smtp_host / port / username / password</td><td>(empty)</td><td>SMTP credentials for email notifications</td></tr>
+    <tr><td>smtp_from_name</td><td>WorkTrack Pro</td><td>Display name on outbound emails</td></tr>
+    <tr><td>admin_email</td><td>(empty)</td><td>Admin's email for test emails</td></tr>
+    <tr><td>wfh_notify_emails</td><td>(empty)</td><td>One email per line — receives WFH alerts</td></tr>
+    <tr><td>reminder_enabled / reminder_time</td><td>false / 10:30</td><td>Auto check-in reminder to missing employees</td></tr>
+    <tr><td>leave_sick/casual/planned_quota</td><td>10 / 12 / 5</td><td>Annual leave days per type</td></tr>
+  </table>
+</div>
+
+<!-- ══ SECTION 6 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s6">
+  <div class="section-header"><div class="section-num">6</div><h2>Supabase Configuration</h2></div>
+
+  <h3>Project Details</h3>
+  <table>
+    <tr><th>Setting</th><th>Value</th></tr>
+    <tr><td>Project URL</td><td><code>https://lwnuunwxfgvketjtmreo.supabase.co</code></td></tr>
+    <tr><td>Region</td><td>ap-south-1 (Mumbai — lowest latency for Pune)</td></tr>
+    <tr><td>Anon Key</td><td>Stored in <code>config.ini</code> (safe to embed — RLS enforces access)</td></tr>
+    <tr><td>GitHub Repo</td><td>github.com/Kunallele01/worktrack-pro</td></tr>
+  </table>
+
+  <h3>Row Level Security Policies</h3>
+  <p>Every table has RLS enabled. The <code>is_admin()</code> SQL function reads the current user's profile to check the admin flag. This runs at the database level — no client-side trust.</p>
+  <table>
+    <tr><th>Table</th><th>SELECT</th><th>INSERT</th><th>UPDATE</th><th>DELETE</th></tr>
+    <tr><td>profiles</td><td>Any authenticated user</td><td>Own ID only</td><td>Own + admins</td><td>Admins only (via RPC)</td></tr>
+    <tr><td>attendance</td><td>Own + admins</td><td>Own ID only</td><td>Own + admins</td><td>Admins only</td></tr>
+    <tr><td>leave_requests</td><td>Own + admins</td><td>Own ID only</td><td>Admins only</td><td>—</td></tr>
+    <tr><td>correction_requests</td><td>Own + admins</td><td>Own ID only</td><td>Admins only</td><td>—</td></tr>
+    <tr><td>app_settings</td><td>Any authenticated</td><td>—</td><td>Admins only</td><td>—</td></tr>
+  </table>
+
+  <h3>Database Functions (SECURITY DEFINER)</h3>
+  <table>
+    <tr><th>Function</th><th>Purpose</th></tr>
+    <tr><td><code>handle_new_user()</code></td><td>Trigger on auth.users INSERT — auto-creates profile. First user becomes admin.</td></tr>
+    <tr><td><code>get_email_by_employee_id()</code></td><td>Allows pre-auth lookup of email by employee ID (bypasses RLS).</td></tr>
+    <tr><td><code>is_admin()</code></td><td>Returns TRUE if current user's is_admin = TRUE. Used in all RLS policies.</td></tr>
+    <tr><td><code>delete_user_completely()</code></td><td>Deletes from auth.users (cascades to profiles + attendance). Frees email for re-registration. Checks last-admin guard.</td></tr>
+  </table>
+
+  <div class="callout warn">
+    <div class="callout-icon">⚠️</div>
+    <p>The <code>delete_user_completely()</code> function accesses <code>auth.users</code> using <code>SECURITY DEFINER</code> — it runs with elevated privileges. This is intentional and necessary because the anon/authenticated roles cannot access the auth schema directly.</p>
+  </div>
+</div>
+
+<!-- ══ SECTION 7 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s7">
+  <div class="section-header"><div class="section-num">7</div><h2>Authentication &amp; Security</h2></div>
+
+  <h3>Login Flow</h3>
+  <div class="flow">
+    <div class="flow-step">Enter email or EMP ID</div><div class="flow-arrow">→</div>
+    <div class="flow-step">If emp ID: RPC lookup email</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Supabase Auth signIn</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Fetch profile</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Check is_active</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Route to dashboard / admin</div>
+  </div>
+
+  <h3>Password Reset Flow</h3>
+  <div class="flow">
+    <div class="flow-step">Enter email</div><div class="flow-arrow">→</div>
+    <div class="flow-step">signInWithOtp()</div><div class="flow-arrow">→</div>
+    <div class="flow-step">6-digit code via email</div><div class="flow-arrow">→</div>
+    <div class="flow-step">verifyOtp()</div><div class="flow-arrow">→</div>
+    <div class="flow-step">updateUser(password)</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Sign out → back to login</div>
+  </div>
+
+  <h3>Session Management</h3>
+  <p>Sessions are kept in memory only (<code>persistSession: false</code>). There is no token written to disk. Every app launch requires a fresh login. The JWT is stored in the Supabase client instance and automatically refreshed while the app is running.</p>
+
+  <h3>Security Model</h3>
+  <table>
+    <tr><th>Layer</th><th>Mechanism</th></tr>
+    <tr><td>Authentication</td><td>Supabase GoTrue (bcrypt password hashing, JWT tokens)</td></tr>
+    <tr><td>Authorisation</td><td>Row Level Security policies at the PostgreSQL layer — cannot be bypassed from the client</td></tr>
+    <tr><td>IPC Security</td><td>contextIsolation: true — renderer has no direct Node access. Only methods exposed via contextBridge in preload are available.</td></tr>
+    <tr><td>WebSecurity</td><td>webSecurity: false is set to allow file:// protocol to load local bundled assets. This is a known Electron pattern for packaged apps.</td></tr>
+    <tr><td>Sensitive data</td><td>SMTP password, Resend API key stored in app_settings (DB). Not in source code or config files.</td></tr>
+  </table>
+</div>
+
+<!-- ══ SECTION 8 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s8">
+  <div class="section-header"><div class="section-num">8</div><h2>GPS &amp; Location Detection</h2></div>
+
+  <p>Location detection is the most critical feature of the app. Desktop Windows machines typically have no GPS chip, requiring a multi-stage fallback strategy.</p>
+
+  <h3>Detection Stages (in order)</h3>
+  <table>
+    <tr><th>Stage</th><th>Method</th><th>Typical Accuracy</th><th>When Used</th></tr>
+    <tr><td>1</td><td>Browser <code>navigator.geolocation</code> (low accuracy)</td><td>30–300 m</td><td>First attempt, 8s timeout</td></tr>
+    <tr><td>2</td><td>Windows Location API via Python/winsdk (IPC)</td><td>50–200 km</td><td>If stage 1 fails (code 2 or 3)</td></tr>
+    <tr><td>3</td><td>IP Geolocation via ip-api.com</td><td>City-level (~5–50 km)</td><td>If stage 2 fails</td></tr>
+    <tr><td>4</td><td>WiFi SSID detection (IPC → netsh)</td><td>N/A (yes/no)</td><td>If all geo fails — gives IP coords for map</td></tr>
+  </table>
+
+  <h3>Office Detection Logic</h3>
+  <p>At check-in, the app combines two signals to determine if the employee is in the office:</p>
+  <pre><span class="comment">// Both signals checked independently</span>
+<span class="key">gpsHit</span>  = haversineDistance(userLat, userLon, officeLat, officeLon) &lt;= officeRadiusM
+<span class="key">wifiHit</span> = currentSSID is in the office_wifi_ssid list (from settings)
+
+<span class="key">status</span>  = (gpsHit OR wifiHit) ? <span class="str">"in_office"</span> : <span class="str">"wfh"</span></pre>
+
+  <div class="callout good">
+    <div class="callout-icon">✅</div>
+    <p><strong>Office WiFi SSID is the recommended primary method for desktop PCs.</strong> Configure it in Admin → Settings → Office. If an employee is connected to the office network, they are marked In Office regardless of GPS accuracy. No GPS hardware required.</p>
+  </div>
+
+  <h3>Coordinate Storage</h3>
+  <table>
+    <tr><th>Scenario</th><th>Stored Coordinates</th><th>accuracy_m</th></tr>
+    <tr><td>GPS on-site (WiFi SSID match)</td><td>Office lat/lon</td><td>50</td></tr>
+    <tr><td>GPS on-site (haversine)</td><td>Actual GPS coords</td><td>Actual accuracy</td></tr>
+    <tr><td>WFH with IP coords</td><td>IP-based city coords</td><td>200000</td></tr>
+    <tr><td>WFH with 0,0 (all failed)</td><td>NULL</td><td>NULL</td></tr>
+  </table>
+
+  <h3>is_late Calculation</h3>
+  <p>Uses <code>Intl.DateTimeFormat</code> to get precise IST hour and minute, then compares as plain integers — avoiding all JavaScript timezone parsing bugs:</p>
+  <pre><span class="key">nowH</span>, <span class="key">nowM</span> = Intl.DateTimeFormat(<span class="str">'en-GB'</span>, { timeZone: <span class="str">'Asia/Kolkata'</span>, hour12: false }).formatToParts(new Date())
+<span class="key">is_late</span>  = (nowH * 60 + nowM) > (startHour * 60 + startMin + gracePeriodMins)</pre>
+</div>
+
+<!-- ══ SECTION 9 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s9">
+  <div class="section-header"><div class="section-num">9</div><h2>Feature Reference</h2></div>
+
+  <h3>Employee Dashboard</h3>
+  <p>Split-panel layout. Left: monthly attendance calendar with colour-coded days, stats (Present/WFH/Late/Absent this month), leave days overlaid. Right: live clock (IST), GPS widget, check-in/check-out buttons, today's status.</p>
+
+  <h3>Admin Overview</h3>
+  <p>Real-time via Supabase WebSocket subscription — <em>no polling</em>. Shows 4 animated stat cards with activity rings (percentage of team), donut distribution chart, live check-in feed, and current-week stacked bar chart. Floating orb animations in the background. Hover over donut legend items to see which employees are in each category.</p>
+
+  <h3>Attendance Table</h3>
+  <p>Admin view of all attendance records. Filters: date range, employee search, status. Sortable columns. Exports to Excel. Correct late calculation is displayed per record. Accurate check-in/out times in IST.</p>
+
+  <h3>Employees Panel</h3>
+  <p>Card grid per employee showing: avatar, department, employee ID, this-month attendance (e.g. "18 / 22 days"), active/inactive status, admin badge. Actions: Make Admin / Remove Admin / Deactivate / Activate / Delete (with email notification + last-admin guard).</p>
+
+  <h3>Reports (4 types)</h3>
+  <table>
+    <tr><th>Report</th><th>Content</th><th>Sheet Structure</th></tr>
+    <tr><td>Daily</td><td>All check-ins for today</td><td>Single sheet</td></tr>
+    <tr><td>Monthly</td><td>Full month attendance</td><td>Summary sheet + 1 sheet per employee</td></tr>
+    <tr><td>Late Arrivals</td><td>Employees who arrived late</td><td>Single sheet, filtered</td></tr>
+    <tr><td>WFH Summary</td><td>All WFH check-ins</td><td>Single sheet, filtered</td></tr>
+  </table>
+
+  <h3>Map View</h3>
+  <p>Embedded Leaflet map (CartoDB Dark Matter tiles). Shows: office marker + radius circle, green pins for In Office employees, orange pins for WFH employees. Pins are at actual GPS coordinates. Clicking a pin shows employee name, status, and check-in time.</p>
+
+  <h3>Auto-Checkout</h3>
+  <p>Runs when the admin app is opened after 20:00 IST. Finds all attendance records from today where check_in is set but check_out is null, and sets check_out to 20:00 IST with status <code>auto_checkout</code>. Stored in localStorage to prevent double-run.</p>
+</div>
+
+<!-- ══ SECTION 10 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s10">
+  <div class="section-header"><div class="section-num">10</div><h2>Leave Management System</h2></div>
+
+  <h3>Leave Types &amp; Quotas</h3>
+  <table>
+    <tr><th>Type</th><th>Code</th><th>Default Quota</th><th>Calendar Colour</th></tr>
+    <tr><td>Sick Leave</td><td>SL</td><td>10 days/year</td><td>Rose / Pink</td></tr>
+    <tr><td>Casual Leave</td><td>CL</td><td>12 days/year</td><td>Amber / Yellow</td></tr>
+    <tr><td>Planned Leave</td><td>PL</td><td>5 days/year</td><td>Teal / Green</td></tr>
+    <tr><td>Emergency Leave</td><td>EL</td><td>Unlimited</td><td>Orange</td></tr>
+  </table>
+
+  <h3>Leave Application Templates</h3>
+  <p>Employees can choose from 4 pre-written templates. Each template auto-inserts the employee's name, ID, and department. The employee can edit the pre-filled text before submitting.</p>
+
+  <h3>Working Day Calculation</h3>
+  <p>When an employee selects a date range, the app counts only working days — excluding weekends (Saturday and Sunday) and any company holidays configured by the admin. The count updates live as dates are selected.</p>
+
+  <h3>Approval Workflow</h3>
+  <div class="flow">
+    <div class="flow-step">Employee submits</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Status: pending</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Admin reviews</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Approved / Rejected</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Email sent to employee</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Calendar updated</div>
+  </div>
+
+  <h3>Calendar Integration</h3>
+  <p>Approved leave days appear on the employee's dashboard calendar in the leave type's colour. Hovering shows the leave name. Leave days do <em>not</em> count as Absent in attendance statistics. Company holidays appear as violet/purple cells with a 🏖 indicator.</p>
+</div>
+
+<!-- ══ SECTION 11 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s11">
+  <div class="section-header"><div class="section-num">11</div><h2>Notification System (SMTP)</h2></div>
+
+  <p>All emails are sent via plain SMTP using the <code>nodemailer</code> library in the Electron main process. The renderer cannot send emails directly — it calls the <code>window.api.sendEmail()</code> IPC method which routes to <code>nodemailer.createTransport()</code> in main.cjs.</p>
+
+  <h3>Email Triggers</h3>
+  <table>
+    <tr><th>Event</th><th>Recipient</th><th>Subject</th></tr>
+    <tr><td>WFH check-in</td><td>wfh_notify_emails (admin/HR)</td><td>"WFH Alert: [Name] checked in from home"</td></tr>
+    <tr><td>Leave approved</td><td>Employee</td><td>"Leave Request Approved ✓"</td></tr>
+    <tr><td>Leave rejected</td><td>Employee</td><td>"Leave Request Rejected ✕"</td></tr>
+    <tr><td>Account deleted</td><td>Deleted employee</td><td>"Your WorkTrack Pro account has been removed"</td></tr>
+    <tr><td>Daily reminder</td><td>Employees not checked in</td><td>"Reminder: Don't forget to check in"</td></tr>
+    <tr><td>Test email</td><td>admin_email</td><td>"WorkTrack Pro — Test Email"</td></tr>
+  </table>
+
+  <h3>SMTP Setup</h3>
+  <p>Configure in Admin → Settings → Email. Recommended: Gmail with an App Password (not the Google account password). Go to <em>myaccount.google.com → Security → 2-Step Verification → App Passwords</em> and create one named "WorkTrack".</p>
+  <table>
+    <tr><th>Provider</th><th>Host</th><th>Port</th><th>Auth</th></tr>
+    <tr><td>Gmail</td><td>smtp.gmail.com</td><td>587</td><td>App Password (requires 2FA)</td></tr>
+    <tr><td>Outlook / Hotmail</td><td>smtp-mail.outlook.com</td><td>587</td><td>Account password</td></tr>
+    <tr><td>Custom SMTP</td><td>Your server</td><td>587</td><td>Username + password</td></tr>
+  </table>
+
+  <h3>Daily Reminder Logic</h3>
+  <p>Runs from the admin's machine. On every 5-minute tick while AdminLayout is mounted, it checks: (1) reminders enabled, (2) current IST time ≥ configured reminder time, (3) not already sent today (checked via localStorage key <code>wt_reminder_sent_YYYY-MM-DD</code>). If all conditions met, fetches employees without check-in and sends each one an email.</p>
+</div>
+
+<!-- ══ SECTION 12 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s12">
+  <div class="section-header"><div class="section-num">12</div><h2>Auto-Update System (How to Implement)</h2></div>
+
+  <p>Auto-updates use <code>electron-updater</code> pointing to GitHub Releases as the update server. This is the standard pattern for Electron apps and is completely free.</p>
+
+  <h3>Implementation Overview</h3>
+  <table>
+    <tr><th>Step</th><th>What to Do</th></tr>
+    <tr><td>1. Install</td><td><code>npm install electron-updater</code> in worktrack-electron</td></tr>
+    <tr><td>2. package.json</td><td>Add <code>"publish": {"provider": "github", "owner": "Kunallele01", "repo": "worktrack-pro"}</code> inside the <code>build</code> block</td></tr>
+    <tr><td>3. main.cjs</td><td>Import <code>autoUpdater</code> from <code>electron-updater</code>. Call <code>autoUpdater.checkForUpdatesAndNotify()</code> after window is created.</td></tr>
+    <tr><td>4. IPC</td><td>Forward <code>update-available</code> and <code>update-downloaded</code> events to renderer. Add <code>installUpdate</code> IPC handler that calls <code>autoUpdater.quitAndInstall()</code>.</td></tr>
+    <tr><td>5. Preload</td><td>Expose <code>onUpdateAvailable</code>, <code>onUpdateDownloaded</code>, <code>installUpdate</code> via contextBridge</td></tr>
+    <tr><td>6. UI</td><td>Add a sticky banner component: "New version ready — Restart to update" with an "Update Now" button</td></tr>
+  </table>
+
+  <h3>Version Blocking (Force Update)</h3>
+  <p>To prevent old versions from operating:</p>
+  <ol style="padding-left:20px; color:#475569; font-size:13px; line-height:2;">
+    <li>Add <code>min_app_version</code> key to <code>app_settings</code> in Supabase (e.g. <code>2.1.0</code>)</li>
+    <li>On app startup (after login), compare <code>app.getVersion()</code> with <code>min_app_version</code></li>
+    <li>If current version is lower, show a full-screen blocking modal: "This version is outdated. Please update to continue."</li>
+    <li>The "Update Now" button triggers <code>autoUpdater.downloadUpdate()</code> then <code>autoUpdater.quitAndInstall()</code></li>
+  </ol>
+
+  <h3>Publishing a New Release</h3>
+  <ol style="padding-left:20px; color:#475569; font-size:13px; line-height:2;">
+    <li>Bump version in <code>package.json</code> (e.g. 2.0.0 → 2.1.0)</li>
+    <li>Run <code>npm run package</code> — builds the installer</li>
+    <li>Go to <strong>github.com/Kunallele01/worktrack-pro → Releases → Create new release</strong></li>
+    <li>Upload <code>release/WorkTrack Pro Setup 2.1.0.exe</code> and <code>release/WorkTrack Pro Setup 2.1.0.exe.blockmap</code></li>
+    <li>Add release notes and publish</li>
+    <li>Update <code>min_app_version</code> in Supabase if you want to force everyone to update</li>
+    <li>Optionally use the "Send Update Notification" feature in admin Settings to email all employees</li>
+  </ol>
+
+  <div class="callout info">
+    <div class="callout-icon">💡</div>
+    <p>electron-updater downloads the update silently in the background. Employees won't see a large download — just a notification when it's ready to install. The install takes ~10 seconds and requires an app restart.</p>
+  </div>
+</div>
+
+<!-- ══ SECTION 13 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s13">
+  <div class="section-header"><div class="section-num">13</div><h2>Settings Reference</h2></div>
+
+  <h3>config.ini (Local — per machine)</h3>
+  <p>Located at <code>worktrack-electron/config.ini</code>. These values are local to the development machine. Employees use the packaged app which has no <code>config.ini</code> — it reads from Supabase.</p>
+  <table>
+    <tr><th>Key</th><th>Value</th></tr>
+    <tr><td>[Supabase] url</td><td>Your Supabase project URL</td></tr>
+    <tr><td>[Supabase] key</td><td>Anon public key (safe to expose — RLS protects data)</td></tr>
+    <tr><td>[UI] theme</td><td><code>dark</code> or <code>light</code> — auto-updated when user toggles</td></tr>
+  </table>
+
+  <h3>Admin Settings (Cloud — shared by everyone)</h3>
+  <p>All values in <code>app_settings</code> table are immediately effective for all connected clients. No restart required. The settings cache in the app expires every 5 minutes.</p>
+
+  <h3>Zustand Store (In-Memory)</h3>
+  <table>
+    <tr><th>Key</th><th>Type</th><th>Contents</th></tr>
+    <tr><td>user</td><td>Object | null</td><td>Current logged-in profile. Null = not authenticated.</td></tr>
+    <tr><td>isAdmin</td><td>Boolean</td><td>Derived from user.is_admin</td></tr>
+    <tr><td>settings</td><td>Object</td><td>Cached app_settings from Supabase (for company name etc.)</td></tr>
+    <tr><td>theme</td><td>String</td><td>'dark' | 'light'. Persisted to localStorage.</td></tr>
+    <tr><td>gpsLocation</td><td>Object | null</td><td>{lat, lon, accuracy} — set when GPS resolves</td></tr>
+    <tr><td>gpsStatus</td><td>String</td><td>'idle' | 'acquiring' | 'active' | 'error'</td></tr>
+    <tr><td>todayRecord</td><td>Object | null</td><td>Today's attendance record</td></tr>
+  </table>
+</div>
+
+<!-- ══ SECTION 14 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s14">
+  <div class="section-header"><div class="section-num">14</div><h2>Development Guide</h2></div>
+
+  <h3>Prerequisites</h3>
+  <table>
+    <tr><th>Tool</th><th>Version</th><th>Purpose</th></tr>
+    <tr><td>Node.js</td><td>18+ (24.7.0 used)</td><td>Build toolchain and Electron</td></tr>
+    <tr><td>Python</td><td>3.10+</td><td>GPS via winsdk (Windows only)</td></tr>
+    <tr><td>Git</td><td>Any</td><td>Version control</td></tr>
+    <tr><td>Windows 10/11</td><td>64-bit</td><td>Only platform supported</td></tr>
+  </table>
+
+  <h3>First-Time Setup (new machine)</h3>
+  <pre><span class="comment"># Clone the repo</span>
+git clone https://github.com/Kunallele01/worktrack-pro.git
+cd worktrack-pro/worktrack-electron
+
+<span class="comment"># Install dependencies</span>
+npm install
+
+<span class="comment"># Install Python GPS library (Windows only)</span>
+pip install winsdk</pre>
+
+  <h3>Running in Development</h3>
+  <pre><span class="comment"># From worktrack-electron/ directory</span>
+<span class="comment"># IMPORTANT: Use this command, not npm run dev, from VS Code terminal</span>
+node scripts/launch.js
+
+<span class="comment"># Or the full dev pipeline (build renderer + launch):</span>
+npm run dev</pre>
+
+  <div class="callout warn">
+    <div class="callout-icon">⚠️</div>
+    <p><strong>Critical:</strong> Always launch from the <code>worktrack-electron</code> directory, not the parent. VS Code's terminal sets <code>ELECTRON_RUN_AS_NODE=1</code> which breaks Electron's main process. The <code>scripts/launch.js</code> launcher clears this before spawning Electron.</p>
+  </div>
+
+  <h3>Making Code Changes</h3>
+  <pre><span class="comment"># 1. Edit source files in src/renderer/</span>
+<span class="comment"># 2. Rebuild the renderer:</span>
+npm run build
+
+<span class="comment"># 3. Launch to test:</span>
+node scripts/launch.js
+
+<span class="comment"># 4. When satisfied, save to GitHub:</span>
+cd ..  <span class="comment"># back to "Attendance App 2" root</span>
+git add -A
+git commit -m "describe your change"
+git push</pre>
+
+  <h3>Adding a New Setting</h3>
+  <ol style="padding-left:20px; color:#475569; font-size:13px; line-height:2;">
+    <li>Add the key and default value to the <code>DEFAULTS</code> object in <code>src/renderer/lib/supabase.js</code></li>
+    <li>Run <code>INSERT INTO app_settings VALUES ('key', 'default') ON CONFLICT DO NOTHING</code> in Supabase SQL Editor</li>
+    <li>Add the UI field in <code>src/renderer/pages/admin/Settings.jsx</code></li>
+  </ol>
+
+  <h3>Adding a New Page</h3>
+  <ol style="padding-left:20px; color:#475569; font-size:13px; line-height:2;">
+    <li>Create the page file in <code>src/renderer/pages/</code></li>
+    <li>Import it in <code>src/renderer/App.jsx</code></li>
+    <li>Add a <code>&lt;Route&gt;</code> in the appropriate section (employee or admin)</li>
+    <li>Add a nav item in <code>src/renderer/components/Sidebar.jsx</code> — employee or admin nav array</li>
+  </ol>
+</div>
+
+<!-- ══ SECTION 15 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s15">
+  <div class="section-header"><div class="section-num">15</div><h2>Build &amp; Distribution</h2></div>
+
+  <h3>Build Commands</h3>
+  <table>
+    <tr><th>Command</th><th>What It Does</th></tr>
+    <tr><td><code>npm run build</code></td><td>Builds preload + renderer only. Used during development.</td></tr>
+    <tr><td><code>npm run package</code></td><td>Full production build + NSIS installer. Output: <code>release/</code></td></tr>
+    <tr><td><code>node scripts/launch.js</code></td><td>Launches the app using the last build. No rebuild.</td></tr>
+  </table>
+
+  <h3>Build Pipeline (npm run package)</h3>
+  <div class="flow">
+    <div class="flow-step">build-preload.cjs</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Vite build renderer</div><div class="flow-arrow">→</div>
+    <div class="flow-step">fix-html.js</div><div class="flow-arrow">→</div>
+    <div class="flow-step">electron-builder</div><div class="flow-arrow">→</div>
+    <div class="flow-step">WorkTrack Pro Setup 2.0.0.exe</div>
+  </div>
+
+  <h3>What Employees Receive</h3>
+  <p>A single <code>WorkTrack Pro Setup 2.0.0.exe</code> file (~100–160 MB). This self-contained installer bundles: Electron runtime, Chromium, Node.js, all npm packages, fonts, and the React app. Employees need no additional software — no Node.js, no Python, no Chrome.</p>
+
+  <h3>Windows SmartScreen Warning</h3>
+  <p>Because the installer is not code-signed (requires a ~$300/year certificate), Windows shows a blue "Windows protected your PC" screen. This is normal. Tell employees: <strong>click "More info" → "Run anyway"</strong>.</p>
+
+  <h3>Installation per Employee</h3>
+  <ol style="padding-left:20px; color:#475569; font-size:13px; line-height:2;">
+    <li>Receive the <code>.exe</code> via Teams / email / shared drive</li>
+    <li>Run it — installs silently to <code>%APPDATA%\Local\Programs\worktrack-pro</code>. No admin rights needed.</li>
+    <li>Desktop shortcut created automatically</li>
+    <li>Open app → Register → Sign in</li>
+    <li>Enable Location Services (Settings → Privacy → Location)</li>
+    <li>Enable auto-start in app Settings</li>
+  </ol>
+</div>
+
+<!-- ══ SECTION 16 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s16">
+  <div class="section-header"><div class="section-num">16</div><h2>Architecture Decisions</h2></div>
+
+  <table>
+    <tr><th>Decision</th><th>What Was Chosen</th><th>Why</th></tr>
+    <tr><td>Railway → Supabase</td><td>Supabase (free)</td><td>Railway's free tier was discontinued. Supabase free tier is genuinely free, doesn't sleep, and never needs infrastructure management.</td></tr>
+    <tr><td>FastAPI server → No server</td><td>Direct Supabase client</td><td>A server for 50 people adds zero value. All business logic runs client-side; RLS enforces security at the DB level.</td></tr>
+    <tr><td>CustomTkinter → Electron</td><td>Electron 32 + React</td><td>CustomTkinter has hard limits on UI quality. Electron gives full web-stack rendering quality.</td></tr>
+    <tr><td>winsdk GPS → Browser geolocation</td><td>navigator.geolocation with WiFi fallback</td><td>WebView2 (Chromium) has better location source integration than direct winsdk on many machines.</td></tr>
+    <tr><td>Resend → SMTP</td><td>nodemailer + SMTP</td><td>No new account needed. Works with existing Gmail/Outlook. Familiar to non-technical admins.</td></tr>
+    <tr><td>Admin-creates accounts → Self-register</td><td>Self-registration</td><td>For a 50-person startup, admin-gating adds friction with no meaningful security benefit.</td></tr>
+    <tr><td>Session persistence → No persistence</td><td>Memory-only sessions</td><td>Forces daily login. Reinforces attendance discipline. Avoids stale-token edge cases.</td></tr>
+    <tr><td>ELECTRON_RUN_AS_NODE issue</td><td>scripts/launch.js workaround</td><td>VS Code sets this env var for its own Electron runtime. It must be cleared before spawning the app or Electron runs as plain Node.js (no API, no GUI).</td></tr>
+    <tr><td>crossorigin attr issue</td><td>scripts/fix-html.js</td><td>Vite adds crossorigin for CORS on HTTP servers. file:// doesn't support CORS, causing scripts to silently fail. Post-build removal is the standard Electron fix.</td></tr>
+  </table>
+</div>
+
+<!-- ══ SECTION 17 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s17">
+  <div class="section-header"><div class="section-num">17</div><h2>Troubleshooting</h2></div>
+
+  <table>
+    <tr><th>Problem</th><th>Root Cause</th><th>Solution</th></tr>
+    <tr><td>App launches as blank dark window</td><td>ELECTRON_RUN_AS_NODE=1 (VS Code terminal)</td><td>Always launch via <code>node scripts/launch.js</code> from the worktrack-electron directory.</td></tr>
+    <tr><td>React page shows blank (no error)</td><td>Uncaught render error. ErrorBoundary not wrapping that route.</td><td>Wrap routes with <code>&lt;ErrorBoundary&gt;</code> in App.jsx. The error text will appear on screen.</td></tr>
+    <tr><td>GPS accuracy ±200 km</td><td>Machine using IP-based geolocation (no GPS chip or WiFi positioning)</td><td>Configure office WiFi SSID in Admin Settings. That's the definitive solution for desktop PCs.</td></tr>
+    <tr><td>Cannot re-register with same email after account deletion</td><td>auth.users row not cleaned up</td><td>Use Admin → Employees → Delete (not just deactivate). This calls <code>delete_user_completely()</code> which removes from auth.users. Requires the SQL migration to be run first.</td></tr>
+    <tr><td>"Multiple relationship" Supabase error</td><td>Table has two FKs to same table (user_id + reviewed_by → profiles)</td><td>Use <code>profiles:user_id(...)</code> syntax in .select() to specify which FK to follow.</td></tr>
+    <tr><td>WFH employees show at 0,0 on map</td><td>WiFi SSID stage returned 0,0 before IP fallback was added</td><td>Fixed: WiFi SSID stage now fetches IP coordinates before calling applyLocation.</td></tr>
+    <tr><td>is_late incorrectly calculated</td><td>toLocaleString() date parsing varies by system timezone</td><td>Fixed: use Intl.DateTimeFormat.formatToParts() to get raw IST integers, compare as plain numbers.</td></tr>
+    <tr><td>Supabase "Cannot read border of undefined"</td><td>LEAVE_COLORS keyed by value ('sick') but code used color ('rose')</td><td>Fixed: use <code>LEAVE_COLORS[type.value]</code> not <code>LEAVE_COLORS[type.color]</code>.</td></tr>
+    <tr><td>Build: "crossorigin" causes blank renderer</td><td>Vite adds crossorigin for CORS — breaks file:// protocol</td><td>scripts/fix-html.js removes it post-build. Runs automatically in all build scripts.</td></tr>
+    <tr><td>GPU cache errors in terminal</td><td>VS Code (Electron) and WorkTrack Pro (Electron) competing for same GPU cache</td><td>Harmless. These errors don't affect functionality and disappear in packaged .exe.</td></tr>
+    <tr><td>Autofill errors in terminal</td><td>Chrome DevTools trying to use Autofill CDP protocol which Electron doesn't support</td><td>Harmless. Appears only when DevTools is open. Doesn't affect functionality.</td></tr>
+    <tr><td>Leave page blank screen</td><td>LEAVE_COLORS lookup using wrong key</td><td>Fixed in v2.0. All LEAVE_COLORS lookups use type.value not type.color.</td></tr>
+  </table>
+</div>
+
+<!-- ══ SECTION 18 ══════════════════════════════════════════════════════════════ -->
+<div class="section" id="s18">
+  <div class="section-header"><div class="section-num">18</div><h2>Roadmap &amp; Future Work</h2></div>
+
+  <h3>High Priority</h3>
+  <table>
+    <tr><th>Feature</th><th>Description</th><th>Effort</th></tr>
+    <tr><td>Auto-Update (electron-updater)</td><td>Background update downloads from GitHub Releases. Blocking modal for min version enforcement.</td><td><span class="badge b-orange">Medium</span></td></tr>
+    <tr><td>Holiday calendar (working days)</td><td>Holidays already excluded from leave day count. Extend to attendance stats and "absent" marking.</td><td><span class="badge b-blue">Small</span></td></tr>
+    <tr><td>Leave balance in attendance %</td><td>Approved leave days should not count as absent in monthly summary stats.</td><td><span class="badge b-blue">Small</span></td></tr>
+  </table>
+
+  <h3>Medium Priority</h3>
+  <table>
+    <tr><th>Feature</th><th>Description</th></tr>
+    <tr><td>Face recognition check-in</td><td>Camera-based verification using TensorFlow.js face detection. Strongest office verification.</td></tr>
+    <tr><td>QR code check-in</td><td>Static QR displayed at reception. Scan = check in. Works on phones without the app.</td></tr>
+    <tr><td>Manager role</td><td>Middle tier — can see team attendance but not change settings. Useful for team leads.</td></tr>
+    <tr><td>Salary deduction report</td><td>Auto-calculate based on attendance %. Monthly payroll-ready Excel.</td></tr>
+    <tr><td>Attendance streak counter</td><td>"You've been on time 15 days in a row 🔥" — motivational gamification on dashboard.</td></tr>
+    <tr><td>Bulk employee import</td><td>Upload CSV of employee names/IDs to create 50 accounts at once.</td></tr>
+  </table>
+
+  <h3>Lower Priority</h3>
+  <table>
+    <tr><th>Feature</th><th>Description</th></tr>
+    <tr><td>Half-day leave</td><td>Morning or afternoon half. Counts as 0.5 days against quota.</td></tr>
+    <tr><td>Department-level stats</td><td>Separate RPA vs SAP comparison on admin overview.</td></tr>
+    <tr><td>PDF report export</td><td>Complement to existing Excel exports.</td></tr>
+    <tr><td>Employee profile photos</td><td>Uploaded avatar. Shows in live feed and employee cards.</td></tr>
+    <tr><td>WhatsApp notifications</td><td>WFH alerts via WhatsApp Business API. More likely to be seen than email.</td></tr>
+    <tr><td>IP restriction</td><td>Only allow check-in from office network IP range (alternative/supplement to WiFi SSID).</td></tr>
+    <tr><td>2FA for admins</td><td>TOTP-based two-factor authentication for admin accounts.</td></tr>
+    <tr><td>Audit log</td><td>Track all admin actions (who changed what setting, who deleted whom).</td></tr>
+  </table>
+
+  <div style="margin-top:48px; padding-top:24px; border-top:1px solid #E2E8F0; text-align:center; color:#94A3B8; font-size:12px;">
+    <p><strong style="color:#334155">WorkTrack Pro v2.0.0</strong> &nbsp;·&nbsp; Edel Tech Pvt Ltd &nbsp;·&nbsp; Electron 32 + React 18 + Supabase PostgreSQL 15</p>
+    <p style="margin-top:4px">Supabase Project: <code>lwnuunwxfgvketjtmreo.supabase.co</code> &nbsp;·&nbsp; GitHub: <code>github.com/Kunallele01/worktrack-pro</code></p>
+    <p style="margin-top:4px; color:#CBD5E1">This document was generated alongside the codebase. Keep it updated as features are added.</p>
+  </div>
+</div>
+
+</body>
+</html>
