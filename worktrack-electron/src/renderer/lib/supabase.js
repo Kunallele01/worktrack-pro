@@ -129,8 +129,6 @@ async function _sendWelcomeEmail(profile, password, settings, emailFallback = ''
   <!-- ══ HERO ══ -->
   <div style="background:linear-gradient(145deg,#0f172a 0%,#1e1b4b 45%,#0c0a1e 100%);border-radius:24px 24px 0 0;padding:48px 36px 40px;text-align:center;position:relative;overflow:hidden;border:1px solid rgba(99,102,241,0.2);border-bottom:none;">
     <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#6366f1,#8b5cf6,#a78bfa,#4f86f7,#34d399,#fbbf24,#f472b6,#6366f1);background-size:400% 100%;animation:shimmer 5s linear infinite;"></div>
-    <div style="position:absolute;top:-60px;left:-60px;width:200px;height:200px;background:radial-gradient(circle,rgba(99,102,241,0.18),transparent 70%);border-radius:50%;"></div>
-    <div style="position:absolute;bottom:-50px;right:-50px;width:180px;height:180px;background:radial-gradient(circle,rgba(79,134,247,0.18),transparent 70%);border-radius:50%;"></div>
 
     <!-- Initial avatar -->
     <div style="width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#4f86f7);margin:0 auto 22px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;color:#fff;border:3px solid rgba(255,255,255,0.15);box-shadow:0 0 30px rgba(99,102,241,0.4);">
