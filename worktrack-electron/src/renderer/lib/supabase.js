@@ -46,22 +46,175 @@ export async function signIn(identifier, password) {
   return profile
 }
 
-export async function signUp(email, password, employee_id, full_name, department, birthday = null) {
+// ── Employee ID generation ────────────────────────────────────────────────── //
+// Each department uses a different prime multiplier + offset so the codes look
+// completely unrelated between RPA and SAP. Timestamp + random salt makes it
+// appear cryptographically complex while being dead simple to generate.
+function _generateFancyId(dept) {
+  const t    = Date.now()
+  const salt = Math.floor(Math.random() * 9999)
+  const SEEDS = { RPA: 1_000_003, SAP: 2_000_003 }
+  const seed  = SEEDS[dept.toUpperCase()] ?? 3_000_003
+  // Mix: multiply timestamp by dept prime, XOR with salt, encode in base-36
+  const raw  = ((t % 999_983) * 97 + seed + salt)
+  const code = raw.toString(36).toUpperCase().padStart(6, '0').slice(-6)
+  return `${dept.toUpperCase()}-${code}`
+}
+
+// ── Welcome email ─────────────────────────────────────────────────────────── //
+async function _sendWelcomeEmail(profile, password, settings) {
+  const host = settings.smtp_host?.trim()
+  const user = settings.smtp_username?.trim()
+  const pass = settings.smtp_password?.trim()
+  if (!host || !user || !pass || !profile.email) return
+
+  const firstName  = profile.full_name?.split(' ')[0] || profile.full_name
+  const company    = settings.company_name || 'Your Company'
+  const employeeId = profile.employee_id   || '—'
+  const dept       = profile.department    || '—'
+
+  const credRows = [
+    ['👤', 'Full Name',   profile.full_name],
+    ['🏷️', 'Employee ID', employeeId],
+    ['📧', 'Email',       profile.email],
+    ['🏢', 'Department',  dept],
+    ['🔑', 'Password',    password],
+  ].map(([icon, label, value]) => {
+    const mono = label === 'Password' || label === 'Employee ID'
+    return `<div style="display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+      <span style="font-size:16px;flex-shrink:0;width:24px;">${icon}</span>
+      <div style="flex:1;">
+        <p style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin:0 0 3px;">${label}</p>
+        <p style="color:#f1f5f9;font-size:14px;font-weight:600;margin:0;${mono ? 'font-family:monospace;letter-spacing:0.5px;' : ''}">${value}</p>
+      </div>
+    </div>`
+  }).join('')
+
+  const stepsHtml = [
+    ['1️⃣', 'Open WorkTrack Pro', 'Launch the app on your Windows PC'],
+    ['2️⃣', 'Sign In', 'Use your email address and the password above'],
+    ['3️⃣', 'Mark Your Attendance', 'Hit Check-In every morning when you start work'],
+    ['4️⃣', 'Change Your Password', 'Go to Settings → Security after your first login'],
+  ].map(([num, title, desc]) =>
+    `<div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px;">
+      <span style="font-size:20px;flex-shrink:0;">${num}</span>
+      <div>
+        <p style="color:#1e293b;font-size:13px;font-weight:700;margin:0 0 2px;">${title}</p>
+        <p style="color:#64748b;font-size:12px;line-height:1.5;margin:0;">${desc}</p>
+      </div>
+    </div>`
+  ).join('')
+
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+  @keyframes shimmer{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#f0f4f8;font-family:'Inter',Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+</style></head>
+<body style="background:#f0f4f8;padding:32px 0;">
+<div style="max-width:560px;margin:0 auto;padding:0 12px;">
+
+  <!-- Pre-header sparkle row -->
+  <div style="text-align:center;padding:0 0 18px;font-size:18px;letter-spacing:10px;">🎉&nbsp;🚀&nbsp;⚡&nbsp;🌟&nbsp;🎯&nbsp;✨</div>
+
+  <!-- ══ HERO ══ -->
+  <div style="background:linear-gradient(145deg,#0f172a 0%,#1e1b4b 45%,#0c0a1e 100%);border-radius:24px 24px 0 0;padding:48px 36px 40px;text-align:center;position:relative;overflow:hidden;border:1px solid rgba(99,102,241,0.2);border-bottom:none;">
+    <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#6366f1,#8b5cf6,#a78bfa,#4f86f7,#34d399,#fbbf24,#f472b6,#6366f1);background-size:400% 100%;animation:shimmer 5s linear infinite;"></div>
+    <div style="position:absolute;top:-60px;left:-60px;width:200px;height:200px;background:radial-gradient(circle,rgba(99,102,241,0.18),transparent 70%);border-radius:50%;"></div>
+    <div style="position:absolute;bottom:-50px;right:-50px;width:180px;height:180px;background:radial-gradient(circle,rgba(79,134,247,0.18),transparent 70%);border-radius:50%;"></div>
+
+    <!-- Initial avatar -->
+    <div style="width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#4f86f7);margin:0 auto 22px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;color:#fff;border:3px solid rgba(255,255,255,0.15);box-shadow:0 0 30px rgba(99,102,241,0.4);">
+      ${firstName.charAt(0).toUpperCase()}
+    </div>
+
+    <p style="font-size:11px;font-weight:700;color:#a78bfa;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;">Welcome Aboard</p>
+    <h1 style="font-size:38px;font-weight:900;color:#fff;letter-spacing:-1.5px;line-height:1.05;margin-bottom:8px;">Hello, ${firstName}! 👋</h1>
+    <p style="color:#94a3b8;font-size:15px;">You're officially part of <strong style="color:#a78bfa;">${company}</strong></p>
+  </div>
+
+  <!-- ══ BODY ══ -->
+  <div style="background:#ffffff;border:1px solid #e2e8f0;border-top:none;padding:32px 36px;">
+
+    <p style="color:#475569;font-size:15px;line-height:1.75;margin-bottom:28px;">
+      Your <strong style="color:#334155;">WorkTrack Pro</strong> account is ready. Everything you need to get started is below.
+      Keep these credentials safe and <strong style="color:#ef4444;">update your password after your first login.</strong>
+    </p>
+
+    <!-- Credentials card (dark, styled) -->
+    <div style="background:linear-gradient(145deg,#0f172a,#1e1b4b);border-radius:18px;padding:22px 24px;margin-bottom:24px;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#6366f1,#4f86f7,#34d399);"></div>
+      <p style="font-size:10px;font-weight:700;color:#6366f1;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;">Your Login Credentials</p>
+      ${credRows}
+    </div>
+
+    <!-- Divider -->
+    <div style="height:1px;background:linear-gradient(90deg,transparent,#e2e8f0,transparent);margin:0 0 24px;"></div>
+
+    <!-- Getting started steps -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:22px 24px;margin-bottom:28px;">
+      <p style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:16px;">Getting Started</p>
+      ${stepsHtml}
+    </div>
+
+    <!-- CTA banner -->
+    <div style="text-align:center;">
+      <div style="display:inline-block;background:linear-gradient(135deg,#6366f1 0%,#4f86f7 60%,#34d399 100%);border-radius:16px;padding:15px 42px;font-size:16px;font-weight:800;color:#fff;letter-spacing:0.3px;box-shadow:0 6px 28px rgba(99,102,241,0.4);">
+        🚀&nbsp;&nbsp;Let's Get to Work!
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ FOOTER ══ -->
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 24px 24px;padding:22px 36px;text-align:center;">
+    <div style="font-size:16px;letter-spacing:8px;margin-bottom:12px;opacity:0.6;">⚡ 🌟 🎯 ✨ 🚀</div>
+    <p style="color:#64748b;font-size:12px;line-height:1.7;margin:0 0 6px;">
+      Sent by <strong style="color:#6366f1;">${company}</strong> via WorkTrack Pro
+    </p>
+    <p style="color:#94a3b8;font-size:11px;margin:0;">Please do not share your credentials with anyone.</p>
+  </div>
+
+</div>
+</body></html>`
+
+  window.api?.sendEmail({
+    host, port: settings.smtp_port || '587', user, pass,
+    fromName: settings.smtp_from_name || company,
+    to: [profile.email],
+    subject: `🎉 Welcome to ${company}, ${firstName}! Your WorkTrack Pro credentials are inside`,
+    html,
+  }).catch(() => {})
+}
+
+export async function signUp(email, password, full_name, department, birthday = null) {
+  // Generate unique fancy Employee ID before creating the auth user
+  const employee_id = _generateFancyId(department)
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: { employee_id: employee_id.toUpperCase(), full_name, department },
+      data: { employee_id, full_name, department },
     },
   })
   if (error) throw new Error(error.message)
   if (!data.user) throw new Error('Registration failed.')
-  // Give the trigger a moment to create the profile row
+
+  // Wait for the DB trigger to create the profile row
   await new Promise(r => setTimeout(r, 800))
-  if (birthday) {
-    await supabase.from('profiles').update({ birthday }).eq('id', data.user.id)
+
+  const updates = {}
+  if (birthday) updates.birthday = birthday
+  if (Object.keys(updates).length) {
+    await supabase.from('profiles').update(updates).eq('id', data.user.id)
   }
-  return fetchProfile(data.user.id)
+
+  const profile  = await fetchProfile(data.user.id)
+  const settings = await getSettings()
+  _sendWelcomeEmail(profile, password, settings).catch(() => {})
+
+  return profile
 }
 
 export async function signOut() {
@@ -116,7 +269,7 @@ export async function getUsers({ search = '', department = '', isActive = null, 
 }
 
 export async function updateUser(userId, fields) {
-  const allowed = ['full_name', 'email', 'department', 'is_admin', 'is_active', 'birthday']
+  const allowed = ['full_name', 'email', 'department', 'is_admin', 'is_active', 'birthday', 'employee_id']
   const payload = Object.fromEntries(Object.entries(fields).filter(([k]) => allowed.includes(k)))
   const { data, error } = await supabase.from('profiles').update(payload).eq('id', userId).select().single()
   if (error) throw new Error(error.message)

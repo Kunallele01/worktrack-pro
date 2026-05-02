@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Shield, ShieldOff, UserX, UserCheck, Trash2, Cake } from 'lucide-react'
+import { Search, Shield, ShieldOff, UserX, UserCheck, Trash2, Cake, Hash } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { getUsers, updateUser, deleteUser, getMonthHistory } from '../../lib/supabase'
 import { Card, Badge, Avatar, Button, Input } from '../../components/ui'
@@ -24,6 +24,59 @@ function AttendancePill({ userId }) {
 
   return (
     <span className="text-xs font-mono text-gray-400 bg-white/[0.05] px-2 py-0.5 rounded-full">{label}</span>
+  )
+}
+
+function EmployeeIdModal({ user, onClose, onSaved }) {
+  const toast = useToast()
+  const [empId,  setEmpId ] = useState(user.employee_id || '')
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    if (!empId.trim()) { toast('Employee ID cannot be empty.', 'error'); return }
+    setSaving(true)
+    try {
+      await updateUser(user.id, { employee_id: empId.trim().toUpperCase() })
+      toast(`Employee ID updated for ${user.full_name}.`, 'success')
+      onSaved(); onClose()
+    } catch (e) {
+      toast(e.message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-surface-800 border border-white/10 rounded-2xl shadow-2xl w-full max-w-xs p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-9 h-9 rounded-xl bg-accent-500/15 border border-accent-500/30 flex items-center justify-center">
+            <Hash size={15} className="text-accent-400" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-gray-100">Edit Employee ID</p>
+            <p className="text-xs text-gray-400">{user.full_name}</p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1.5 mb-2">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Employee ID</label>
+          <input value={empId} onChange={e => setEmpId(e.target.value.toUpperCase())}
+            placeholder="e.g. RPA-2CUH" className="input-base py-2.5 text-sm font-mono" />
+        </div>
+        <p className="text-xs text-gray-600 mb-5">Type any ID. The new value will be saved as-is (uppercase).</p>
+        <div className="flex gap-2.5">
+          <Button variant="secondary" onClick={onClose} className="flex-1 text-sm">Cancel</Button>
+          <Button onClick={handleSave} loading={saving} className="flex-1 text-sm">
+            <Hash size={14} /> Save
+          </Button>
+        </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
@@ -85,7 +138,7 @@ function BirthdayModal({ user, onClose, onSaved }) {
   )
 }
 
-function EmployeeCard({ user, onAction, onBirthdayEdit }) {
+function EmployeeCard({ user, onAction, onBirthdayEdit, onIdEdit }) {
   const todayMD = `${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`
   const bdayMD  = user.birthday ? user.birthday.slice(5) : null  // "MM-DD"
   const isBdayToday = bdayMD === todayMD
@@ -104,7 +157,12 @@ function EmployeeCard({ user, onAction, onBirthdayEdit }) {
               {user.full_name}
               {isBdayToday && <span className="ml-2 text-base">🎂</span>}
             </p>
-            <p className="text-xs font-mono text-accent-400">{user.employee_id}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-mono text-accent-400">{user.employee_id}</p>
+              <button onClick={() => onIdEdit(user)}
+                className="text-[10px] text-gray-600 hover:text-accent-400 transition-colors leading-none"
+                title="Edit Employee ID">✎</button>
+            </div>
             {user.department && <p className="text-xs text-gray-500 mt-0.5">{user.department}</p>}
           </div>
           {user.is_admin && <Badge status="admin" />}
@@ -161,6 +219,7 @@ export default function Employees() {
   const [search,     setSearch    ] = useState('')
   const [loading,    setLoading   ] = useState(false)
   const [bdayTarget, setBdayTarget] = useState(null)
+  const [idTarget,   setIdTarget  ] = useState(null)
 
   const load = async () => {
     setLoading(true)
@@ -210,12 +269,11 @@ export default function Employees() {
     <div className="h-full flex flex-col p-6 gap-4">
       {Dialog}
       <AnimatePresence>
+        {idTarget && (
+          <EmployeeIdModal user={idTarget} onClose={() => setIdTarget(null)} onSaved={load} />
+        )}
         {bdayTarget && (
-          <BirthdayModal
-            user={bdayTarget}
-            onClose={() => setBdayTarget(null)}
-            onSaved={load}
-          />
+          <BirthdayModal user={bdayTarget} onClose={() => setBdayTarget(null)} onSaved={load} />
         )}
       </AnimatePresence>
 
@@ -234,7 +292,7 @@ export default function Employees() {
       <div className="flex-1 overflow-y-auto">
         <div className="grid grid-cols-3 gap-4 pb-4">
           {filtered.map(u => (
-            <EmployeeCard key={u.id} user={u} onAction={handleAction} onBirthdayEdit={setBdayTarget} />
+            <EmployeeCard key={u.id} user={u} onAction={handleAction} onBirthdayEdit={setBdayTarget} onIdEdit={setIdTarget} />
           ))}
         </div>
       </div>
