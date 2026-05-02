@@ -4,7 +4,7 @@ import { format, parseISO } from 'date-fns'
 import { CheckCircle, XCircle, Clock } from 'lucide-react'
 import { getAllCorrections, reviewCorrection } from '../../lib/supabase'
 import { useStore } from '../../lib/store'
-import { Card, Button, Avatar } from '../../components/ui'
+import { Card, Button, Avatar, EmptyState } from '../../components/ui'
 import { useToast } from '../../components/ui'
 
 const CORR_TYPES = {
@@ -117,9 +117,11 @@ export default function AdminCorrections() {
 
       <div className="flex-1 overflow-y-auto">
         {shown.length === 0 ? (
-          <Card className="p-10 text-center">
-            <p className="text-4xl mb-3">✅</p>
-            <p className="text-sm text-gray-400">No {tab} correction requests</p>
+          <Card>
+            {tab === 'pending'
+              ? <EmptyState emoji="🎯" title="No pending corrections" subtitle="All attendance correction requests have been reviewed. Great work!" />
+              : <EmptyState emoji="📁" title="No history yet" subtitle="Reviewed correction requests will show up here over time." />
+            }
           </Card>
         ) : (
           <div className="flex flex-col gap-3">

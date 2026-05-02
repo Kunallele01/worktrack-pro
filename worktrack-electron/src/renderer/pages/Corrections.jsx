@@ -4,7 +4,7 @@ import { format, parseISO } from 'date-fns'
 import { submitCorrection, getMyCorrections, getMonthHistory } from '../lib/supabase'
 import { useStore } from '../lib/store'
 import Sidebar from '../components/Sidebar'
-import { Page, Card, Button, Select } from '../components/ui'
+import { Page, Card, Button, Select, EmptyState } from '../components/ui'
 import { ToastProvider, useToast } from '../components/ui'
 
 const CORR_TYPES = [
@@ -101,9 +101,9 @@ function CorrectionForm({ user, history, onSuccess }) {
 function MyRequests({ requests }) {
   const STATUS = { pending: 'text-amber-400', approved: 'text-emerald-400', rejected: 'text-red-400' }
   if (!requests.length) return (
-    <Card className="p-8 text-center">
-      <p className="text-3xl mb-2">✅</p>
-      <p className="text-sm text-gray-400">No correction requests submitted yet.</p>
+    <Card>
+      <EmptyState emoji="✍️" title="No correction requests yet"
+        subtitle="Submit a correction above if you notice a wrong or missed check-in." />
     </Card>
   )
   return (

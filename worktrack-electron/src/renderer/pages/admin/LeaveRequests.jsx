@@ -4,7 +4,7 @@ import { format, parseISO } from 'date-fns'
 import { CheckCircle, XCircle, Clock } from 'lucide-react'
 import { getAllLeaveRequests, reviewLeave } from '../../lib/supabase'
 import { useStore } from '../../lib/store'
-import { Card, Button, Avatar } from '../../components/ui'
+import { Card, Button, Avatar, EmptyState } from '../../components/ui'
 import { useToast } from '../../components/ui'
 import { LEAVE_TYPES, LEAVE_COLORS } from '../../lib/leaveConstants'
 
@@ -206,9 +206,11 @@ export default function LeaveRequests() {
 
       <div className="flex-1 overflow-y-auto">
         {(tab === 'pending' ? pending : reviewed).length === 0 ? (
-          <Card className="p-10 text-center">
-            <p className="text-4xl mb-3">{tab === 'pending' ? '✅' : '📋'}</p>
-            <p className="text-sm text-gray-400">{tab === 'pending' ? 'No pending requests' : 'No reviewed requests yet'}</p>
+          <Card>
+            {tab === 'pending'
+              ? <EmptyState emoji="✅" title="All caught up!" subtitle="No leave requests are waiting for your review right now." />
+              : <EmptyState emoji="📋" title="No history yet" subtitle="Reviewed leave requests will appear here once you start approving or rejecting them." />
+            }
           </Card>
         ) : (
           <div className="flex flex-col gap-3">

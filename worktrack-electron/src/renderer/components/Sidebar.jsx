@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { LayoutDashboard, Settings, BarChart3, Users, Calendar, Map, LogOut, Zap, Sun, Moon, CalendarCheck, ClipboardList, UserCircle } from 'lucide-react'
-import { signOut, getAdminBadgeCounts, getEmployeeBadgeCounts } from '../lib/supabase'
+import { AnimatePresence, motion } from 'framer-motion'
+import { LayoutDashboard, Settings, BarChart3, Users, Calendar, Map, LogOut, Zap, Sun, Moon, CalendarCheck, ClipboardList, UserCircle, Bell } from 'lucide-react'
+import { signOut, getAdminBadgeCounts, getEmployeeBadgeCounts, getNotifications } from '../lib/supabase'
 import { useStore } from '../lib/store'
 import { Avatar } from './ui'
 
@@ -32,9 +32,14 @@ export default function Sidebar() {
   const settings   = useStore(s => s.settings)
   const theme      = useStore(s => s.theme)
   const setTheme   = useStore(s => s.setTheme)
-  const badges     = useStore(s => s.badges)
-  const setBadges  = useStore(s => s.setBadges)
-  const timerRef   = useRef(null)
+  const badges          = useStore(s => s.badges)
+  const setBadges       = useStore(s => s.setBadges)
+  const notifications   = useStore(s => s.notifications)
+  const setNotifications= useStore(s => s.setNotifications)
+  const timerRef        = useRef(null)
+  const [notifOpen,  setNotifOpen ] = useState(false)
+  const [lastSeen,   setLastSeen  ] = useState(() => localStorage.getItem('wt-notif-seen') || '1970-01-01T00:00:00Z')
+  const notifRef = useRef(null)
 
   const companyName = settings?.company_name || 'Your Company'
   const navItems    = isAdmin ? ADMIN_NAV : EMP_NAV
@@ -46,14 +51,48 @@ export default function Sidebar() {
         ? await getAdminBadgeCounts()
         : await getEmployeeBadgeCounts(user.id)
       setBadges(counts)
-    } catch { /* silent — badges are non-critical */ }
+    } catch { /* silent */ }
   }
+
+  const loadNotifications = useCallback(async () => {
+    if (!user?.id) return
+    try { setNotifications(await getNotifications(user.id, isAdmin)) }
+    catch { /* silent */ }
+  }, [user?.id, isAdmin])
 
   useEffect(() => {
     loadBadges()
-    timerRef.current = setInterval(loadBadges, 60_000)
+    loadNotifications()
+    timerRef.current = setInterval(() => { loadBadges(); loadNotifications() }, 60_000)
     return () => clearInterval(timerRef.current)
   }, [user?.id, isAdmin])
+
+  // Close notification panel on outside click
+  useEffect(() => {
+    if (!notifOpen) return
+    const handler = (e) => { if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [notifOpen])
+
+  const unreadCount = notifications.filter(n => new Date(n.time) > new Date(lastSeen)).length
+
+  function openNotifications() {
+    setNotifOpen(o => !o)
+    const now = new Date().toISOString()
+    setLastSeen(now)
+    localStorage.setItem('wt-notif-seen', now)
+  }
+
+  function relTime(iso) {
+    const diff = Date.now() - new Date(iso).getTime()
+    const m = Math.floor(diff / 60000)
+    if (m < 1)  return 'just now'
+    if (m < 60) return `${m}m ago`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}h ago`
+    return `${Math.floor(h / 24)}d ago`
+  }
 
   async function handleLogout() {
     window.api?.destroyTray()
@@ -114,6 +153,63 @@ export default function Sidebar() {
           )
         })}
       </nav>
+
+      {/* Notification bell */}
+      <div className="px-3 pb-1 pt-2 border-t border-white/[0.06]" ref={notifRef}>
+        <button onClick={openNotifications}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-all relative">
+          <Bell size={15} />
+          <span className="flex-1 text-left">Notifications</span>
+          {unreadCount > 0 && (
+            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 leading-none">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {/* Dropdown panel — slides out to the right of the sidebar */}
+        <AnimatePresence>
+          {notifOpen && (
+            <motion.div
+              initial={{ opacity: 0, x: -8, scale: 0.97 }}
+              animate={{ opacity: 1, x: 0,  scale: 1 }}
+              exit={{   opacity: 0, x: -8, scale: 0.97 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 260 }}
+              style={{ position: 'fixed', left: 224, bottom: 120, width: 340, zIndex: 500 }}
+              className="bg-surface-800 border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+                <p className="text-sm font-bold text-gray-100">Notifications</p>
+                <span className="text-xs text-gray-500">{notifications.length} recent</span>
+              </div>
+              <div className="overflow-y-auto" style={{ maxHeight: 360 }}>
+                {notifications.length === 0 ? (
+                  <div className="flex flex-col items-center py-10 px-4 text-center">
+                    <span className="text-4xl mb-3">🔔</span>
+                    <p className="text-sm font-medium text-gray-300">You're all caught up</p>
+                    <p className="text-xs text-gray-500 mt-1">No new notifications in the last 7 days.</p>
+                  </div>
+                ) : (
+                  notifications.map(n => {
+                    const isNew = new Date(n.time) > new Date(lastSeen)
+                    return (
+                      <div key={n.id}
+                        className={`flex items-start gap-3 px-4 py-3 border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors ${isNew ? 'bg-accent-500/[0.04]' : ''}`}>
+                        <span className="text-xl shrink-0 mt-0.5">{n.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-xs font-semibold leading-snug ${isNew ? 'text-gray-100' : 'text-gray-300'}`}>{n.title}</p>
+                          <p className="text-xs text-gray-500 mt-0.5 leading-snug">{n.subtitle}</p>
+                        </div>
+                        <span className="text-[10px] text-gray-600 shrink-0 mt-0.5 whitespace-nowrap">{relTime(n.time)}</span>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* User */}
       <div className="px-3 pb-4 pt-3 border-t border-white/[0.06]">

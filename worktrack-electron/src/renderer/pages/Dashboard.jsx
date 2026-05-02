@@ -101,9 +101,73 @@ function DashboardInner() {
   const canCheckIn  = gpsStatus === 'active' && !checkedIn
   const canCheckOut = checkedIn && !checkedOut
 
-  const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const hour      = new Date().getHours()
+  const greeting  = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const firstName = user?.full_name?.split(' ')[0] || ''
+
+  // ── Motivational message — deterministic per user per day ──────────────────
+  const MESSAGES = [
+    "Consistency is the rarest superpower. You're building it right now.",
+    "Every great record started with someone showing up today. That's you.",
+    "The discipline to check in on time is the same discipline that builds careers.",
+    "Small wins compound. Today's check-in is one of them.",
+    "You don't need motivation to do great work. You need habits — and you have them.",
+    "Progress is rarely loud. It mostly sounds like today — ordinary, consistent, powerful.",
+    "Showing up is the first chapter. Make today a good one.",
+    "Behind every great result is a long streak of unremarkable days, done well.",
+    "Your future self will quietly thank you for what you do today.",
+    "The team runs because everyone pulls. Today you're doing your part.",
+    "Excellence isn't a singular act — it's what you do when no one's watching.",
+    "You showed up. That already puts you ahead of the average.",
+    "Good things take time. Great things take showing up every single day.",
+    "The work you do today is the story you get to tell tomorrow.",
+    "Discipline is choosing the right thing even when it's the harder thing.",
+    "Another day, another opportunity to outperform yesterday's version of yourself.",
+    "Reliability is the foundation of trust. You're building both, right now.",
+    "Not every day feels epic. But every consistent day IS epic in hindsight.",
+    "Greatness is ordinary effort, done with extraordinary consistency.",
+    "You bring something to this team that no one else can. Today included.",
+    "Hard work in silence lets the results do the talking.",
+    "Focus on what you can control: full effort, today. Done.",
+    "The best version of yourself showed up today. Own it.",
+    "Results are just consistency that finally became visible.",
+    "One more day of doing it right. That's how legends are made.",
+    "Make today something worth putting on your record.",
+    "The people who change industries mostly just never stopped showing up.",
+    "This moment is part of a bigger story you're writing.",
+    "Your work matters more than you realise. Today is proof.",
+    "Behind every great career is a thousand unremarkable mornings, just like this one.",
+  ]
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000)
+  const userHash  = (user?.id || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+  const todayMsg  = MESSAGES[(userHash + dayOfYear) % MESSAGES.length]
+
+  // ── Streak — consecutive working days present (current month data) ─────────
+  const presentDates = new Set(
+    history.filter(r => ['in_office','wfh'].includes(r.status)).map(r => r.date)
+  )
+  let streak = 0
+  const cur = new Date()
+  // include today if already checked in, else start from yesterday
+  if (!presentDates.has(cur.toLocaleDateString('sv-SE'))) cur.setDate(cur.getDate() - 1)
+  for (let i = 0; i < 60; i++) {
+    const day = cur.getDay()
+    if (day !== 0 && day !== 6) {
+      if (presentDates.has(cur.toLocaleDateString('sv-SE'))) streak++
+      else break
+    }
+    cur.setDate(cur.getDate() - 1)
+  }
+
+  // ── Month progress ─────────────────────────────────────────────────────────
+  const now = new Date()
+  let totalWD = 0, passedWD = 0
+  const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  for (let d = 1; d <= dim; d++) {
+    const wd = new Date(now.getFullYear(), now.getMonth(), d).getDay()
+    if (wd !== 0 && wd !== 6) { totalWD++; if (d <= now.getDate()) passedWD++ }
+  }
+  const monthPct = totalWD ? Math.round((passedWD / totalWD) * 100) : 0
 
   return (
     <div className="flex h-screen bg-surface-900 overflow-hidden">
@@ -112,20 +176,44 @@ function DashboardInner() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left column */}
         <div className="w-80 shrink-0 flex flex-col border-r border-white/[0.06] overflow-y-auto p-5 gap-5">
+
+          {/* Greeting */}
           <div>
-            <h2 className="text-xl font-bold text-gray-100">{greeting}, {firstName} 👋</h2>
-            <p className="text-sm text-gray-500 mt-0.5">{format(new Date(), 'EEEE, d MMMM yyyy')}</p>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-100">{greeting}, {firstName} 👋</h2>
+              {streak > 0 && (
+                <span className="flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                  🔥 {streak}d
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">{format(new Date(), 'EEEE, d MMMM yyyy')}</p>
+            <p className="text-xs text-gray-500 italic mt-2 leading-relaxed border-l-2 border-accent-500/30 pl-2">
+              {todayMsg}
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <StatCard icon={Users}     value={summary.present ?? '—'} label="Present"   accentColor="success" />
-            <StatCard icon={Home}      value={summary.wfh     ?? '—'} label="WFH"       accentColor="info" />
-            <StatCard icon={Clock}     value={summary.late    ?? '—'} label="Late"      accentColor="warning" />
-            <StatCard icon={AlertTriangle} value={summary.absent ?? '—'} label="Absent" accentColor="danger" />
+            <StatCard icon={Users}         value={summary.present ?? '—'} label="Present"   accentColor="success" />
+            <StatCard icon={Home}          value={summary.wfh     ?? '—'} label="WFH"       accentColor="info" />
+            <StatCard icon={Clock}         value={summary.late    ?? '—'} label="Late"      accentColor="warning" />
+            <StatCard icon={AlertTriangle} value={summary.absent  ?? '—'} label="Absent"    accentColor="danger" />
+          </div>
+
+          {/* Month progress */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Month Progress</p>
+              <span className="text-xs font-bold text-accent-400">{monthPct}%</span>
+            </div>
+            <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+              <div className="h-full bg-accent-500 rounded-full transition-all duration-700"
+                style={{ width: `${monthPct}%` }} />
+            </div>
+            <p className="text-xs text-gray-600">{passedWD} of {totalWD} working days through {format(new Date(), 'MMMM')}</p>
           </div>
 
           <Card className="p-4">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">This Month</p>
             <CalendarWidget attendance={history} holidays={holidays} leaves={leaves} />
           </Card>
         </div>

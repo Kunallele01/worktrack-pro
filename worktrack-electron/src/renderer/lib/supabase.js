@@ -853,6 +853,57 @@ export async function sendBirthdayEmail(person, settings) {
   }).catch(() => {})
 }
 
+// ── Notification feed ─────────────────────────────────────────────────────── //
+
+export async function getNotifications(userId, isAdmin) {
+  const since = new Date(); since.setDate(since.getDate() - 7)
+  const sinceISO = since.toISOString()
+  const today    = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Kolkata' })
+  const items    = []
+
+  if (isAdmin) {
+    const [{ data: lv }, { data: cr }, { data: late }] = await Promise.all([
+      supabase.from('leave_requests')
+        .select('id,type,days,created_at,profiles:user_id(full_name)')
+        .eq('status','pending').gte('created_at', sinceISO)
+        .order('created_at',{ascending:false}).limit(6),
+      supabase.from('correction_requests')
+        .select('id,type,created_at,profiles:user_id(full_name)')
+        .eq('status','pending').gte('created_at', sinceISO)
+        .order('created_at',{ascending:false}).limit(6),
+      supabase.from('attendance')
+        .select('id,check_in_time,profiles(full_name)')
+        .eq('date',today).eq('is_late',true)
+        .order('check_in_time',{ascending:false}).limit(5),
+    ])
+    const LEAVE_LABEL = { sick:'Sick Leave', casual:'Casual Leave', planned:'Planned Leave', emergency:'Emergency Leave' }
+    for (const r of lv||[])   items.push({ id:`lv-${r.id}`, icon:'📋', title:`${r.profiles?.full_name} requested ${r.days}d leave`, subtitle:`${LEAVE_LABEL[r.type]||r.type} · awaiting review`, time:r.created_at, link:'/admin/leaves' })
+    for (const r of cr||[])   items.push({ id:`cr-${r.id}`, icon:'✏️',  title:`${r.profiles?.full_name} submitted a correction`,        subtitle:'Needs your review',                                  time:r.created_at, link:'/admin/corrections' })
+    for (const r of late||[]) items.push({ id:`lt-${r.id}`, icon:'⏰',  title:`${r.profiles?.full_name} checked in late`,               subtitle:`Today · ${r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : ''}`, time:r.check_in_time||today, link:'/admin/attendance' })
+  } else {
+    const [{ data: lv }, { data: cr }] = await Promise.all([
+      supabase.from('leave_requests')
+        .select('id,type,days,status,reviewed_at,admin_note')
+        .eq('user_id',userId).in('status',['approved','rejected'])
+        .gte('reviewed_at', sinceISO).order('reviewed_at',{ascending:false}).limit(6),
+      supabase.from('correction_requests')
+        .select('id,type,status,reviewed_at,admin_note')
+        .eq('user_id',userId).in('status',['approved','rejected'])
+        .gte('reviewed_at', sinceISO).order('reviewed_at',{ascending:false}).limit(6),
+    ])
+    for (const r of lv||[]) {
+      const ok = r.status === 'approved'
+      items.push({ id:`lv-${r.id}`, icon: ok?'✅':'❌', title:`Your ${r.days}d leave was ${r.status}`, subtitle: r.admin_note || (ok?'Approved by admin':'Reach out to admin for details.'), time:r.reviewed_at, link:'/leaves' })
+    }
+    for (const r of cr||[]) {
+      const ok = r.status === 'approved'
+      items.push({ id:`cr-${r.id}`, icon: ok?'✅':'❌', title:`Your correction was ${r.status}`, subtitle: r.admin_note || (ok?'Attendance updated.':'Reach out to admin for details.'), time:r.reviewed_at, link:'/corrections' })
+    }
+  }
+
+  return items.sort((a,b) => new Date(b.time) - new Date(a.time))
+}
+
 // ── Badge counts ─────────────────────────────────────────────────────────── //
 
 // Admin: how many pending leave + correction requests are waiting for review

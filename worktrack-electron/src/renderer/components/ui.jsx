@@ -403,6 +403,22 @@ const AVATAR_COLORS = [
   'bg-red-600','bg-purple-600','bg-pink-600','bg-teal-600',
 ]
 
+export function EmptyState({ emoji = '📭', title, subtitle, action }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-14 px-8 text-center select-none">
+      <div className="relative mb-5">
+        <div className="w-20 h-20 rounded-full bg-white/[0.04] border border-white/[0.07] flex items-center justify-center">
+          <span style={{ fontSize: 40 }}>{emoji}</span>
+        </div>
+        <div className="absolute inset-0 rounded-full bg-accent-500/20 blur-2xl opacity-40 pointer-events-none" />
+      </div>
+      <p className="text-sm font-bold text-gray-200 mb-1.5">{title}</p>
+      {subtitle && <p className="text-xs text-gray-500 max-w-xs leading-relaxed">{subtitle}</p>}
+      {action && <div className="mt-5">{action}</div>}
+    </div>
+  )
+}
+
 export function Avatar({ name = '', size = 8, textSize = 'text-xs' }) {
   const initials = name.split(' ').slice(0,2).map(p => p[0]?.toUpperCase()).join('')
   const color    = AVATAR_COLORS[Math.abs(name.split('').reduce((a,c) => a + c.charCodeAt(0), 0)) % AVATAR_COLORS.length]

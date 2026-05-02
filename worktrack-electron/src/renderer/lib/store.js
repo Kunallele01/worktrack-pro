@@ -35,6 +35,10 @@ export const useStore = create((set, get) => ({
   badges:    { leaves: 0, corrections: 0 },
   setBadges: (b) => set(s => ({ badges: { ...s.badges, ...b } })),
 
+  // Notification feed
+  notifications:    [],
+  setNotifications: (n) => set({ notifications: n }),
+
   // Company name (from settings)
   companyName: () => get().settings?.company_name || 'Your Company',
 }))

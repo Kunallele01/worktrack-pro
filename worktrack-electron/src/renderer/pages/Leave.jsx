@@ -6,7 +6,7 @@ import { applyLeave, getMyLeaves, getLeaveBalance, getSettings, getHolidays } fr
 import { LEAVE_TYPES, LEAVE_COLORS } from '../lib/leaveConstants'
 import { useStore } from '../lib/store'
 import Sidebar from '../components/Sidebar'
-import { Page, Card, Button, Select } from '../components/ui'
+import { Page, Card, Button, Select, EmptyState } from '../components/ui'
 import { ToastProvider, useToast } from '../components/ui'
 
 // Re-export for any imports that still reference this file
@@ -338,10 +338,9 @@ function LeaveInner() {
             </div>
 
             {filtered.length === 0 ? (
-              <Card className="p-10 text-center">
-                <p className="text-4xl mb-3">🏖️</p>
-                <p className="text-sm font-medium text-gray-300">No leave requests yet</p>
-                <p className="text-xs text-gray-500 mt-1">Click "Apply for Leave" to submit your first request</p>
+              <Card>
+                <EmptyState emoji="🏖️" title="No leave requests yet"
+                  subtitle={filter === 'all' ? 'Apply for leave using the button above and your requests will appear here.' : `No ${filter} leave requests to show.`} />
               </Card>
             ) : (
               <div className="flex flex-col gap-3">
