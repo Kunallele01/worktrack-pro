@@ -679,7 +679,9 @@ export async function sendBirthdayEmail(person, settings) {
   if (!host || !user || !pass || !person.email) return
 
   const firstName = person.full_name?.split(' ')[0] || person.full_name
+  const fullName  = person.full_name || firstName
   const company   = settings.company_name || 'Your Team'
+  const dept      = person.department ? ` from ${person.department}` : ''
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -688,98 +690,155 @@ export async function sendBirthdayEmail(person, settings) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Happy Birthday ${firstName}!</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
-  @keyframes bd-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-  @keyframes bd-shimmer { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:#05030f; font-family:'Inter',Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  @keyframes shimmer { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#03010a;font-family:'Inter',Arial,sans-serif;-webkit-font-smoothing:antialiased;}
 </style>
 </head>
-<body style="background:#05030f;padding:28px 0;">
-<div style="max-width:580px;margin:0 auto;padding:0 16px;">
+<body style="background:#03010a;padding:32px 0;">
+<div style="max-width:560px;margin:0 auto;padding:0 12px;">
 
-  <!-- ══ HEADER ══ -->
-  <div style="background:linear-gradient(160deg,#1e0a3c 0%,#2d1257 45%,#1a1050 100%);border-radius:24px 24px 0 0;padding:52px 44px 40px;text-align:center;position:relative;overflow:hidden;border:1px solid rgba(244,114,182,0.2);border-bottom:none;">
-    <div style="position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#f472b6,#e879f9,#a78bfa,#4f86f7,#34d399,#fbbf24,#f472b6);background-size:300% 100%;animation:bd-shimmer 4s linear infinite;"></div>
-    <div style="position:absolute;top:-80px;left:-80px;width:260px;height:260px;background:radial-gradient(circle,rgba(244,114,182,0.18) 0%,transparent 70%);border-radius:50%;"></div>
-    <div style="position:absolute;bottom:-60px;right:-60px;width:220px;height:220px;background:radial-gradient(circle,rgba(79,134,247,0.18) 0%,transparent 70%);border-radius:50%;"></div>
-    <div style="position:absolute;top:30%;left:60%;width:150px;height:150px;background:radial-gradient(circle,rgba(167,139,250,0.15) 0%,transparent 70%);border-radius:50%;"></div>
+<!-- ══════════ PRE-HEADER CONFETTI ROW ══════════ -->
+<div style="text-align:center;padding:0 0 18px;font-size:20px;letter-spacing:8px;">
+  🎊&nbsp;🎉&nbsp;🎈&nbsp;🎂&nbsp;🎁&nbsp;🎀&nbsp;✨&nbsp;🌟&nbsp;💫&nbsp;🎊
+</div>
 
-    <div style="font-size:80px;line-height:1;margin-bottom:18px;animation:bd-float 3s ease-in-out infinite;display:inline-block;filter:drop-shadow(0 0 24px rgba(251,191,36,0.4));">🎂</div>
-    <div style="font-size:24px;letter-spacing:10px;margin-bottom:22px;opacity:0.95;">🎊&nbsp;🌟&nbsp;🎉&nbsp;✨&nbsp;🎈&nbsp;🎁&nbsp;🎀</div>
-    <h1 style="font-size:46px;font-weight:900;background:linear-gradient(135deg,#f9a8d4 0%,#f472b6 30%,#c084fc 60%,#818cf8 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-1.5px;line-height:1.05;margin-bottom:14px;">Happy Birthday!</h1>
-    <p style="font-size:30px;font-weight:800;color:#fbbf24;letter-spacing:-0.5px;text-shadow:0 0 30px rgba(251,191,36,0.4);">${firstName} &nbsp;⭐</p>
-  </div>
+<!-- ══════════ HERO ══════════ -->
+<div style="position:relative;border-radius:24px 24px 0 0;overflow:hidden;border:1px solid rgba(244,114,182,0.25);border-bottom:none;">
 
-  <!-- ══ BODY ══ -->
-  <div style="background:linear-gradient(180deg,#0d0822 0%,#070615 100%);border:1px solid rgba(167,139,250,0.12);border-top:none;padding:40px 44px;">
+  <!-- Rainbow top line -->
+  <div style="height:5px;background:linear-gradient(90deg,#f43f5e,#f472b6,#e879f9,#a78bfa,#818cf8,#4f86f7,#34d399,#fbbf24,#f43f5e);background-size:400% 100%;animation:shimmer 5s linear infinite;"></div>
 
-    <!-- Personal message box -->
-    <div style="background:linear-gradient(135deg,rgba(244,114,182,0.07) 0%,rgba(167,139,250,0.07) 100%);border:1px solid rgba(244,114,182,0.18);border-radius:18px;padding:28px 28px;margin-bottom:32px;text-align:center;">
-      <p style="color:#e2e8f0;font-size:17px;line-height:1.8;">
-        Hey&nbsp;<strong style="color:#f472b6;font-size:19px;">${firstName}</strong>,&nbsp;today the universe made
-        a very good decision — it gave us <strong style="color:#a78bfa;">you</strong>. 🌙<br><br>
-        The entire <strong style="color:#60a5fa;">${company}</strong> team pauses today to celebrate someone
-        who shows up, delivers, and makes this place better simply by being here. That's you —
-        and we're ridiculously proud of it. 🚀
+  <!-- Hero background -->
+  <div style="background:linear-gradient(160deg,#1a0535 0%,#260a4a 30%,#16073d 60%,#0d0527 100%);padding:50px 36px 42px;text-align:center;">
+
+    <!-- Stars scatter row 1 -->
+    <div style="font-size:14px;letter-spacing:18px;margin-bottom:6px;opacity:0.6;">✦ ✧ ✦ ✧ ✦ ✧ ✦</div>
+
+    <!-- CAKE — big, central, glowing -->
+    <div style="font-size:90px;line-height:1;margin:8px 0 16px;display:inline-block;filter:drop-shadow(0 0 30px rgba(251,191,36,0.55)) drop-shadow(0 0 60px rgba(251,191,36,0.2));">🎂</div>
+
+    <!-- Stars scatter row 2 -->
+    <div style="font-size:18px;letter-spacing:12px;margin-bottom:24px;opacity:0.85;">🎊&nbsp;🌟&nbsp;🎉&nbsp;💫&nbsp;🎈</div>
+
+    <!-- HAPPY BIRTHDAY — massive gradient text -->
+    <h1 style="font-size:48px;font-weight:900;line-height:1;letter-spacing:-2px;margin-bottom:8px;background:linear-gradient(135deg,#fda4d4 0%,#f472b6 25%,#e879f9 50%,#c084fc 70%,#818cf8 90%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
+      Happy Birthday
+    </h1>
+    <h1 style="font-size:48px;font-weight:900;line-height:1;letter-spacing:-2px;margin-bottom:20px;background:linear-gradient(135deg,#fda4d4 0%,#f472b6 25%,#e879f9 50%,#c084fc 70%,#818cf8 90%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
+      ${firstName}! 🥳
+    </h1>
+
+    <!-- Name in gold plate -->
+    <div style="display:inline-block;background:linear-gradient(135deg,rgba(251,191,36,0.15) 0%,rgba(251,191,36,0.08) 100%);border:1px solid rgba(251,191,36,0.35);border-radius:14px;padding:10px 28px;">
+      <p style="font-size:15px;font-weight:700;color:#fde68a;letter-spacing:2px;text-transform:uppercase;margin:0;">
+        ⭐ &nbsp;${fullName}${dept} &nbsp;⭐
       </p>
     </div>
-
-    <!-- 3-column feature tiles -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
-      <tr>
-        <td width="33%" style="padding:0 6px 0 0;">
-          <div style="background:rgba(244,114,182,0.07);border:1px solid rgba(244,114,182,0.2);border-radius:16px;padding:20px 14px;text-align:center;">
-            <div style="font-size:32px;margin-bottom:10px;">🎂</div>
-            <p style="color:#f472b6;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px;">Your Day</p>
-            <p style="color:#cbd5e1;font-size:12px;line-height:1.5;">Every moment today belongs to you</p>
-          </div>
-        </td>
-        <td width="34%" style="padding:0 3px;">
-          <div style="background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.2);border-radius:16px;padding:20px 14px;text-align:center;">
-            <div style="font-size:32px;margin-bottom:10px;">⭐</div>
-            <p style="color:#a78bfa;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px;">You're A Star</p>
-            <p style="color:#cbd5e1;font-size:12px;line-height:1.5;">Shine brighter than ever, ${firstName}</p>
-          </div>
-        </td>
-        <td width="33%" style="padding:0 0 0 6px;">
-          <div style="background:rgba(79,134,247,0.07);border:1px solid rgba(79,134,247,0.2);border-radius:16px;padding:20px 14px;text-align:center;">
-            <div style="font-size:32px;margin-bottom:10px;">🎁</div>
-            <p style="color:#60a5fa;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px;">New Chapter</p>
-            <p style="color:#cbd5e1;font-size:12px;line-height:1.5;">A fresh year full of possibilities</p>
-          </div>
-        </td>
-      </tr>
-    </table>
-
-    <!-- Divider -->
-    <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(167,139,250,0.25),transparent);margin:0 0 30px;"></div>
-
-    <!-- Quote -->
-    <div style="border-left:4px solid;border-image:linear-gradient(180deg,#f472b6,#a78bfa) 1;padding:18px 22px;background:rgba(167,139,250,0.05);border-radius:0 14px 14px 0;margin-bottom:34px;">
-      <p style="color:#c4b5fd;font-size:15px;font-style:italic;line-height:1.75;margin:0;">
-        "The most important birthday is today — because it's yours, and because it's here.
-        Go out and remind the world exactly why you were born to be extraordinary."
-      </p>
-      <p style="color:#7c3aed;font-size:12px;font-weight:700;margin:12px 0 0;letter-spacing:0.3px;">— The Team at ${company}</p>
-    </div>
-
-    <!-- Big CTA -->
-    <div style="text-align:center;margin-bottom:10px;">
-      <div style="display:inline-block;background:linear-gradient(135deg,#f472b6 0%,#a78bfa 50%,#4f86f7 100%);border-radius:16px;padding:16px 40px;font-size:17px;font-weight:800;color:#fff;letter-spacing:0.3px;box-shadow:0 6px 30px rgba(244,114,182,0.35),0 2px 8px rgba(0,0,0,0.4);">
-        🎊&nbsp;&nbsp;Here's To An Incredible Year Ahead!&nbsp;&nbsp;🎊
-      </div>
-    </div>
   </div>
+</div>
 
-  <!-- ══ FOOTER ══ -->
-  <div style="background:#030208;border:1px solid rgba(255,255,255,0.04);border-top:none;border-radius:0 0 24px 24px;padding:26px 44px;text-align:center;">
-    <div style="font-size:20px;letter-spacing:6px;margin-bottom:14px;opacity:0.8;">🎂&nbsp;🎉&nbsp;🌟&nbsp;🎊&nbsp;✨&nbsp;🎈&nbsp;🎀&nbsp;💫</div>
-    <p style="color:#475569;font-size:13px;line-height:1.7;margin:0;">
-      Sent with&nbsp;💜&nbsp;by your team at <strong style="color:#7c3aed;">${company}</strong> via <strong style="color:#475569;">WorkTrack Pro</strong>
+<!-- ══════════ MAIN BODY ══════════ -->
+<div style="background:linear-gradient(180deg,#0e0726 0%,#07041a 100%);border:1px solid rgba(167,139,250,0.12);border-top:none;padding:36px 32px 28px;">
+
+  <!-- Personal message — the core of the email -->
+  <div style="background:linear-gradient(135deg,rgba(244,114,182,0.06) 0%,rgba(99,102,241,0.06) 100%);border:1px solid rgba(244,114,182,0.18);border-radius:20px;padding:28px;margin-bottom:28px;">
+    <p style="color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;text-align:center;">A Message From Your Team</p>
+    <p style="color:#e2e8f0;font-size:16px;line-height:1.85;text-align:center;">
+      Hey <strong style="color:#f9a8d4;font-size:18px;">${firstName}</strong> —
     </p>
-    <p style="color:#1e293b;font-size:11px;margin-top:8px;">Your attendance, your team, your birthday — all in one place.</p>
+    <p style="color:#cbd5e1;font-size:15px;line-height:1.85;margin-top:14px;">
+      Today the universe made one of its best decisions. It brought <strong style="color:#f472b6;">${fullName}</strong>
+      into the world — and eventually, into this team. And honestly? We got the better end of that deal. 🌙
+    </p>
+    <p style="color:#cbd5e1;font-size:15px;line-height:1.85;margin-top:14px;">
+      You show up. You push through. You make hard things look easy and boring things look interesting.
+      The whole <strong style="color:#a78bfa;">${company}</strong> team stops today — just for a moment —
+      to say: <em style="color:#fbbf24;">you are seen, you are valued, and you are absolutely irreplaceable.</em> 🚀
+    </p>
+    <p style="color:#cbd5e1;font-size:15px;line-height:1.85;margin-top:14px;">
+      So take today. Own it. You deserve every second of it.
+    </p>
   </div>
+
+  <!-- 3 wish tiles -->
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;border-collapse:separate;border-spacing:8px;">
+    <tr>
+      <td style="width:33%;vertical-align:top;">
+        <div style="background:rgba(244,114,182,0.07);border:1px solid rgba(244,114,182,0.22);border-radius:18px;padding:22px 14px;text-align:center;height:100%;">
+          <div style="font-size:36px;margin-bottom:12px;">🎯</div>
+          <p style="color:#f472b6;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Crushed It</p>
+          <p style="color:#94a3b8;font-size:12px;line-height:1.6;">Another year of doing amazing things. Keep going.</p>
+        </div>
+      </td>
+      <td style="width:34%;vertical-align:top;">
+        <div style="background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.22);border-radius:18px;padding:22px 14px;text-align:center;height:100%;">
+          <div style="font-size:36px;margin-bottom:12px;">🌟</div>
+          <p style="color:#a78bfa;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Unstoppable</p>
+          <p style="color:#94a3b8;font-size:12px;line-height:1.6;">${firstName}, the best version of you starts today.</p>
+        </div>
+      </td>
+      <td style="width:33%;vertical-align:top;">
+        <div style="background:rgba(79,134,247,0.07);border:1px solid rgba(79,134,247,0.22);border-radius:18px;padding:22px 14px;text-align:center;height:100%;">
+          <div style="font-size:36px;margin-bottom:12px;">🎁</div>
+          <p style="color:#60a5fa;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">New Chapter</p>
+          <p style="color:#94a3b8;font-size:12px;line-height:1.6;">A fresh year. Endless possibilities. All yours.</p>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Divider -->
+  <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(167,139,250,0.3),transparent);margin:0 0 28px;"></div>
+
+  <!-- Pull quote -->
+  <div style="background:rgba(167,139,250,0.05);border-radius:0 18px 18px 0;border-left:4px solid #a78bfa;padding:20px 24px;margin-bottom:28px;">
+    <p style="color:#c4b5fd;font-size:15px;font-style:italic;line-height:1.8;margin:0 0 10px;">
+      "The secret of a great life is not doing what you love every day — it's becoming someone
+      others are genuinely glad to know. You've already done that, ${firstName}."
+    </p>
+    <p style="color:#6d28d9;font-size:12px;font-weight:700;margin:0;letter-spacing:0.5px;">
+      — With love, from everyone at ${company}
+    </p>
+  </div>
+
+  <!-- Wishes list -->
+  <div style="margin-bottom:32px;">
+    <p style="color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:16px;text-align:center;">Wishes From The Team</p>
+    ${['🥂 &nbsp;May every goal you set this year fall perfectly into place.',
+       '🌈 &nbsp;May the good days outnumber the hard ones, ten to one.',
+       '💪 &nbsp;May you surprise even yourself with what you accomplish.',
+       '🎵 &nbsp;May today be the kind of day songs are written about.',
+       '✨ &nbsp;May this year be your most extraordinary one yet.']
+      .map(w => `<div style="display:flex;align-items:flex-start;gap:12px;padding:11px 14px;margin-bottom:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);border-radius:12px;">
+        <p style="color:#cbd5e1;font-size:14px;line-height:1.5;margin:0;">${w}</p>
+      </div>`).join('')}
+  </div>
+
+  <!-- CTA button -->
+  <div style="text-align:center;">
+    <div style="display:inline-block;background:linear-gradient(135deg,#f43f5e 0%,#f472b6 30%,#a78bfa 65%,#4f86f7 100%);border-radius:18px;padding:16px 44px;box-shadow:0 8px 32px rgba(244,114,182,0.4),0 2px 8px rgba(0,0,0,0.5);">
+      <p style="color:#fff;font-size:17px;font-weight:900;margin:0;letter-spacing:0.3px;">
+        🎊 &nbsp;Here's To You, ${firstName}! &nbsp;🎊
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ FOOTER ══════════ -->
+<div style="background:#020108;border:1px solid rgba(255,255,255,0.04);border-top:none;border-radius:0 0 24px 24px;padding:24px 32px;text-align:center;">
+  <div style="font-size:18px;letter-spacing:8px;margin-bottom:14px;opacity:0.7;">🎂 🎉 🌟 🎊 ✨ 🎈 🎀 💫 🥳</div>
+  <p style="color:#334155;font-size:13px;line-height:1.7;margin:0 0 6px;">
+    Sent with 💜 from your team at <strong style="color:#6d28d9;">${company}</strong>
+  </p>
+  <p style="color:#1e293b;font-size:11px;margin:0;">Powered by WorkTrack Pro — your attendance, your team, your story.</p>
+</div>
+
+<!-- POST-FOOTER CONFETTI ROW -->
+<div style="text-align:center;padding:18px 0 0;font-size:18px;letter-spacing:8px;opacity:0.5;">
+  ✨&nbsp;🌟&nbsp;💫&nbsp;⭐&nbsp;🌟&nbsp;✨
+</div>
 
 </div>
 </body>
