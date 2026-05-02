@@ -236,6 +236,20 @@ export async function checkIn(userId, latitude, longitude, accuracy) {
   return data
 }
 
+// Fetch an OSM tile and return it as a base64 data-URL so email clients
+// never need to load external images (OSM blocks Gmail's image proxy with 418).
+async function _fetchTileB64(url) {
+  try {
+    const resp = await fetch(url)   // Electron renderer has a valid Chromium UA — OSM accepts it
+    if (!resp.ok) return null
+    const buf   = await resp.arrayBuffer()
+    const bytes = new Uint8Array(buf)
+    let   bin   = ''
+    for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i])
+    return `data:image/png;base64,${btoa(bin)}`
+  } catch { return null }
+}
+
 async function _sendWFHEmail(settings, userId, lat, lon) {
   const host  = settings.smtp_host?.trim()
   const user  = settings.smtp_username?.trim()
@@ -255,34 +269,46 @@ async function _sendWFHEmail(settings, userId, lat, lon) {
   const empId   = profile?.employee_id || ''
   const dept    = profile?.department  || ''
 
-  // Build OSM tile map (3×3 grid at zoom 14, light tiles, properly placed marker)
+  // Build OSM tile map — fetch tiles as base64 so they embed directly into the email HTML.
+  // This bypasses Gmail's image proxy (which OSM blocks) entirely.
   const hasCoords = lat && lon && lat !== 0 && lon !== 0
   let mapHtml = ''
   if (hasCoords) {
-    const ZOOM = 14
-    const n = Math.pow(2, ZOOM)
-    const latRad   = lat * Math.PI / 180
-    const fracX    = (lon + 180) / 360 * n
-    const fracY    = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n
-    const tileX    = Math.floor(fracX)
-    const tileY    = Math.floor(fracY)
-    const offsetX  = fracX - tileX   // 0–1 within the centre tile
-    const offsetY  = fracY - tileY   // 0–1 within the centre tile
-    const TS       = 173             // rendered px per tile (520 / 3)
-    const markerL  = Math.round((1 + offsetX) * TS)
-    const markerT  = Math.round((1 + offsetY) * TS)
+    const ZOOM  = 14
+    const n     = Math.pow(2, ZOOM)
+    const latR  = lat * Math.PI / 180
+    const fracX = (lon + 180) / 360 * n
+    const fracY = (1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2 * n
+    const tileX = Math.floor(fracX)
+    const tileY = Math.floor(fracY)
+    const offX  = fracX - tileX    // 0–1 fractional offset within the centre tile
+    const offY  = fracY - tileY
+    const TS    = 173              // rendered px per tile  (520 ÷ 3 ≈ 173)
+    const mkL   = Math.round((1 + offX) * TS)   // marker pixel from left
+    const mkT   = Math.round((1 + offY) * TS)   // marker pixel from top
 
-    const rows = [-1, 0, 1].map(dy =>
-      `<tr>${[-1, 0, 1].map(dx =>
-        `<td style="padding:0;line-height:0;"><img src="https://tile.openstreetmap.org/${ZOOM}/${tileX+dx}/${tileY+dy}.png" width="${TS}" height="${TS}" style="display:block;" alt=""></td>`
+    // Fetch all 9 tiles in parallel from inside Electron (Chromium UA → OSM accepts)
+    const b64Grid = await Promise.all(
+      [-1, 0, 1].map(dy =>
+        Promise.all([-1, 0, 1].map(dx =>
+          _fetchTileB64(`https://tile.openstreetmap.org/${ZOOM}/${tileX+dx}/${tileY+dy}.png`)
+        ))
+      )
+    )
+
+    const tileRows = b64Grid.map(row =>
+      `<tr>${row.map(b64 =>
+        b64
+          ? `<td style="padding:0;line-height:0;"><img src="${b64}" width="${TS}" height="${TS}" style="display:block;"></td>`
+          : `<td style="padding:0;width:${TS}px;height:${TS}px;background:#f1f5f9;"></td>`
       ).join('')}</tr>`
     ).join('')
 
     mapHtml = `
     <div style="position:relative;overflow:hidden;border-radius:12px;border:1px solid #e2e8f0;line-height:0;width:${TS*3}px;margin:0 auto;">
-      <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;display:block;">${rows}</table>
-      <div style="position:absolute;top:${markerT}px;left:${markerL}px;transform:translate(-50%,-100%);font-size:26px;line-height:1;filter:drop-shadow(0 2px 5px rgba(0,0,0,0.45));">📍</div>
-      <div style="position:absolute;bottom:4px;right:6px;background:rgba(255,255,255,0.85);font-size:9px;color:#666;padding:1px 5px;border-radius:3px;">© OpenStreetMap contributors</div>
+      <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${tileRows}</table>
+      <div style="position:absolute;top:${mkT}px;left:${mkL}px;transform:translate(-50%,-100%);font-size:26px;line-height:1;filter:drop-shadow(0 2px 5px rgba(0,0,0,0.45));">📍</div>
+      <div style="position:absolute;bottom:4px;right:6px;background:rgba(255,255,255,0.85);font-size:9px;color:#555;padding:1px 5px;border-radius:3px;">© OpenStreetMap contributors</div>
     </div>`
   }
 
