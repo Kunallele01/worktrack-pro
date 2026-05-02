@@ -213,7 +213,7 @@ function BirthdaySelfModal({ user, onClose }) {
           </motion.p>
 
           {/* CTA button */}
-          <motion.div {...stagger(6)}>
+          <motion.div {...stagger(6)} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12 }}>
             <motion.button
               onClick={onClose}
               whileHover={{ scale:1.05, boxShadow:'0 8px 40px rgba(244,114,182,0.6)' }}
@@ -227,6 +227,12 @@ function BirthdaySelfModal({ user, onClose }) {
             >
               🎉&nbsp;&nbsp;Let's Make It Legendary!
             </motion.button>
+            <button
+              onClick={onClose}
+              style={{ background:'none', border:'none', color:'#4b2d7a', fontSize:11, cursor:'pointer', letterSpacing:0.3, padding:'2px 8px' }}
+            >
+              Don't show again today
+            </button>
           </motion.div>
         </div>
 
@@ -293,15 +299,20 @@ export function BirthdayManager({ user }) {
 
   useEffect(() => {
     if (!user?.id) return
-    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Kolkata' })
+    const today    = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Kolkata' })
+    const modalKey = `wt-bday-modal-${today}`
 
     getTodaysBirthdays().then(async people => {
       const isMyBday = people.some(p => p.id === user.id)
       setOtherBirthdays(people.filter(p => p.id !== user.id))
 
       if (isMyBday) {
-        setConfetti(true)
-        setSelfModal(true)
+        // Only show modal + confetti if not already dismissed today
+        if (!localStorage.getItem(modalKey)) {
+          setConfetti(true)
+          setSelfModal(true)
+        }
+        // Email still fires once regardless (separate key)
         const emailKey = `wt-bday-email-${today}`
         if (!localStorage.getItem(emailKey)) {
           localStorage.setItem(emailKey, '1')
@@ -312,6 +323,12 @@ export function BirthdayManager({ user }) {
     }).catch(() => {})
   }, [user?.id])
 
+  function handleModalClose() {
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Kolkata' })
+    localStorage.setItem(`wt-bday-modal-${today}`, '1')
+    setSelfModal(false)
+  }
+
   const visibleBanners = otherBirthdays.filter(p => !dismissed.has(p.id))
   const dismiss = useCallback(id => setDismissed(s => new Set([...s, id])), [])
 
@@ -319,7 +336,7 @@ export function BirthdayManager({ user }) {
     <>
       <Confetti run={confetti} />
       <AnimatePresence>
-        {selfModal && <BirthdaySelfModal user={user} onClose={() => setSelfModal(false)} />}
+        {selfModal && <BirthdaySelfModal user={user} onClose={handleModalClose} />}
       </AnimatePresence>
       {visibleBanners.length > 0 && <BirthdayBanners birthdays={visibleBanners} onDismiss={dismiss} />}
     </>

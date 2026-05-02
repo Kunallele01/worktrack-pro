@@ -9,6 +9,76 @@ import { Page, GpsWidget, StatCard, CalendarWidget, Button, Badge, Card } from '
 import { ToastProvider, useToast } from '../components/ui'
 import { BirthdayManager } from '../components/BirthdayEffects'
 
+// ── WMO weather code → emoji + label ─────────────────────────────────────────
+const WMO_MAP = [
+  [0,  '☀️',  'Clear Sky'],
+  [1,  '🌤️', 'Mainly Clear'],
+  [2,  '⛅',  'Partly Cloudy'],
+  [3,  '☁️',  'Overcast'],
+  [45, '🌫️', 'Foggy'],
+  [48, '🌫️', 'Freezing Fog'],
+  [51, '🌦️', 'Light Drizzle'],
+  [53, '🌦️', 'Drizzle'],
+  [55, '🌧️', 'Heavy Drizzle'],
+  [61, '🌧️', 'Light Rain'],
+  [63, '🌧️', 'Rainy'],
+  [65, '🌧️', 'Heavy Rain'],
+  [71, '🌨️', 'Light Snow'],
+  [73, '🌨️', 'Snowing'],
+  [75, '❄️',  'Heavy Snow'],
+  [77, '🌨️', 'Snow Grains'],
+  [80, '🌦️', 'Rain Showers'],
+  [81, '🌧️', 'Showers'],
+  [82, '🌧️', 'Heavy Showers'],
+  [85, '🌨️', 'Snow Showers'],
+  [86, '❄️',  'Heavy Snow Showers'],
+  [95, '⛈️', 'Thunderstorm'],
+  [96, '⛈️', 'Thunderstorm + Hail'],
+  [99, '⛈️', 'Severe Thunderstorm'],
+]
+function wmoInfo(code) {
+  let best = WMO_MAP[0]
+  for (const row of WMO_MAP) { if (row[0] <= code) best = row }
+  return { icon: best[1], label: best[2] }
+}
+
+function WeatherWidget({ lat, lon }) {
+  const [w, setW] = useState(null)
+
+  useEffect(() => {
+    if (!lat || !lon || (lat === 0 && lon === 0)) return
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=temperature_2m,apparent_temperature,weather_code&timezone=auto`)
+      .then(r => r.json())
+      .then(d => {
+        if (!d.current) return
+        setW({
+          temp:   Math.round(d.current.temperature_2m),
+          feels:  Math.round(d.current.apparent_temperature),
+          code:   d.current.weather_code,
+        })
+      })
+      .catch(() => {})
+  }, [lat, lon])
+
+  if (!w) return null
+  const { icon, label } = wmoInfo(w.code)
+
+  return (
+    <div className="flex items-center justify-center gap-3 mt-1">
+      <div className="h-px w-12 bg-white/10" />
+      <span style={{ fontSize: 28, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))' }}>{icon}</span>
+      <div className="text-left">
+        <p className="text-sm font-bold text-gray-200 leading-tight">
+          {w.temp}°C
+          <span className="font-normal text-gray-400 ml-1.5">{label}</span>
+        </p>
+        <p className="text-xs text-gray-600">Feels like {w.feels}°C</p>
+      </div>
+      <div className="h-px w-12 bg-white/10" />
+    </div>
+  )
+}
+
 function LiveClock() {
   const [now, setNow] = useState(new Date())
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
@@ -46,11 +116,13 @@ function TodayStatus({ record }) {
 }
 
 function DashboardInner() {
-  const toast    = useToast()
-  const user     = useStore(s => s.user)
+  const toast       = useToast()
+  const user        = useStore(s => s.user)
   const gpsLocation = useStore(s => s.gpsLocation)
   const gpsStatus   = useStore(s => s.gpsStatus)
-  const setGps   = useStore(s => s.setGps)
+  const setGps      = useStore(s => s.setGps)
+  const settings    = useStore(s => s.settings)
+  const setSettings = useStore(s => s.setSettings)
 
   const [today,    setToday   ] = useState(null)
   const [summary,  setSummary ] = useState({})
@@ -62,14 +134,16 @@ function DashboardInner() {
   const loadData = useCallback(async () => {
     if (!user) return
     const now = new Date()
-    const [t, s, h, hols, leavs] = await Promise.all([
+    const [t, s, h, hols, leavs, sett] = await Promise.all([
       getTodayAttendance(user.id),
       getMonthSummary(user.id, now.getFullYear(), now.getMonth() + 1),
       getMonthHistory(user.id, now.getFullYear(), now.getMonth() + 1),
       getHolidays(),
       getMyLeaves(user.id, now.getFullYear()),
+      getSettings(),
     ])
     setToday(t); setSummary(s); setHistory(h); setHolidays(hols); setLeaves(leavs)
+    if (sett) setSettings(sett)
   }, [user])
 
   useEffect(() => { loadData() }, [loadData])
@@ -220,7 +294,19 @@ function DashboardInner() {
 
         {/* Right column */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
-          <LiveClock />
+          {/* Clock + Weather */}
+          <div>
+            <LiveClock />
+            {(() => {
+              // WiFi mode + office coords configured → show office weather; otherwise use resolved coords
+              const inWifi = gpsLocation?.accuracy < 0
+              const offLat = settings?.office_lat ? parseFloat(settings.office_lat) : null
+              const offLon = settings?.office_lng ? parseFloat(settings.office_lng) : null
+              const wLat = inWifi && offLat ? offLat : gpsLocation?.lat
+              const wLon = inWifi && offLon ? offLon : gpsLocation?.lon
+              return wLat && wLon ? <WeatherWidget lat={wLat} lon={wLon} /> : null
+            })()}
+          </div>
 
           {/* GPS Widget */}
           <GpsWidget onReady={(lat, lon, acc) => setGps({ lat, lon, accuracy: acc })} />
