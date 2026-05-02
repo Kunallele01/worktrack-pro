@@ -166,6 +166,12 @@ html:not(.dark) {
 html:not(.dark) body,
 html:not(.dark) #root {
   background: #F8F9FC;
+  color-scheme: light;
+}
+
+html:not(.dark) input[type="date"],
+html:not(.dark) input[type="time"] {
+  color-scheme: light;
 }
 
 /* Surface backgrounds */
