@@ -62,11 +62,19 @@ function _generateFancyId(dept) {
 }
 
 // ── Welcome email ─────────────────────────────────────────────────────────── //
-async function _sendWelcomeEmail(profile, password, settings) {
-  const host = settings.smtp_host?.trim()
-  const user = settings.smtp_username?.trim()
-  const pass = settings.smtp_password?.trim()
-  if (!host || !user || !pass || !profile.email) return
+async function _sendWelcomeEmail(profile, password, settings, emailFallback = '') {
+  const host    = settings.smtp_host?.trim()
+  const user    = settings.smtp_username?.trim()
+  const pass    = settings.smtp_password?.trim()
+  const toEmail = profile.email || emailFallback   // use passed email if profile row lacks it
+  if (!host || !user || !pass) {
+    console.warn('[WelcomeEmail] Skipped: SMTP not configured (smtp_host/username/password missing)')
+    return
+  }
+  if (!toEmail) {
+    console.warn('[WelcomeEmail] Skipped: no email address on profile')
+    return
+  }
 
   const firstName  = profile.full_name?.split(' ')[0] || profile.full_name
   const company    = settings.company_name || 'Your Company'
@@ -181,10 +189,10 @@ async function _sendWelcomeEmail(profile, password, settings) {
   window.api?.sendEmail({
     host, port: settings.smtp_port || '587', user, pass,
     fromName: settings.smtp_from_name || company,
-    to: [profile.email],
+    to: [toEmail],
     subject: `🎉 Welcome to ${company}, ${firstName}! Your WorkTrack Pro credentials are inside`,
     html,
-  }).catch(() => {})
+  }).catch(e => console.warn('[WelcomeEmail] SMTP error:', e.message))
 }
 
 export async function signUp(email, password, full_name, department, birthday = null) {
@@ -211,8 +219,8 @@ export async function signUp(email, password, full_name, department, birthday = 
   }
 
   const profile  = await fetchProfile(data.user.id)
-  const settings = await getSettings()
-  _sendWelcomeEmail(profile, password, settings).catch(() => {})
+  const settings = await getSettings(true)   // force-refresh — new user session, cache may be stale
+  _sendWelcomeEmail(profile, password, settings, email).catch(e => console.warn('[WelcomeEmail]', e.message))
 
   return profile
 }
