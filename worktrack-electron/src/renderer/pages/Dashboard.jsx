@@ -7,6 +7,7 @@ import { useStore } from '../lib/store'
 import Sidebar from '../components/Sidebar'
 import { Page, GpsWidget, StatCard, CalendarWidget, Button, Badge, Card } from '../components/ui'
 import { ToastProvider, useToast } from '../components/ui'
+import { BirthdayManager } from '../components/BirthdayEffects'
 
 function LiveClock() {
   const [now, setNow] = useState(new Date())
@@ -106,6 +107,7 @@ function DashboardInner() {
 
   return (
     <div className="flex h-screen bg-surface-900 overflow-hidden">
+      <BirthdayManager user={user} />
       <Sidebar />
       <div className="flex-1 flex overflow-hidden">
         {/* Left column */}

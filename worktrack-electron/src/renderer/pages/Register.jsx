@@ -6,6 +6,24 @@ import { Page, Button, Input, PasswordInput, Select } from '../components/ui'
 
 const DEPT_OPTIONS = [{ value: 'RPA', label: 'RPA' }, { value: 'SAP', label: 'SAP' }]
 
+const MONTHS = [
+  { value: '01', label: 'January' },   { value: '02', label: 'February' },
+  { value: '03', label: 'March' },     { value: '04', label: 'April' },
+  { value: '05', label: 'May' },       { value: '06', label: 'June' },
+  { value: '07', label: 'July' },      { value: '08', label: 'August' },
+  { value: '09', label: 'September' }, { value: '10', label: 'October' },
+  { value: '11', label: 'November' },  { value: '12', label: 'December' },
+]
+const DAYS = Array.from({ length: 31 }, (_, i) => ({
+  value: String(i + 1).padStart(2, '0'),
+  label: String(i + 1),
+}))
+const YEAR_END = new Date().getFullYear() - 16
+const YEARS = Array.from({ length: YEAR_END - 1959 }, (_, i) => {
+  const y = YEAR_END - i
+  return { value: String(y), label: String(y) }
+})
+
 function StrengthBar({ password }) {
   const score = [
     password.length >= 8,
@@ -34,16 +52,23 @@ function StrengthBar({ password }) {
 export default function Register() {
   const navigate  = useNavigate()
   const [form, setForm] = useState({ emp_id: '', name: '', email: '', dept: '', pw: '', pw2: '' })
+  const [bday, setBday] = useState({ month: '', day: '', year: '' })
   const [err,  setErr ] = useState('')
   const [loading, setLoading] = useState(false)
   const set = (k) => (e) => { setForm(f => ({ ...f, [k]: e.target.value })); setErr('') }
 
+  const birthday = (bday.month && bday.day && bday.year)
+    ? `${bday.year}-${bday.month}-${bday.day}`
+    : null
+
   async function handleSubmit(e) {
     e.preventDefault()
+    if (!form.dept)  { setErr('Please select your department.'); return }
+    if (!birthday)   { setErr('Please select your date of birth.'); return }
     if (form.pw !== form.pw2) { setErr('Passwords do not match.'); return }
     setLoading(true)
     try {
-      await signUp(form.email, form.pw, form.emp_id, form.name, form.dept)
+      await signUp(form.email, form.pw, form.emp_id, form.name, form.dept, birthday)
       navigate('/', { replace: true })
     } catch (e) {
       setErr(e.message)
@@ -76,6 +101,34 @@ export default function Register() {
             <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Department</label>
             <Select value={form.dept} onChange={v => setForm(f => ({...f, dept: v}))} options={DEPT_OPTIONS} placeholder="Select department…" />
           </div>
+
+          {/* Birthday */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+              Date of Birth <span className="text-red-400">*</span>
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <Select
+                value={bday.month}
+                onChange={v => setBday(b => ({ ...b, month: v }))}
+                options={MONTHS}
+                placeholder="Month"
+              />
+              <Select
+                value={bday.day}
+                onChange={v => setBday(b => ({ ...b, day: v }))}
+                options={DAYS}
+                placeholder="Day"
+              />
+              <Select
+                value={bday.year}
+                onChange={v => setBday(b => ({ ...b, year: v }))}
+                options={YEARS}
+                placeholder="Year"
+              />
+            </div>
+          </div>
+
           <div>
             <PasswordInput label="Password" placeholder="Min 8 chars, 1 uppercase, 1 number" value={form.pw} onChange={set('pw')} required />
             <StrengthBar password={form.pw} />

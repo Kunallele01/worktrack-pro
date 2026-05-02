@@ -46,7 +46,7 @@ export async function signIn(identifier, password) {
   return profile
 }
 
-export async function signUp(email, password, employee_id, full_name, department) {
+export async function signUp(email, password, employee_id, full_name, department, birthday = null) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -58,6 +58,9 @@ export async function signUp(email, password, employee_id, full_name, department
   if (!data.user) throw new Error('Registration failed.')
   // Give the trigger a moment to create the profile row
   await new Promise(r => setTimeout(r, 800))
+  if (birthday) {
+    await supabase.from('profiles').update({ birthday }).eq('id', data.user.id)
+  }
   return fetchProfile(data.user.id)
 }
 
@@ -113,7 +116,7 @@ export async function getUsers({ search = '', department = '', isActive = null, 
 }
 
 export async function updateUser(userId, fields) {
-  const allowed = ['full_name', 'email', 'department', 'is_admin', 'is_active']
+  const allowed = ['full_name', 'email', 'department', 'is_admin', 'is_active', 'birthday']
   const payload = Object.fromEntries(Object.entries(fields).filter(([k]) => allowed.includes(k)))
   const { data, error } = await supabase.from('profiles').update(payload).eq('id', userId).select().single()
   if (error) throw new Error(error.message)
@@ -653,6 +656,142 @@ export async function reviewCorrection(corrId, reviewerId, approved, adminNote =
   }).eq('id', corrId).select().single()
   if (error) throw new Error(error.message)
   return data
+}
+
+// ── Birthdays ─────────────────────────────────────────────────────────────── //
+
+export async function getTodaysBirthdays() {
+  const { data } = await supabase.from('profiles')
+    .select('id,full_name,email,birthday,department,employee_id')
+    .eq('is_active', true)
+  const today = new Date()
+  return (data || []).filter(p => {
+    if (!p.birthday) return false
+    const b = new Date(p.birthday)
+    return b.getMonth() === today.getMonth() && b.getDate() === today.getDate()
+  })
+}
+
+export async function sendBirthdayEmail(person, settings) {
+  const host = settings.smtp_host?.trim()
+  const user = settings.smtp_username?.trim()
+  const pass = settings.smtp_password?.trim()
+  if (!host || !user || !pass || !person.email) return
+
+  const firstName = person.full_name?.split(' ')[0] || person.full_name
+  const company   = settings.company_name || 'Your Team'
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Happy Birthday ${firstName}!</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+  @keyframes bd-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+  @keyframes bd-shimmer { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#05030f; font-family:'Inter',Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+</style>
+</head>
+<body style="background:#05030f;padding:28px 0;">
+<div style="max-width:580px;margin:0 auto;padding:0 16px;">
+
+  <!-- ══ HEADER ══ -->
+  <div style="background:linear-gradient(160deg,#1e0a3c 0%,#2d1257 45%,#1a1050 100%);border-radius:24px 24px 0 0;padding:52px 44px 40px;text-align:center;position:relative;overflow:hidden;border:1px solid rgba(244,114,182,0.2);border-bottom:none;">
+    <div style="position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#f472b6,#e879f9,#a78bfa,#4f86f7,#34d399,#fbbf24,#f472b6);background-size:300% 100%;animation:bd-shimmer 4s linear infinite;"></div>
+    <div style="position:absolute;top:-80px;left:-80px;width:260px;height:260px;background:radial-gradient(circle,rgba(244,114,182,0.18) 0%,transparent 70%);border-radius:50%;"></div>
+    <div style="position:absolute;bottom:-60px;right:-60px;width:220px;height:220px;background:radial-gradient(circle,rgba(79,134,247,0.18) 0%,transparent 70%);border-radius:50%;"></div>
+    <div style="position:absolute;top:30%;left:60%;width:150px;height:150px;background:radial-gradient(circle,rgba(167,139,250,0.15) 0%,transparent 70%);border-radius:50%;"></div>
+
+    <div style="font-size:80px;line-height:1;margin-bottom:18px;animation:bd-float 3s ease-in-out infinite;display:inline-block;filter:drop-shadow(0 0 24px rgba(251,191,36,0.4));">🎂</div>
+    <div style="font-size:24px;letter-spacing:10px;margin-bottom:22px;opacity:0.95;">🎊&nbsp;🌟&nbsp;🎉&nbsp;✨&nbsp;🎈&nbsp;🎁&nbsp;🎀</div>
+    <h1 style="font-size:46px;font-weight:900;background:linear-gradient(135deg,#f9a8d4 0%,#f472b6 30%,#c084fc 60%,#818cf8 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-1.5px;line-height:1.05;margin-bottom:14px;">Happy Birthday!</h1>
+    <p style="font-size:30px;font-weight:800;color:#fbbf24;letter-spacing:-0.5px;text-shadow:0 0 30px rgba(251,191,36,0.4);">${firstName} &nbsp;⭐</p>
+  </div>
+
+  <!-- ══ BODY ══ -->
+  <div style="background:linear-gradient(180deg,#0d0822 0%,#070615 100%);border:1px solid rgba(167,139,250,0.12);border-top:none;padding:40px 44px;">
+
+    <!-- Personal message box -->
+    <div style="background:linear-gradient(135deg,rgba(244,114,182,0.07) 0%,rgba(167,139,250,0.07) 100%);border:1px solid rgba(244,114,182,0.18);border-radius:18px;padding:28px 28px;margin-bottom:32px;text-align:center;">
+      <p style="color:#e2e8f0;font-size:17px;line-height:1.8;">
+        Hey&nbsp;<strong style="color:#f472b6;font-size:19px;">${firstName}</strong>,&nbsp;today the universe made
+        a very good decision — it gave us <strong style="color:#a78bfa;">you</strong>. 🌙<br><br>
+        The entire <strong style="color:#60a5fa;">${company}</strong> team pauses today to celebrate someone
+        who shows up, delivers, and makes this place better simply by being here. That's you —
+        and we're ridiculously proud of it. 🚀
+      </p>
+    </div>
+
+    <!-- 3-column feature tiles -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
+      <tr>
+        <td width="33%" style="padding:0 6px 0 0;">
+          <div style="background:rgba(244,114,182,0.07);border:1px solid rgba(244,114,182,0.2);border-radius:16px;padding:20px 14px;text-align:center;">
+            <div style="font-size:32px;margin-bottom:10px;">🎂</div>
+            <p style="color:#f472b6;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px;">Your Day</p>
+            <p style="color:#cbd5e1;font-size:12px;line-height:1.5;">Every moment today belongs to you</p>
+          </div>
+        </td>
+        <td width="34%" style="padding:0 3px;">
+          <div style="background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.2);border-radius:16px;padding:20px 14px;text-align:center;">
+            <div style="font-size:32px;margin-bottom:10px;">⭐</div>
+            <p style="color:#a78bfa;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px;">You're A Star</p>
+            <p style="color:#cbd5e1;font-size:12px;line-height:1.5;">Shine brighter than ever, ${firstName}</p>
+          </div>
+        </td>
+        <td width="33%" style="padding:0 0 0 6px;">
+          <div style="background:rgba(79,134,247,0.07);border:1px solid rgba(79,134,247,0.2);border-radius:16px;padding:20px 14px;text-align:center;">
+            <div style="font-size:32px;margin-bottom:10px;">🎁</div>
+            <p style="color:#60a5fa;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px;">New Chapter</p>
+            <p style="color:#cbd5e1;font-size:12px;line-height:1.5;">A fresh year full of possibilities</p>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Divider -->
+    <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(167,139,250,0.25),transparent);margin:0 0 30px;"></div>
+
+    <!-- Quote -->
+    <div style="border-left:4px solid;border-image:linear-gradient(180deg,#f472b6,#a78bfa) 1;padding:18px 22px;background:rgba(167,139,250,0.05);border-radius:0 14px 14px 0;margin-bottom:34px;">
+      <p style="color:#c4b5fd;font-size:15px;font-style:italic;line-height:1.75;margin:0;">
+        "The most important birthday is today — because it's yours, and because it's here.
+        Go out and remind the world exactly why you were born to be extraordinary."
+      </p>
+      <p style="color:#7c3aed;font-size:12px;font-weight:700;margin:12px 0 0;letter-spacing:0.3px;">— The Team at ${company}</p>
+    </div>
+
+    <!-- Big CTA -->
+    <div style="text-align:center;margin-bottom:10px;">
+      <div style="display:inline-block;background:linear-gradient(135deg,#f472b6 0%,#a78bfa 50%,#4f86f7 100%);border-radius:16px;padding:16px 40px;font-size:17px;font-weight:800;color:#fff;letter-spacing:0.3px;box-shadow:0 6px 30px rgba(244,114,182,0.35),0 2px 8px rgba(0,0,0,0.4);">
+        🎊&nbsp;&nbsp;Here's To An Incredible Year Ahead!&nbsp;&nbsp;🎊
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ FOOTER ══ -->
+  <div style="background:#030208;border:1px solid rgba(255,255,255,0.04);border-top:none;border-radius:0 0 24px 24px;padding:26px 44px;text-align:center;">
+    <div style="font-size:20px;letter-spacing:6px;margin-bottom:14px;opacity:0.8;">🎂&nbsp;🎉&nbsp;🌟&nbsp;🎊&nbsp;✨&nbsp;🎈&nbsp;🎀&nbsp;💫</div>
+    <p style="color:#475569;font-size:13px;line-height:1.7;margin:0;">
+      Sent with&nbsp;💜&nbsp;by your team at <strong style="color:#7c3aed;">${company}</strong> via <strong style="color:#475569;">WorkTrack Pro</strong>
+    </p>
+    <p style="color:#1e293b;font-size:11px;margin-top:8px;">Your attendance, your team, your birthday — all in one place.</p>
+  </div>
+
+</div>
+</body>
+</html>`
+
+  window.api?.sendEmail({
+    host, port: settings.smtp_port || '587', user, pass,
+    fromName: settings.smtp_from_name || company,
+    to: [person.email],
+    subject: `🎂 Happy Birthday ${firstName}! Your whole team is celebrating YOU today 🎉✨`,
+    html,
+  }).catch(() => {})
 }
 
 // ── Badge counts ─────────────────────────────────────────────────────────── //

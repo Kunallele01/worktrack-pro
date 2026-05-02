@@ -4,6 +4,7 @@ import { getSettings, runAutoCheckout, sendCheckInReminders } from '../../lib/su
 import { useStore } from '../../lib/store'
 import Sidebar from '../../components/Sidebar'
 import { Page, ToastProvider } from '../../components/ui'
+import { BirthdayManager } from '../../components/BirthdayEffects'
 
 function checkAndSendReminders(settings) {
   if (settings.reminder_enabled !== 'true') return
@@ -30,6 +31,7 @@ function checkAndSendReminders(settings) {
 
 export default function AdminLayout() {
   const setSettings = useStore(s => s.setSettings)
+  const user        = useStore(s => s.user)
 
   useEffect(() => {
     getSettings(true).then(s => {
@@ -48,6 +50,7 @@ export default function AdminLayout() {
   return (
     <Page className="flex h-screen bg-surface-900 overflow-hidden">
       <ToastProvider>
+        <BirthdayManager user={user} />
         <Sidebar />
         <main className="flex-1 overflow-hidden">
           <Outlet />

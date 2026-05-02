@@ -154,6 +154,11 @@
   transition: opacity 200ms ease, transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* ── Birthday animation keyframes ───────────────────────────────────────── */
+@keyframes bd-float   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+@keyframes bd-shimmer { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+@keyframes bd-bounce  { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-16px)} 60%{transform:translateY(-8px)} }
+
 /* ── Light mode overrides ───────────────────────────────────────────────── */
 /* Applied when html.dark class is ABSENT */
 
