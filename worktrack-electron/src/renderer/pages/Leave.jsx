@@ -249,14 +249,23 @@ function RequestCard({ req }) {
 }
 
 function LeaveInner() {
-  const toast = useToast()
-  const user  = useStore(s => s.user)
+  const toast     = useToast()
+  const user      = useStore(s => s.user)
+  const setBadges = useStore(s => s.setBadges)
   const [balance,  setBalance ] = useState({ sick: 0, casual: 0, planned: 0, emergency: 0 })
   const [requests, setRequests] = useState([])
   const [holidays, setHolidays] = useState([])
   const [quotas,   setQuotas  ] = useState({})
   const [applying, setApplying] = useState(false)
   const [filter,   setFilter  ] = useState('all')
+
+  // Mark leaves as seen — clears the sidebar badge
+  useEffect(() => {
+    if (user?.id) {
+      localStorage.setItem(`wt-leaves-seen-${user.id}`, new Date().toISOString())
+      setBadges({ leaves: 0 })
+    }
+  }, [user?.id])
 
   const load = useCallback(async () => {
     if (!user) return

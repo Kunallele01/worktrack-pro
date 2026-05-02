@@ -24,8 +24,7 @@ function Field({ label, value }) {
 }
 
 function SettingsInner() {
-  const toast  = useToast()
-  const user     = useStore(s => s.user)
+  const toast    = useToast()
   const theme    = useStore(s => s.theme)
   const setTheme = useStore(s => s.setTheme)
   const [pw, setPw] = useState({ cur: '', new: '', conf: '' })
@@ -62,13 +61,6 @@ function SettingsInner() {
       <Sidebar />
       <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
         <h1 className="text-xl font-bold text-gray-100">Settings</h1>
-
-        <Section title="Account">
-          <Field label="Full Name"   value={user?.full_name} />
-          <Field label="Employee ID" value={user?.employee_id} />
-          <Field label="Email"       value={user?.email} />
-          <Field label="Department"  value={user?.department} />
-        </Section>
 
         <Section title="Security">
           <form onSubmit={handleChangePw} className="flex flex-col gap-4">

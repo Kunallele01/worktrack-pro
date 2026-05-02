@@ -28,6 +28,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import Dashboard from './pages/Dashboard'
 import Leave from './pages/Leave'
 import Corrections from './pages/Corrections'
+import Profile from './pages/Profile'
 import AdminLayout from './pages/admin/AdminLayout'
 import Overview from './pages/admin/Overview'
 import Attendance from './pages/admin/Attendance'
@@ -70,6 +71,7 @@ export default function App() {
 
           {/* Employee */}
           <Route path="/dashboard"   element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="/profile"     element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="/leaves"      element={<PrivateRoute><ErrorBoundary><Leave /></ErrorBoundary></PrivateRoute>} />
           <Route path="/corrections" element={<PrivateRoute><Corrections /></PrivateRoute>} />
           <Route path="/settings"    element={<PrivateRoute><EmployeeSettings /></PrivateRoute>} />

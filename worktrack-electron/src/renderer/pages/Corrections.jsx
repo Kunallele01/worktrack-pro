@@ -133,9 +133,18 @@ function MyRequests({ requests }) {
 }
 
 function CorrectionsInner() {
-  const user  = useStore(s => s.user)
+  const user      = useStore(s => s.user)
+  const setBadges = useStore(s => s.setBadges)
   const [history,  setHistory ] = useState([])
   const [requests, setRequests] = useState([])
+
+  // Mark corrections as seen — clears the sidebar badge
+  useEffect(() => {
+    if (user?.id) {
+      localStorage.setItem(`wt-corrections-seen-${user.id}`, new Date().toISOString())
+      setBadges({ corrections: 0 })
+    }
+  }, [user?.id])
 
   const load = useCallback(async () => {
     if (!user) return

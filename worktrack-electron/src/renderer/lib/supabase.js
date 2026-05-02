@@ -655,6 +655,30 @@ export async function reviewCorrection(corrId, reviewerId, approved, adminNote =
   return data
 }
 
+// ── Badge counts ─────────────────────────────────────────────────────────── //
+
+// Admin: how many pending leave + correction requests are waiting for review
+export async function getAdminBadgeCounts() {
+  const [lRes, cRes] = await Promise.all([
+    supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabase.from('correction_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+  ])
+  return { leaves: lRes.count || 0, corrections: cRes.count || 0 }
+}
+
+// Employee: how many of their leaves/corrections were reviewed since they last opened those pages
+export async function getEmployeeBadgeCounts(userId) {
+  const leavesSeen = localStorage.getItem(`wt-leaves-seen-${userId}`) || '1970-01-01T00:00:00Z'
+  const corrSeen   = localStorage.getItem(`wt-corrections-seen-${userId}`) || '1970-01-01T00:00:00Z'
+  const [lRes, cRes] = await Promise.all([
+    supabase.from('leave_requests').select('id', { count: 'exact', head: true })
+      .eq('user_id', userId).neq('status', 'pending').gt('reviewed_at', leavesSeen),
+    supabase.from('correction_requests').select('id', { count: 'exact', head: true })
+      .eq('user_id', userId).neq('status', 'pending').gt('reviewed_at', corrSeen),
+  ])
+  return { leaves: lRes.count || 0, corrections: cRes.count || 0 }
+}
+
 // ── Reminder emails ───────────────────────────────────────────────────────── //
 
 export async function sendCheckInReminders() {

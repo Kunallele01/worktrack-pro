@@ -316,7 +316,7 @@ export function GpsWidget({ onReady }) {
     : 'poor'
 
   const tierConfig = {
-    wifi: { dot: 'bg-blue-400',    text: 'WiFi Detection Active',        sub: `Network: ${wifi || 'detected'} — office match verified at check-in` },
+    wifi: { dot: 'bg-blue-400',    text: 'WiFi Detection Active',        sub: `Network: ${wifi || 'detected'} — SSID verified against office list at check-in` },
     good: { dot: 'bg-emerald-400', text: 'GPS / WiFi Active',            sub: `Accuracy: ±${Math.round(coords?.accuracy)}m` },
     fair: { dot: 'bg-amber-400',   text: 'Location Active (Low)',        sub: `Accuracy: ±${Math.round((coords?.accuracy||0)/1000)}km` },
     poor: { dot: 'bg-red-400',     text: 'IP-Based Location (Very Low)', sub: `Accuracy: ±${Math.round((coords?.accuracy||0)/1000)}km — WiFi SSID detection active` },
@@ -351,9 +351,13 @@ export function GpsWidget({ onReady }) {
           {status === 'active' && (
             <>
               <p className="text-xs text-gray-400 mt-0.5">{tierConfig[tier]?.sub}</p>
-              <p className="font-mono text-xs text-accent-400 mt-1">
-                {coords.lat.toFixed(6)}, {coords.lon.toFixed(6)}
-              </p>
+              {(coords.lat !== 0 || coords.lon !== 0) ? (
+                <p className="font-mono text-xs text-accent-400 mt-1">
+                  {coords.lat.toFixed(6)}, {coords.lon.toFixed(6)}
+                </p>
+              ) : (
+                <p className="text-xs text-amber-400/70 mt-1">Approximate location unavailable</p>
+              )}
             </>
           )}
           {status === 'error' && <p className="text-xs text-red-400 mt-1">{error}</p>}

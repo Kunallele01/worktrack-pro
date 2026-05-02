@@ -31,6 +31,10 @@ export const useStore = create((set, get) => ({
   todayRecord: null,
   setTodayRecord: (r) => set({ todayRecord: r }),
 
+  // Nav badge counts — pending requests (admin) or unread reviews (employee)
+  badges:    { leaves: 0, corrections: 0 },
+  setBadges: (b) => set(s => ({ badges: { ...s.badges, ...b } })),
+
   // Company name (from settings)
   companyName: () => get().settings?.company_name || 'Your Company',
 }))

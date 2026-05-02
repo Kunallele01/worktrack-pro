@@ -65,10 +65,60 @@ function createWindow() {
 
 // ── System tray ───────────────────────────────────────────────────────────── //
 
+// Generates a 32x32 blue circle PNG via pure Node.js — no external icon file needed.
+function makeTrayIcon() {
+  const { deflateSync } = require('zlib')
+  const S = 32
+
+  const crcTable = new Uint32Array(256)
+  for (let i = 0; i < 256; i++) {
+    let c = i
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1)
+    crcTable[i] = c
+  }
+  function crc32(buf) {
+    let c = 0xFFFFFFFF
+    for (let i = 0; i < buf.length; i++) c = crcTable[(c ^ buf[i]) & 0xFF] ^ (c >>> 8)
+    return (c ^ 0xFFFFFFFF) >>> 0
+  }
+  function mkChunk(type, data) {
+    const tb = Buffer.from(type, 'ascii')
+    const lenBuf = Buffer.alloc(4); lenBuf.writeUInt32BE(data.length)
+    const crcBuf = Buffer.alloc(4); crcBuf.writeUInt32BE(crc32(Buffer.concat([tb, data])))
+    return Buffer.concat([lenBuf, tb, data, crcBuf])
+  }
+
+  // Build 32x32 RGBA scanlines: blue circle (#4f86f7) on transparent background
+  const cx = S / 2 - 0.5, cy = S / 2 - 0.5, r = S / 2 - 2
+  const rows = []
+  for (let y = 0; y < S; y++) {
+    const row = Buffer.alloc(1 + S * 4)   // filter byte (None=0) + RGBA pixels
+    for (let x = 0; x < S; x++) {
+      const dx = x - cx, dy = y - cy
+      const d  = Math.sqrt(dx * dx + dy * dy)
+      const off = 1 + x * 4
+      let alpha = d < r - 1 ? 255 : d <= r ? Math.round(255 * (r - d)) : 0
+      if (alpha > 0) { row[off] = 79; row[off+1] = 134; row[off+2] = 247; row[off+3] = alpha }
+    }
+    rows.push(row)
+  }
+
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(S, 0); ihdr.writeUInt32BE(S, 4)
+  ihdr[8] = 8; ihdr[9] = 6  // 8-bit RGBA
+
+  return nativeImage.createFromBuffer(Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    mkChunk('IHDR', ihdr),
+    mkChunk('IDAT', deflateSync(Buffer.concat(rows))),
+    mkChunk('IEND', Buffer.alloc(0)),
+  ]))
+}
+
 function createTray() {
+  const icon = makeTrayIcon()
   try {
-    const iconPath = path.join(__dirname, '..', 'resources', 'icon.ico')
-    tray = new Tray(fs.existsSync(iconPath) ? iconPath : nativeImage.createEmpty())
+    tray = new Tray(icon)
   } catch {
     tray = new Tray(nativeImage.createEmpty())
   }
