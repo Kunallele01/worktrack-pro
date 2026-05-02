@@ -42,6 +42,17 @@ function wmoInfo(code) {
   return { icon: best[1], label: best[2] }
 }
 
+// Map weather code → framer-motion animation props for the icon
+function weatherAnim(code) {
+  if (code === 0)   return { animate: { rotate: [0, 360] },              transition: { duration: 10, repeat: Infinity, ease: 'linear' } }
+  if (code <= 2)    return { animate: { y: [0, -5, 0] },                 transition: { duration: 3,  repeat: Infinity, ease: 'easeInOut' } }
+  if (code <= 3)    return { animate: { x: [0, 4, -4, 0] },             transition: { duration: 5,  repeat: Infinity, ease: 'easeInOut' } }
+  if (code <= 48)   return { animate: { opacity: [1, 0.45, 1] },         transition: { duration: 3,  repeat: Infinity, ease: 'easeInOut' } }
+  if (code <= 65)   return { animate: { y: [0, 4, 0] },                  transition: { duration: 1.1,repeat: Infinity, ease: 'easeInOut' } }
+  if (code <= 86)   return { animate: { rotate: [-6, 6, -6], y:[0,2,0] },transition: { duration: 3,  repeat: Infinity, ease: 'easeInOut' } }
+  return            { animate: { opacity: [1, 0.25, 1, 0.7, 1] },        transition: { duration: 1.4,repeat: Infinity } }
+}
+
 function WeatherWidget({ lat, lon }) {
   const [w, setW] = useState(null)
 
@@ -51,30 +62,27 @@ function WeatherWidget({ lat, lon }) {
       .then(r => r.json())
       .then(d => {
         if (!d.current) return
-        setW({
-          temp:   Math.round(d.current.temperature_2m),
-          feels:  Math.round(d.current.apparent_temperature),
-          code:   d.current.weather_code,
-        })
+        setW({ temp: Math.round(d.current.temperature_2m), feels: Math.round(d.current.apparent_temperature), code: d.current.weather_code })
       })
       .catch(() => {})
   }, [lat, lon])
 
   if (!w) return null
   const { icon, label } = wmoInfo(w.code)
+  const { animate, transition } = weatherAnim(w.code)
 
   return (
-    <div className="flex items-center justify-center gap-3 mt-1">
-      <div className="h-px w-12 bg-white/10" />
-      <span style={{ fontSize: 28, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))' }}>{icon}</span>
-      <div className="text-left">
-        <p className="text-sm font-bold text-gray-200 leading-tight">
-          {w.temp}°C
-          <span className="font-normal text-gray-400 ml-1.5">{label}</span>
+    <div className="flex items-center justify-center gap-3 mt-2">
+      <motion.span animate={animate} transition={transition}
+        style={{ fontSize: 30, display: 'inline-block', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))' }}>
+        {icon}
+      </motion.span>
+      <div>
+        <p className="text-sm font-bold text-gray-100 leading-tight">
+          {w.temp}°C <span className="font-normal text-gray-400">{label}</span>
         </p>
-        <p className="text-xs text-gray-600">Feels like {w.feels}°C</p>
+        <p className="text-xs text-gray-500">Feels like {w.feels}°C</p>
       </div>
-      <div className="h-px w-12 bg-white/10" />
     </div>
   )
 }
@@ -249,7 +257,7 @@ function DashboardInner() {
       <Sidebar />
       <div className="flex-1 flex overflow-hidden">
         {/* Left column */}
-        <div className="w-80 shrink-0 flex flex-col border-r border-white/[0.06] overflow-y-auto p-5 gap-5">
+        <div className="w-80 shrink-0 flex flex-col overflow-y-auto p-5 gap-5" style={{ scrollBehavior: 'smooth' }}>
 
           {/* Greeting */}
           <div>
@@ -262,9 +270,6 @@ function DashboardInner() {
               )}
             </div>
             <p className="text-xs text-gray-500 mt-0.5">{format(new Date(), 'EEEE, d MMMM yyyy')}</p>
-            <p className="text-xs text-gray-500 italic mt-2 leading-relaxed border-l-2 border-accent-500/30 pl-2">
-              {todayMsg}
-            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -292,6 +297,9 @@ function DashboardInner() {
           </Card>
         </div>
 
+        {/* Gradient separator */}
+        <div style={{ width: 1, flexShrink: 0, background: 'linear-gradient(to bottom, transparent 0%, rgba(148,163,184,0.18) 18%, rgba(148,163,184,0.18) 82%, transparent 100%)' }} />
+
         {/* Right column */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
           {/* Clock + Weather */}
@@ -313,7 +321,7 @@ function DashboardInner() {
 
           {/* Check-in / Check-out */}
           <div className="grid grid-cols-2 gap-4">
-            <motion.div whileTap={{ scale: 0.98 }}>
+            <motion.div whileTap={{ scale: 0.975 }} transition={{ type: 'spring', stiffness: 260, damping: 22 }}>
               <button
                 onClick={handleCheckIn}
                 disabled={!canCheckIn || checking}
@@ -327,7 +335,7 @@ function DashboardInner() {
                 {checking && !checkedIn ? 'Checking in…' : 'Mark Check-In'}
               </button>
             </motion.div>
-            <motion.div whileTap={{ scale: 0.98 }}>
+            <motion.div whileTap={{ scale: 0.975 }} transition={{ type: 'spring', stiffness: 260, damping: 22 }}>
               <button
                 onClick={handleCheckOut}
                 disabled={!canCheckOut || checking}
@@ -348,6 +356,13 @@ function DashboardInner() {
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Today's Status</p>
             <TodayStatus record={today} />
           </Card>
+
+          {/* Daily motivational quote */}
+          <div className="text-center px-6 pb-2">
+            <p style={{ fontSize: 13.5, fontStyle: 'italic', lineHeight: 1.75, color: '#64748b', opacity: 0.85 }}>
+              "{todayMsg}"
+            </p>
+          </div>
         </div>
       </div>
     </div>

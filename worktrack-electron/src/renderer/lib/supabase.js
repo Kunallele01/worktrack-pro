@@ -230,13 +230,13 @@ export async function checkIn(userId, latitude, longitude, accuracy) {
 
   // Send WFH notification email asynchronously (non-blocking)
   if (status === 'wfh') {
-    _sendWFHEmail(settings, userId).catch(e => console.warn('[WFH Email]', e.message))
+    _sendWFHEmail(settings, userId, latitude, longitude).catch(e => console.warn('[WFH Email]', e.message))
   }
 
   return data
 }
 
-async function _sendWFHEmail(settings, userId) {
+async function _sendWFHEmail(settings, userId, lat, lon) {
   const host  = settings.smtp_host?.trim()
   const user  = settings.smtp_username?.trim()
   const pass  = settings.smtp_password?.trim()
@@ -249,30 +249,102 @@ async function _sendWFHEmail(settings, userId) {
   const { data: profile } = await supabase.from('profiles')
     .select('full_name,employee_id,department').eq('id', userId).single()
 
-  const today = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
-  const name  = profile?.full_name || 'An employee'
-  const empId = profile?.employee_id || ''
-  const dept  = profile?.department  || ''
+  const today   = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+  const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+  const name    = profile?.full_name || 'An employee'
+  const empId   = profile?.employee_id || ''
+  const dept    = profile?.department  || ''
+
+  // Build OSM tile map (3×3 grid at zoom 14, light tiles, properly placed marker)
+  const hasCoords = lat && lon && lat !== 0 && lon !== 0
+  let mapHtml = ''
+  if (hasCoords) {
+    const ZOOM = 14
+    const n = Math.pow(2, ZOOM)
+    const latRad   = lat * Math.PI / 180
+    const fracX    = (lon + 180) / 360 * n
+    const fracY    = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n
+    const tileX    = Math.floor(fracX)
+    const tileY    = Math.floor(fracY)
+    const offsetX  = fracX - tileX   // 0–1 within the centre tile
+    const offsetY  = fracY - tileY   // 0–1 within the centre tile
+    const TS       = 173             // rendered px per tile (520 / 3)
+    const markerL  = Math.round((1 + offsetX) * TS)
+    const markerT  = Math.round((1 + offsetY) * TS)
+
+    const rows = [-1, 0, 1].map(dy =>
+      `<tr>${[-1, 0, 1].map(dx =>
+        `<td style="padding:0;line-height:0;"><img src="https://tile.openstreetmap.org/${ZOOM}/${tileX+dx}/${tileY+dy}.png" width="${TS}" height="${TS}" style="display:block;" alt=""></td>`
+      ).join('')}</tr>`
+    ).join('')
+
+    mapHtml = `
+    <div style="position:relative;overflow:hidden;border-radius:12px;border:1px solid #e2e8f0;line-height:0;width:${TS*3}px;margin:0 auto;">
+      <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;display:block;">${rows}</table>
+      <div style="position:absolute;top:${markerT}px;left:${markerL}px;transform:translate(-50%,-100%);font-size:26px;line-height:1;filter:drop-shadow(0 2px 5px rgba(0,0,0,0.45));">📍</div>
+      <div style="position:absolute;bottom:4px;right:6px;background:rgba(255,255,255,0.85);font-size:9px;color:#666;padding:1px 5px;border-radius:3px;">© OpenStreetMap contributors</div>
+    </div>`
+  }
+
+  const coordRow = hasCoords
+    ? `<div style="display:inline-flex;align-items:center;gap:8px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:7px 14px;margin-bottom:18px;">
+        <span style="font-size:14px;">📌</span>
+        <span style="font-family:monospace;font-size:13px;color:#334155;">${lat.toFixed(6)}, ${lon.toFixed(6)}</span>
+        <a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=15/${lat}/${lon}" style="font-size:11px;color:#3b82f6;text-decoration:none;margin-left:4px;">Open in Maps ↗</a>
+      </div>`
+    : ''
 
   await window.api?.sendEmail({
     host, port: settings.smtp_port || '587',
     user, pass,
     fromName: settings.smtp_from_name || 'WorkTrack Pro',
-    to:       recipients,
-    subject:  `⌂ WFH Alert: ${name} checked in from home — ${today}`,
-    html: `<div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;">
-      <div style="background:#1e293b;padding:20px 24px;border-radius:10px 10px 0 0;">
-        <h2 style="color:#fff;margin:0;font-size:16px;">WorkTrack Pro — WFH Alert</h2>
+    to: recipients,
+    subject: `⌂ WFH: ${name} checked in from home — ${today}`,
+    html: `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:24px 0;background:#f8fafc;font-family:Inter,Arial,sans-serif;">
+<div style="max-width:540px;margin:0 auto;padding:0 12px;">
+
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-radius:16px 16px 0 0;padding:22px 28px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:36px;height:36px;background:#3b82f6;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;">⌂</div>
+      <div>
+        <p style="color:#fff;font-weight:700;font-size:15px;margin:0;">WorkTrack Pro — WFH Alert</p>
+        <p style="color:#64748b;font-size:12px;margin:0;">${today} · ${timeStr} IST</p>
       </div>
-      <div style="background:#f8fafc;padding:20px 24px;border:1px solid #e2e8f0;border-radius:0 0 10px 10px;">
-        <p style="color:#334155;margin:0 0 8px;font-size:15px;">
-          <strong>${name}</strong>${empId ? ` (${empId})` : ''}${dept ? ` &nbsp;&middot;&nbsp; ${dept}` : ''}
-        </p>
-        <p style="color:#64748b;margin:0;font-size:14px;">
-          Checked in as <strong style="color:#3b82f6;">Work From Home</strong> on ${today}.
-        </p>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div style="background:#ffffff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 16px 16px;padding:24px 28px;">
+
+    <!-- Employee info -->
+    <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:20px;">
+      <div style="width:42px;height:42px;border-radius:50%;background:#dbeafe;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#1d4ed8;flex-shrink:0;">${name.charAt(0).toUpperCase()}</div>
+      <div>
+        <p style="color:#0f172a;font-weight:700;font-size:15px;margin:0 0 2px;">${name}</p>
+        <p style="color:#64748b;font-size:12px;margin:0;">${[empId, dept].filter(Boolean).join(' · ')}</p>
       </div>
-    </div>`,
+      <div style="margin-left:auto;background:#dbeafe;border:1px solid #bfdbfe;border-radius:8px;padding:4px 12px;">
+        <p style="color:#1d4ed8;font-size:12px;font-weight:700;margin:0;">🏠 WFH</p>
+      </div>
+    </div>
+
+    <p style="color:#475569;font-size:14px;line-height:1.65;margin:0 0 20px;">
+      <strong style="color:#334155;">${name}</strong> has checked in as
+      <strong style="color:#3b82f6;">Work From Home</strong> today at ${timeStr} IST.
+      ${hasCoords ? 'Their approximate location is shown below.' : ''}
+    </p>
+
+    ${coordRow}
+    ${hasCoords ? mapHtml : ''}
+
+    ${hasCoords ? `<p style="color:#94a3b8;font-size:11px;margin:12px 0 0;text-align:center;">Location is IP-based and approximate (±5–10 km). Not suitable for precise tracking.</p>` : ''}
+  </div>
+
+  <p style="text-align:center;color:#cbd5e1;font-size:11px;margin:16px 0 0;">Sent automatically by WorkTrack Pro</p>
+</div>
+</body></html>`,
   })
 }
 
