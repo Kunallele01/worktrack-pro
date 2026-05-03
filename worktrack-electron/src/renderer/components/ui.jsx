@@ -38,29 +38,6 @@ export function Card({ children, className = '', hover = false, onClick }) {
   )
 }
 
-// Counts from 0 to value with an ease-out cubic — used in StatCard
-function AnimatedNumber({ value }) {
-  const [display, setDisplay] = useState(typeof value === 'number' ? 0 : value)
-  const rafRef = useRef(null)
-
-  useEffect(() => {
-    if (typeof value !== 'number') { setDisplay(value); return }
-    const end   = value
-    const dur   = 650
-    const t0    = performance.now()
-    const tick  = (now) => {
-      const p = Math.min((now - t0) / dur, 1)
-      const e = 1 - Math.pow(1 - p, 3)          // ease-out cubic
-      setDisplay(Math.round(end * e))
-      if (p < 1) rafRef.current = requestAnimationFrame(tick)
-    }
-    cancelAnimationFrame(rafRef.current)
-    rafRef.current = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [value])
-
-  return display
-}
 
 // ── Button ───────────────────────────────────────────────────────────────── //
 
@@ -748,21 +725,25 @@ export function Select({ value, onChange, options = [], placeholder = 'Select…
 // ── AnimatedNumber — counts up from 0 to value on mount/change ────────────── //
 
 export function AnimatedNumber({ value, className = '' }) {
-  const [display, setDisplay] = useState(0)
-  const target = Number(value) || 0
+  const isNum = typeof value === 'number' || (typeof value === 'string' && !isNaN(Number(value)) && value !== '—')
+  const target = isNum ? (Number(value) || 0) : 0
+  const [display, setDisplay] = useState(isNum ? 0 : value)
+  const rafRef = useRef(null)
 
   useEffect(() => {
-    if (target === 0) { setDisplay(0); return }
-    const start = performance.now()
-    const duration = 1200
+    if (!isNum) { setDisplay(value); return }
+    const t0  = performance.now()
+    const dur = 650
     const tick = (now) => {
-      const t = Math.min((now - start) / duration, 1)
-      const eased = 1 - Math.pow(1 - t, 3)
-      setDisplay(Math.round(eased * target))
-      if (t < 1) requestAnimationFrame(tick)
+      const p = Math.min((now - t0) / dur, 1)
+      const e = 1 - Math.pow(1 - p, 3)
+      setDisplay(Math.round(target * e))
+      if (p < 1) rafRef.current = requestAnimationFrame(tick)
     }
-    requestAnimationFrame(tick)
-  }, [target])
+    cancelAnimationFrame(rafRef.current)
+    rafRef.current = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [target, isNum])
 
   return <span className={className}>{display}</span>
 }
