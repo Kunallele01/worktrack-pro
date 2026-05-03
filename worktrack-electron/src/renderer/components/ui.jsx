@@ -23,14 +23,43 @@ export function Page({ children, className = '' }) {
 export function Card({ children, className = '', hover = false, onClick }) {
   return (
     <motion.div
-      whileHover={hover ? { scale: 1.01, borderColor: 'rgba(255,255,255,0.12)' } : undefined}
-      transition={{ duration: 0.15 }}
+      whileHover={{
+        y: -2,
+        boxShadow: '0 10px 32px rgba(0,0,0,0.22)',
+        borderColor: 'rgba(255,255,255,0.10)',
+        ...(hover ? { scale: 1.01 } : {}),
+      }}
+      transition={{ type: 'spring', stiffness: 320, damping: 28 }}
       onClick={onClick}
       className={`card ${hover ? 'cursor-pointer' : ''} ${className}`}
     >
       {children}
     </motion.div>
   )
+}
+
+// Counts from 0 to value with an ease-out cubic — used in StatCard
+function AnimatedNumber({ value }) {
+  const [display, setDisplay] = useState(typeof value === 'number' ? 0 : value)
+  const rafRef = useRef(null)
+
+  useEffect(() => {
+    if (typeof value !== 'number') { setDisplay(value); return }
+    const end   = value
+    const dur   = 650
+    const t0    = performance.now()
+    const tick  = (now) => {
+      const p = Math.min((now - t0) / dur, 1)
+      const e = 1 - Math.pow(1 - p, 3)          // ease-out cubic
+      setDisplay(Math.round(end * e))
+      if (p < 1) rafRef.current = requestAnimationFrame(tick)
+    }
+    cancelAnimationFrame(rafRef.current)
+    rafRef.current = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [value])
+
+  return display
 }
 
 // ── Button ───────────────────────────────────────────────────────────────── //
@@ -136,7 +165,7 @@ export function StatCard({ icon: Icon, value, label, delta, accentColor = 'accen
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">{label}</p>
-          <p className="stat-number">{value}</p>
+          <p className="stat-number"><AnimatedNumber value={value} /></p>
           {delta && (
             <p className={`text-xs mt-1 ${delta.startsWith('+') ? 'text-emerald-400' : 'text-red-400'}`}>{delta}</p>
           )}

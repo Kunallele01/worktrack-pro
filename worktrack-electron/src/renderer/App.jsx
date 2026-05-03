@@ -19,8 +19,9 @@ class ErrorBoundary extends Component {
     return this.props.children
   }
 }
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AnimatePresence } from 'framer-motion'
+
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useStore } from './lib/store'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -53,17 +54,23 @@ function AdminRoute({ children }) {
   return children
 }
 
-export default function App() {
-  const theme    = useStore(s => s.theme)
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark')
-  }, [theme])
+// Keyed by first path segment — admin sub-pages share the same key so only
+// the outlet transitions (handled in AdminLayout), not the whole shell.
+function AnimatedRoutes() {
+  const location = useLocation()
+  const segmentKey = '/' + (location.pathname.split('/')[1] || '')
 
   return (
-    <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <AnimatePresence mode="wait">
-        <Routes>
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={segmentKey}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{    opacity: 0, y: -6 }}
+        transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+        style={{ width: '100%', height: '100vh', overflow: 'hidden' }}
+      >
+        <Routes location={location}>
           {/* Public */}
           <Route path="/"         element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -90,7 +97,21 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </AnimatePresence>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
+export default function App() {
+  const theme = useStore(s => s.theme)
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+  }, [theme])
+
+  return (
+    <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <AnimatedRoutes />
     </HashRouter>
   )
 }
