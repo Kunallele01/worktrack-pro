@@ -92,8 +92,8 @@ function SettingsInner() {
               <p className="text-xs text-gray-500 mt-0.5">Start WorkTrack Pro automatically when you log in</p>
             </div>
             <button onClick={toggleStartup}
-              className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${startup ? 'bg-accent-500' : 'bg-gray-700'}`}>
-              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${startup ? 'translate-x-7' : 'translate-x-1'}`} />
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${startup ? 'bg-accent-500' : 'bg-gray-400'}`}>
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${startup ? 'translate-x-5' : 'translate-x-0.5'}`} />
             </button>
           </div>
         </Section>
