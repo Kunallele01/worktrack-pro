@@ -787,6 +787,36 @@ export async function applyLeave(userId, { type, startDate, endDate, days, reaso
     user_id: userId, type, start_date: startDate, end_date: endDate, days, reason,
   }).select().single()
   if (error) throw new Error(error.message)
+
+  // Notify admin(s) of new leave request
+  const [profile, settings] = await Promise.all([
+    supabase.from('profiles').select('full_name,employee_id,department').eq('id', userId).single().then(r => r.data),
+    getSettings(),
+  ])
+  const host = settings.smtp_host?.trim(), user = settings.smtp_username?.trim(), pass = settings.smtp_password?.trim()
+  const notify = (settings.wfh_notify_emails || settings.admin_email || '').split('\n').map(s => s.trim()).filter(Boolean)
+  if (host && user && pass && notify.length && profile) {
+    const LABELS = { sick:'Sick Leave', casual:'Casual Leave', planned:'Planned Leave', emergency:'Emergency Leave' }
+    window.api?.sendEmail({
+      host, port: settings.smtp_port || '587', user, pass,
+      fromName: settings.smtp_from_name || 'WorkTrack Pro',
+      to: notify,
+      subject: `📋 New Leave Request — ${profile.full_name} (${days}d ${LABELS[type] || type})`,
+      html: `<div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;">
+        <div style="background:#1e293b;padding:20px 24px;border-radius:10px 10px 0 0;">
+          <h2 style="color:#fff;margin:0;font-size:16px;">WorkTrack Pro — New Leave Request</h2>
+        </div>
+        <div style="background:#f8fafc;padding:20px 24px;border:1px solid #e2e8f0;border-radius:0 0 10px 10px;">
+          <p style="color:#334155;font-size:15px;margin:0 0 8px;"><strong>${profile.full_name}</strong> (${profile.employee_id}) has requested leave.</p>
+          <p style="color:#64748b;font-size:14px;margin:0 0 4px;"><strong>Type:</strong> ${LABELS[type] || type}</p>
+          <p style="color:#64748b;font-size:14px;margin:0 0 4px;"><strong>Duration:</strong> ${startDate} → ${endDate} · ${days} day${days !== 1 ? 's' : ''}</p>
+          <p style="color:#64748b;font-size:14px;margin:0 0 12px;"><strong>Reason:</strong> ${reason}</p>
+          <p style="color:#94a3b8;font-size:12px;margin:0;">Review this request in WorkTrack Pro → Leave Requests.</p>
+        </div>
+      </div>`,
+    }).catch(() => {})
+  }
+
   return data
 }
 
@@ -868,6 +898,36 @@ export async function submitCorrection(userId, { date, type, requestedCheckin, r
     reason,
   }).select().single()
   if (error) throw new Error(error.message)
+
+  // Notify admin(s) of new correction request
+  const [profile, settings] = await Promise.all([
+    supabase.from('profiles').select('full_name,employee_id').eq('id', userId).single().then(r => r.data),
+    getSettings(),
+  ])
+  const host = settings.smtp_host?.trim(), user = settings.smtp_username?.trim(), pass = settings.smtp_password?.trim()
+  const notify = (settings.wfh_notify_emails || settings.admin_email || '').split('\n').map(s => s.trim()).filter(Boolean)
+  const TYPE_LABELS = { forgot_checkin:'Forgot Check-in', forgot_checkout:'Forgot Check-out', wrong_status:'Wrong Status', other:'Other' }
+  if (host && user && pass && notify.length && profile) {
+    window.api?.sendEmail({
+      host, port: settings.smtp_port || '587', user, pass,
+      fromName: settings.smtp_from_name || 'WorkTrack Pro',
+      to: notify,
+      subject: `✏️ Correction Request — ${profile.full_name} · ${date}`,
+      html: `<div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;">
+        <div style="background:#1e293b;padding:20px 24px;border-radius:10px 10px 0 0;">
+          <h2 style="color:#fff;margin:0;font-size:16px;">WorkTrack Pro — Attendance Correction</h2>
+        </div>
+        <div style="background:#f8fafc;padding:20px 24px;border:1px solid #e2e8f0;border-radius:0 0 10px 10px;">
+          <p style="color:#334155;font-size:15px;margin:0 0 8px;"><strong>${profile.full_name}</strong> (${profile.employee_id}) submitted a correction request.</p>
+          <p style="color:#64748b;font-size:14px;margin:0 0 4px;"><strong>Date:</strong> ${date}</p>
+          <p style="color:#64748b;font-size:14px;margin:0 0 4px;"><strong>Type:</strong> ${TYPE_LABELS[type] || type}</p>
+          <p style="color:#64748b;font-size:14px;margin:0 0 12px;"><strong>Reason:</strong> ${reason}</p>
+          <p style="color:#94a3b8;font-size:12px;margin:0;">Review in WorkTrack Pro → Corrections.</p>
+        </div>
+      </div>`,
+    }).catch(() => {})
+  }
+
   return data
 }
 
@@ -912,6 +972,37 @@ export async function reviewCorrection(corrId, reviewerId, approved, adminNote =
     reviewed_at: new Date().toISOString(),
   }).eq('id', corrId).select().single()
   if (error) throw new Error(error.message)
+
+  // Email the employee about the decision
+  if (corr?.user_id) {
+    const [profile, settings] = await Promise.all([
+      supabase.from('profiles').select('full_name,email').eq('id', corr.user_id).single().then(r => r.data),
+      getSettings(),
+    ])
+    const host = settings.smtp_host?.trim(), user = settings.smtp_username?.trim(), pass = settings.smtp_password?.trim()
+    if (host && user && pass && profile?.email) {
+      const statusWord = approved ? 'Approved ✓' : 'Rejected ✕'
+      const color      = approved ? '#10B981' : '#EF4444'
+      window.api?.sendEmail({
+        host, port: settings.smtp_port || '587', user, pass,
+        fromName: settings.smtp_from_name || 'WorkTrack Pro',
+        to: [profile.email],
+        subject: `Correction Request ${statusWord} — WorkTrack Pro`,
+        html: `<div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;">
+          <div style="background:#1e293b;padding:20px 24px;border-radius:10px 10px 0 0;">
+            <h2 style="color:#fff;margin:0;font-size:16px;">WorkTrack Pro — Correction ${statusWord}</h2>
+          </div>
+          <div style="background:#f8fafc;padding:20px 24px;border:1px solid #e2e8f0;border-radius:0 0 10px 10px;">
+            <p style="color:#334155;margin:0 0 8px;font-size:15px;">Hi <strong>${profile.full_name}</strong>,</p>
+            <p style="color:#64748b;font-size:14px;margin:0 0 8px;">Your attendance correction request for <strong>${corr.date}</strong> has been <strong style="color:${color}">${approved ? 'approved' : 'rejected'}</strong>.</p>
+            ${adminNote ? `<p style="color:#64748b;font-style:italic;font-size:14px;margin:0 0 8px;">"${adminNote}"</p>` : ''}
+            ${approved ? '<p style="color:#10B981;font-size:13px;margin:0;">Your attendance record has been updated accordingly.</p>' : ''}
+          </div>
+        </div>`,
+      }).catch(() => {})
+    }
+  }
+
   return data
 }
 

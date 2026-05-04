@@ -308,8 +308,8 @@ function DashboardInner() {
             {(() => {
               // WiFi mode + office coords configured → show office weather; otherwise use resolved coords
               const inWifi = gpsLocation?.accuracy < 0
-              const offLat = settings?.office_lat ? parseFloat(settings.office_lat) : null
-              const offLon = settings?.office_lng ? parseFloat(settings.office_lng) : null
+              const offLat = settings?.office_latitude ? parseFloat(settings.office_latitude) : null
+              const offLon = settings?.office_longitude ? parseFloat(settings.office_longitude) : null
               const wLat = inWifi && offLat ? offLat : gpsLocation?.lat
               const wLon = inWifi && offLon ? offLon : gpsLocation?.lon
               return wLat && wLon ? <WeatherWidget lat={wLat} lon={wLon} /> : null

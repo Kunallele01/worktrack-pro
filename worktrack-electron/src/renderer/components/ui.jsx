@@ -426,11 +426,15 @@ export function EmptyState({ emoji = '📭', title, subtitle, action }) {
 }
 
 export function Avatar({ name = '', size = 8, textSize = 'text-xs' }) {
-  const initials = name.split(' ').slice(0,2).map(p => p[0]?.toUpperCase()).join('')
-  const color    = AVATAR_COLORS[Math.abs(name.split('').reduce((a,c) => a + c.charCodeAt(0), 0)) % AVATAR_COLORS.length]
+  const initials  = name.split(' ').slice(0,2).map(p => p[0]?.toUpperCase()).join('')
+  const color     = AVATAR_COLORS[Math.abs(name.split('').reduce((a,c) => a + c.charCodeAt(0), 0)) % AVATAR_COLORS.length]
+  // Use inline px values so Tailwind purging never removes them
+  const px        = size * 4   // Tailwind size unit = 0.25rem = 4px
+  const fontSize  = Math.max(10, Math.round(px * 0.36))
   return (
-    <div className={`w-${size} h-${size} ${color} rounded-full flex items-center justify-center shrink-0`}>
-      <span className={`${textSize} font-semibold text-white`}>{initials || '?'}</span>
+    <div className={`${color} rounded-full flex items-center justify-center shrink-0 select-none`}
+      style={{ width: px, height: px, minWidth: px }}>
+      <span style={{ fontSize, fontWeight: 600, color: '#fff', lineHeight: 1 }}>{initials || '?'}</span>
     </div>
   )
 }
