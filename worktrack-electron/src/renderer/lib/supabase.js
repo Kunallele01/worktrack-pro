@@ -855,7 +855,7 @@ export async function reviewLeave(leaveId, reviewerId, approved, adminNote = '')
     admin_note:  adminNote,
     reviewed_by: reviewerId,
     reviewed_at: new Date().toISOString(),
-  }).eq('id', leaveId).select().single()
+  }).eq('id', leaveId).select('*, profiles:user_id(full_name,email)').single()
   if (error) throw new Error(error.message)
 
   // Email the employee about the decision
