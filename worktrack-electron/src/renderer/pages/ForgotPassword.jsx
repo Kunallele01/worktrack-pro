@@ -37,7 +37,7 @@ export default function ForgotPassword() {
           {stage === 'email' && (
             <motion.div key="email" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <h1 className="text-2xl font-bold text-gray-50 mb-1">Reset password</h1>
-              <p className="text-sm text-gray-400 mb-8">We'll send a 6-digit code to your email.</p>
+              <p className="text-sm text-gray-400 mb-8">We'll send a one-time code to your email.</p>
               <form onSubmit={sendOtp} className="flex flex-col gap-4">
                 <Input label="Email Address" type="email" placeholder="you@company.com"
                   value={email} onChange={e => { setEmail(e.target.value); setErr('') }} required />
@@ -51,10 +51,10 @@ export default function ForgotPassword() {
           {stage === 'otp' && (
             <motion.div key="otp" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <h1 className="text-2xl font-bold text-gray-50 mb-1">Check your inbox</h1>
-              <p className="text-sm text-gray-400 mb-8">Enter the 6-digit code sent to <span className="text-accent-400">{email}</span></p>
+              <p className="text-sm text-gray-400 mb-8">Enter the code sent to <span className="text-accent-400">{email}</span></p>
               <form onSubmit={resetPw} className="flex flex-col gap-4">
-                <Input label="6-Digit Code" placeholder="123456" maxLength={6}
-                  value={otp} onChange={e => { setOtp(e.target.value.replace(/\D/,'')); setErr('') }} required />
+                <Input label="Reset Code" placeholder="Enter the code from your email" maxLength={10}
+                  value={otp} onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setErr('') }} required />
                 <PasswordInput label="New Password" placeholder="Min 8 chars"
                   value={pw} onChange={e => { setPw(e.target.value); setErr('') }} required />
                 {err && <p className="text-sm text-red-400">{err}</p>}
