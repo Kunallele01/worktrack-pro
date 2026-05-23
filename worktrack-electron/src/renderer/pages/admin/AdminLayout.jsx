@@ -39,12 +39,15 @@ export default function AdminLayout() {
     getSettings(true).then(s => {
       setSettings(s)
       checkAndSendReminders(s)
+      runAutoCheckout(s).then(n => { if (n > 0) console.log(`Auto-checkout: ${n} records updated`) })
     })
-    runAutoCheckout().then(n => { if (n > 0) console.log(`Auto-checkout: ${n} records updated`) })
 
-    // Check every 5 minutes if reminders need to be sent
+    // Check every 5 minutes for reminders and auto-checkout
     const interval = setInterval(() => {
-      getSettings().then(checkAndSendReminders)
+      getSettings().then(s => {
+        checkAndSendReminders(s)
+        runAutoCheckout(s).then(n => { if (n > 0) console.log(`Auto-checkout: ${n} records updated`) })
+      })
     }, 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])

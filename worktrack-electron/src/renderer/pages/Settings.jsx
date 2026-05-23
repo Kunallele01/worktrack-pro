@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { changePassword } from '../lib/supabase'
 import { useStore } from '../lib/store'
-import Sidebar from '../components/Sidebar'
-import { Page, Card, Button, Input, PasswordInput } from '../components/ui'
-import { ToastProvider, useToast } from '../components/ui'
+import { Card, Button, Input, PasswordInput } from '../components/ui'
+import { useToast } from '../components/ui'
 
 function Section({ title, children }) {
   return (
@@ -57,9 +56,7 @@ function SettingsInner() {
   }
 
   return (
-    <div className="flex h-screen bg-surface-900 overflow-hidden">
-      <Sidebar />
-      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
+    <div className="h-full overflow-y-auto p-6 flex flex-col gap-5">
         <h1 className="text-xl font-bold text-gray-100">Settings</h1>
 
         <Section title="Security">
@@ -103,11 +100,10 @@ function SettingsInner() {
           <Field label="Version"     value={version} />
           <Field label="Stack"       value="Electron + React + Supabase" />
         </Section>
-      </div>
     </div>
   )
 }
 
 export default function EmployeeSettings() {
-  return <Page><ToastProvider><SettingsInner /></ToastProvider></Page>
+  return <SettingsInner />
 }

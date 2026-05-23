@@ -30,6 +30,7 @@ import Dashboard from './pages/Dashboard'
 import Leave from './pages/Leave'
 import Corrections from './pages/Corrections'
 import Profile from './pages/Profile'
+import EmployeeLayout from './pages/EmployeeLayout'
 import AdminLayout from './pages/admin/AdminLayout'
 import Overview from './pages/admin/Overview'
 import Attendance from './pages/admin/Attendance'
@@ -54,11 +55,14 @@ function AdminRoute({ children }) {
   return children
 }
 
-// Keyed by first path segment — admin sub-pages share the same key so only
-// the outlet transitions (handled in AdminLayout), not the whole shell.
+// Employee paths share key '/employee' so only EmployeeLayout's inner
+// AnimatePresence transitions — not the whole shell including sidebar.
+const EMPLOYEE_SEGMENTS = new Set(['dashboard', 'profile', 'leaves', 'corrections', 'settings'])
+
 function AnimatedRoutes() {
   const location = useLocation()
-  const segmentKey = '/' + (location.pathname.split('/')[1] || '')
+  const segment = location.pathname.split('/')[1] || ''
+  const segmentKey = EMPLOYEE_SEGMENTS.has(segment) ? '/employee' : ('/' + segment)
 
   return (
     <AnimatePresence mode="wait" initial={false}>
@@ -76,12 +80,14 @@ function AnimatedRoutes() {
           <Route path="/register" element={<Register />} />
           <Route path="/forgot"   element={<ForgotPassword />} />
 
-          {/* Employee */}
-          <Route path="/dashboard"   element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-          <Route path="/profile"     element={<PrivateRoute><Profile /></PrivateRoute>} />
-          <Route path="/leaves"      element={<PrivateRoute><ErrorBoundary><Leave /></ErrorBoundary></PrivateRoute>} />
-          <Route path="/corrections" element={<PrivateRoute><Corrections /></PrivateRoute>} />
-          <Route path="/settings"    element={<PrivateRoute><EmployeeSettings /></PrivateRoute>} />
+          {/* Employee — shared layout keeps sidebar stable between pages */}
+          <Route element={<PrivateRoute><EmployeeLayout /></PrivateRoute>}>
+            <Route path="/dashboard"   element={<Dashboard />} />
+            <Route path="/profile"     element={<Profile />} />
+            <Route path="/leaves"      element={<ErrorBoundary><Leave /></ErrorBoundary>} />
+            <Route path="/corrections" element={<Corrections />} />
+            <Route path="/settings"    element={<EmployeeSettings />} />
+          </Route>
 
           {/* Admin */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>

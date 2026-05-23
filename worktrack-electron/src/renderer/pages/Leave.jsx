@@ -5,9 +5,8 @@ import { Plus, X, Calendar, FileText, Clock } from 'lucide-react'
 import { applyLeave, getMyLeaves, getLeaveBalance, getSettings, getHolidays } from '../lib/supabase'
 import { LEAVE_TYPES, LEAVE_COLORS } from '../lib/leaveConstants'
 import { useStore } from '../lib/store'
-import Sidebar from '../components/Sidebar'
-import { Page, Card, Button, Select, EmptyState } from '../components/ui'
-import { ToastProvider, useToast } from '../components/ui'
+import { Card, Button, Select, EmptyState } from '../components/ui'
+import { useToast } from '../components/ui'
 
 // Re-export for any imports that still reference this file
 export { LEAVE_TYPES, LEAVE_COLORS }
@@ -294,9 +293,8 @@ function LeaveInner() {
   const pending  = requests.filter(r => r.status === 'pending').length
 
   return (
-    <div className="flex h-screen bg-surface-900 overflow-hidden">
-      <Sidebar />
-      <div className="flex-1 overflow-y-auto p-6">
+    <>
+      <div className="h-full overflow-y-auto p-6">
         <div className="max-w-2xl mx-auto flex flex-col gap-6">
 
           {/* Header */}
@@ -358,10 +356,10 @@ function LeaveInner() {
             onSuccess={() => { setApplying(false); load() }} />
         )}
       </AnimatePresence>
-    </div>
+    </>
   )
 }
 
 export default function Leave() {
-  return <Page><ToastProvider><LeaveInner /></ToastProvider></Page>
+  return <LeaveInner />
 }

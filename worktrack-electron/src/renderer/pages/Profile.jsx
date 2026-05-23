@@ -1,9 +1,8 @@
 import React, { useState } from 'react'
 import { updateUser } from '../lib/supabase'
 import { useStore } from '../lib/store'
-import Sidebar from '../components/Sidebar'
-import { Page, Card, Button, Input } from '../components/ui'
-import { ToastProvider, useToast } from '../components/ui'
+import { Card, Button, Input } from '../components/ui'
+import { useToast } from '../components/ui'
 
 function Field({ label, value }) {
   return (
@@ -40,9 +39,7 @@ function ProfileInner() {
   }
 
   return (
-    <div className="flex h-screen bg-surface-900 overflow-hidden">
-      <Sidebar />
-      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
+    <div className="h-full overflow-y-auto p-6 flex flex-col gap-5">
         <h1 className="text-xl font-bold text-gray-100">Profile</h1>
 
         <Card className="p-5 max-w-xl">
@@ -65,11 +62,10 @@ function ProfileInner() {
             </Button>
           </form>
         </Card>
-      </div>
     </div>
   )
 }
 
 export default function Profile() {
-  return <Page><ToastProvider><ProfileInner /></ToastProvider></Page>
+  return <ProfileInner />
 }

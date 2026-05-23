@@ -67,7 +67,18 @@ export default function AdminSettings() {
               onChange={set('office_radius_m')}
               className="w-full accent-accent-500" />
           </div>
-          <Input label="Office Start Time (HH:MM)" value={s.office_start_time || ''} onChange={set('office_start_time')} placeholder="09:30" />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Office Start Time (IST)</label>
+              <input type="time" value={s.office_start_time || '09:30'} onChange={set('office_start_time')}
+                className="input-base py-2.5 text-sm" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Auto Checkout Time (IST)</label>
+              <input type="time" value={s.auto_checkout_time || '20:00'} onChange={set('auto_checkout_time')}
+                className="input-base py-2.5 text-sm" />
+            </div>
+          </div>
         </div>
         <Input label="Company Name" value={s.company_name || ''} onChange={set('company_name')} placeholder="Your Company" />
         <div className="flex flex-col gap-1.5">
@@ -91,7 +102,7 @@ export default function AdminSettings() {
           <p className="text-xs text-gray-500">0 = strict (9:31 is late) · 10 = relaxed (9:40 is fine) · 30 = very relaxed</p>
         </div>
 
-        <Button onClick={save(['office_latitude','office_longitude','office_radius_m','office_start_time','grace_period_minutes','company_name','office_wifi_ssid'])}
+        <Button onClick={save(['office_latitude','office_longitude','office_radius_m','office_start_time','auto_checkout_time','grace_period_minutes','company_name','office_wifi_ssid'])}
           loading={saving.office_latitude} className="w-fit text-sm">
           Save Office Settings
         </Button>

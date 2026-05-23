@@ -4,10 +4,8 @@ import { CheckCircle, ArrowRightFromLine, Users, Home, Clock, AlertTriangle } fr
 import { format } from 'date-fns'
 import { getTodayAttendance, getMonthSummary, getMonthHistory, checkIn, checkOut, getSettings, getHolidays, getMyLeaves } from '../lib/supabase'
 import { useStore } from '../lib/store'
-import Sidebar from '../components/Sidebar'
-import { Page, GpsWidget, StatCard, CalendarWidget, Button, Badge, Card } from '../components/ui'
-import { ToastProvider, useToast } from '../components/ui'
-import { BirthdayManager } from '../components/BirthdayEffects'
+import { GpsWidget, StatCard, CalendarWidget, Button, Badge, Card } from '../components/ui'
+import { useToast } from '../components/ui'
 
 // ── WMO weather code → emoji + label ─────────────────────────────────────────
 const WMO_MAP = [
@@ -252,10 +250,7 @@ function DashboardInner() {
   const monthPct = totalWD ? Math.round((passedWD / totalWD) * 100) : 0
 
   return (
-    <div className="flex h-screen bg-surface-900 overflow-hidden">
-      <BirthdayManager user={user} />
-      <Sidebar />
-      <div className="flex-1 flex overflow-hidden">
+    <div className="h-full flex overflow-hidden">
         {/* Left column */}
         <div className="w-80 shrink-0 flex flex-col overflow-y-auto p-5 gap-5" style={{ scrollBehavior: 'smooth' }}>
 
@@ -365,10 +360,9 @@ function DashboardInner() {
           </div>
         </div>
       </div>
-    </div>
   )
 }
 
 export default function Dashboard() {
-  return <Page><ToastProvider><DashboardInner /></ToastProvider></Page>
+  return <DashboardInner />
 }

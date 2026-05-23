@@ -302,6 +302,7 @@ const DEFAULTS = {
   grace_period_minutes:'10',
   reminder_enabled:    'false',
   reminder_time:       '10:30',
+  auto_checkout_time:  '20:00',
   leave_sick_quota:    '10',
   leave_casual_quota:  '12',
   leave_planned_quota: '5',
@@ -641,6 +642,7 @@ export async function getAllAttendance({ start, end, userId, status, page = 1, l
   if (end)     q = q.lte('date', end)
   if (userId)  q = q.eq('user_id', userId)
   if (status)  q = q.eq('status', status)
+  q = q.limit(10000) // override PostgREST default 1000-row cap
   const { data, error } = await q
   if (error) throw new Error(error.message)
   const items = data || []
@@ -704,19 +706,32 @@ function countWeekdays(year, month) {
   return count
 }
 
-// Auto-checkout: runs once when the admin app loads after 20:00 IST
-export async function runAutoCheckout() {
+// Auto-checkout: call on interval; fires once per day after configured time
+export async function runAutoCheckout(settings) {
+  const cfg    = settings || await getSettings()
+  const [cH, cM] = (cfg.auto_checkout_time || '20:00').split(':').map(Number)
+
   const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
-  if (nowIST.getHours() < 20) return 0
-  const today   = nowIST.toLocaleDateString('sv-SE')
-  const checkoutTime = new Date()
-  checkoutTime.setUTCHours(14, 30, 0, 0) // 20:00 IST = 14:30 UTC
+  const today  = nowIST.toLocaleDateString('sv-SE')
+  const nowMin = nowIST.getHours() * 60 + nowIST.getMinutes()
+  if (nowMin < cH * 60 + cM) return 0
+
+  const cacheK = `wt_autocheckout_done_${today}`
+  if (localStorage.getItem(cacheK)) return 0
+
+  // Build checkout timestamp at exactly the configured time today (UTC)
+  const checkoutTime = new Date(nowIST)
+  checkoutTime.setHours(cH, cM, 0, 0)
+
   const { data } = await supabase.from('attendance')
     .select('id').eq('date', today).not('check_in_time', 'is', null).is('check_out_time', null)
-  if (!data?.length) return 0
+  if (!data?.length) { localStorage.setItem(cacheK, '1'); return 0 }
+
   await supabase.from('attendance')
     .update({ check_out_time: checkoutTime.toISOString(), status: 'auto_checkout' })
     .in('id', data.map(r => r.id))
+
+  localStorage.setItem(cacheK, '1')
   return data.length
 }
 

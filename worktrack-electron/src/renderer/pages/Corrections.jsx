@@ -3,9 +3,8 @@ import { motion } from 'framer-motion'
 import { format, parseISO } from 'date-fns'
 import { submitCorrection, getMyCorrections, getMonthHistory } from '../lib/supabase'
 import { useStore } from '../lib/store'
-import Sidebar from '../components/Sidebar'
-import { Page, Card, Button, Select, EmptyState } from '../components/ui'
-import { ToastProvider, useToast } from '../components/ui'
+import { Card, Button, Select, EmptyState } from '../components/ui'
+import { useToast } from '../components/ui'
 
 const CORR_TYPES = [
   { value: 'forgot_checkin',  label: '🔑 Forgot to check in',        fields: ['checkin', 'status'] },
@@ -159,19 +158,16 @@ function CorrectionsInner() {
   useEffect(() => { load() }, [load])
 
   return (
-    <div className="flex h-screen bg-surface-900 overflow-hidden">
-      <Sidebar />
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-xl mx-auto flex flex-col gap-5">
-          <div>
-            <h1 className="text-xl font-bold text-gray-100">Attendance Corrections</h1>
-            <p className="text-sm text-gray-400 mt-0.5">Request a fix for a wrong or missed check-in</p>
-          </div>
-          <CorrectionForm user={user} history={history} onSuccess={load} />
-          <div>
-            <h2 className="text-sm font-semibold text-gray-300 mb-3">My Requests</h2>
-            <MyRequests requests={requests} />
-          </div>
+    <div className="h-full overflow-y-auto p-6">
+      <div className="max-w-xl mx-auto flex flex-col gap-5">
+        <div>
+          <h1 className="text-xl font-bold text-gray-100">Attendance Corrections</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Request a fix for a wrong or missed check-in</p>
+        </div>
+        <CorrectionForm user={user} history={history} onSuccess={load} />
+        <div>
+          <h2 className="text-sm font-semibold text-gray-300 mb-3">My Requests</h2>
+          <MyRequests requests={requests} />
         </div>
       </div>
     </div>
@@ -179,5 +175,5 @@ function CorrectionsInner() {
 }
 
 export default function Corrections() {
-  return <Page><ToastProvider><CorrectionsInner /></ToastProvider></Page>
+  return <CorrectionsInner />
 }
