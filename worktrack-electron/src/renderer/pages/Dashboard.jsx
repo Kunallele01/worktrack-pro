@@ -71,10 +71,10 @@ function WeatherWidget({ lat, lon }) {
 
   return (
     <div className="flex items-center justify-center gap-3 mt-2">
-      <motion.span animate={animate} transition={transition}
-        style={{ fontSize: 30, display: 'inline-block', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))' }}>
+      <motion.div animate={animate} transition={transition}
+        style={{ fontSize: 30, lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))' }}>
         {icon}
-      </motion.span>
+      </motion.div>
       <div>
         <p className="text-sm font-bold text-gray-100 leading-tight">
           {w.temp}°C <span className="font-normal text-gray-400">{label}</span>

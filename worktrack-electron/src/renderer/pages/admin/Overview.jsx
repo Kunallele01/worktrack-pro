@@ -181,13 +181,16 @@ export default function Overview() {
     { name: 'Late',      value: stats.late       || 0 },
   ]
 
-  const total    = stats.total_employees || 0
-  const inOff    = stats.in_office       || 0
-  const wfhCount = stats.wfh             || 0
-  const lateCount= stats.late            || 0
-  const pctInOff = total > 0 ? Math.round(inOff    / total * 100) : 0
-  const pctWfh   = total > 0 ? Math.round(wfhCount / total * 100) : 0
-  const pctOnsit = total > 0 ? Math.round((inOff + wfhCount) / total * 100) : 0
+  const total      = stats.total_employees || 0
+  const inOff      = stats.in_office       || 0
+  const wfhCount   = stats.wfh             || 0
+  const lateCount  = stats.late            || 0
+  const checkedIn  = inOff + wfhCount
+  const absent     = Math.max(0, total - checkedIn)
+  const pctInOff   = total > 0 ? Math.round(inOff      / total      * 100) : 0
+  const pctWfh     = total > 0 ? Math.round(wfhCount   / total      * 100) : 0
+  const pctPresent = total > 0 ? Math.round(checkedIn  / total      * 100) : 0
+  const pctLate    = checkedIn > 0 ? Math.round(lateCount / checkedIn * 100) : 0
 
   return (
     <div className="relative h-full overflow-y-auto p-6">
@@ -206,10 +209,10 @@ export default function Overview() {
       {/* Animated stat cards with activity rings */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Total',     value: total,     pct: pctOnsit,                                       color: '#4F86F7',  sub: `of ${total} employees` },
-          { label: 'In Office', value: inOff,     pct: pctInOff,                                       color: '#10B981', sub: `${total - inOff} working remotely` },
-          { label: 'WFH',       value: wfhCount,  pct: pctWfh,                                         color: '#3B82F6', sub: `${total - wfhCount} in office / absent` },
-          { label: 'Late',      value: lateCount, pct: total > 0 ? Math.round(lateCount/total*100) : 0, color: '#F59E0B', sub: lateCount === 0 ? 'All on time today' : `${total - lateCount} on time` },
+          { label: 'Present',   value: checkedIn, pct: pctPresent, color: '#4F86F7',  sub: absent === 0 ? 'Full house today!' : `${absent} not yet checked in` },
+          { label: 'In Office', value: inOff,     pct: pctInOff,   color: '#10B981', sub: `${wfhCount} WFH · ${absent} absent` },
+          { label: 'WFH',       value: wfhCount,  pct: pctWfh,     color: '#3B82F6', sub: `${inOff} in office · ${absent} absent` },
+          { label: 'Late',      value: lateCount, pct: pctLate,    color: '#F59E0B', sub: lateCount === 0 ? 'All on time today' : `of ${checkedIn} present` },
         ].map((s, i) => (
           <motion.div
             key={s.label}

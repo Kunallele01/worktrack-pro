@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { LogIn, AlertCircle } from 'lucide-react'
+import { AlertCircle, MapPin, LayoutDashboard, CalendarDays } from 'lucide-react'
 import { signIn } from '../lib/supabase'
 import { useStore } from '../lib/store'
 import { Page, Button, Input, PasswordInput } from '../components/ui'
@@ -28,18 +28,15 @@ function LiveClock() {
         <span>{m}</span>
       </div>
       <p className="font-mono text-4xl font-light text-white/40 tabular-nums mb-5">{s}</p>
-      <p className="text-white/60 text-base font-light">{date}</p>
+      <p className="text-white/50 text-base font-light">{date}</p>
     </div>
   )
 }
 
-// Animated mesh gradient background
 function MeshBackground() {
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {/* Base */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#0a0e1a] via-[#0d1628] to-[#0a0e1a]" />
-      {/* Orbs */}
       <motion.div
         animate={{ x: [0, 30, 0], y: [0, -20, 0] }}
         transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
@@ -55,8 +52,7 @@ function MeshBackground() {
         transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-accent-500/10 rounded-full blur-2xl"
       />
-      {/* Grid dots */}
-      <svg className="absolute inset-0 w-full h-full opacity-[0.04]" xmlns="http://www.w3.org/2000/svg">
+      <svg className="absolute inset-0 w-full h-full opacity-[0.045]" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id="dots" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
             <circle cx="1" cy="1" r="1" fill="white"/>
@@ -67,6 +63,12 @@ function MeshBackground() {
     </div>
   )
 }
+
+const FEATURES = [
+  { Icon: MapPin,          title: 'Smart Location',       desc: 'Auto-detects WFH or in-office via WiFi' },
+  { Icon: LayoutDashboard, title: 'Real-time Overview',   desc: "See your whole team's status at a glance" },
+  { Icon: CalendarDays,    title: 'Leave Management',     desc: 'Apply, track, and approve time-off in one place' },
+]
 
 export default function Login() {
   const navigate  = useNavigate()
@@ -83,7 +85,6 @@ export default function Login() {
     try {
       const profile = await signIn(id, pw)
       setUser(profile)
-      // Register tray icon now that we're logged in
       window.api?.createTray()
       navigate(profile.is_admin ? '/admin' : '/dashboard', { replace: true })
     } catch (e) {
@@ -98,35 +99,74 @@ export default function Login() {
       {/* Left panel */}
       <div className="relative hidden lg:flex flex-col items-center justify-center w-[55%] overflow-hidden">
         <MeshBackground />
-        <div className="relative z-10 flex flex-col items-center gap-10">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-2xl bg-accent-500 flex items-center justify-center">
-              <LogIn size={20} className="text-white" />
+        <div className="relative z-10 flex flex-col items-center gap-10 px-12 w-full">
+          {/* Logo */}
+          <div className="flex items-center gap-3 self-start">
+            <div className="w-10 h-10 rounded-2xl bg-accent-500 flex items-center justify-center shadow-lg shadow-accent-500/30">
+              <span className="text-white font-black text-lg">W</span>
             </div>
             <div>
               <p className="text-white font-bold text-lg leading-tight">WorkTrack Pro</p>
               <p className="text-white/40 text-xs">Attendance Intelligence</p>
             </div>
           </div>
+
           <LiveClock />
-          <p className="text-white/30 text-sm max-w-xs text-center mt-4">
+
+          {/* Feature highlights */}
+          <div className="flex flex-col gap-4 w-full max-w-xs">
+            {FEATURES.map(({ Icon, title, desc }, i) => (
+              <motion.div
+                key={title}
+                initial={{ opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.4 + i * 0.12, duration: 0.5, ease: [0.16,1,0.3,1] }}
+                className="flex items-center gap-3"
+              >
+                <div className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0">
+                  <Icon size={16} className="text-accent-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white/75 leading-tight">{title}</p>
+                  <p className="text-xs text-white/30 leading-snug">{desc}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          <p className="text-white/20 text-xs text-center max-w-xs">
             Built for teams who value time — yours and everyone else's.
           </p>
         </div>
       </div>
 
+      {/* Divider */}
+      <div className="hidden lg:block w-px bg-gradient-to-b from-transparent via-white/[0.08] to-transparent" />
+
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center bg-surface-900 px-8">
+      <div className="flex-1 flex items-center justify-center relative overflow-hidden px-8">
+        {/* Subtle background that echoes the left panel */}
+        <div className="absolute inset-0 bg-surface-900" />
+        <div className="absolute inset-0 bg-gradient-to-br from-surface-900 via-surface-900 to-accent-950/20 pointer-events-none" />
+        <svg className="absolute inset-0 w-full h-full opacity-[0.025] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="rdots" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
+              <circle cx="1" cy="1" r="1" fill="white"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#rdots)"/>
+        </svg>
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-sm"
+          className="w-full max-w-sm relative z-10"
         >
-          {/* Logo (mobile) */}
+          {/* Logo (mobile only) */}
           <div className="flex items-center gap-2 mb-10 lg:hidden">
             <div className="w-8 h-8 rounded-xl bg-accent-500 flex items-center justify-center">
-              <LogIn size={16} className="text-white" />
+              <span className="text-white font-black">W</span>
             </div>
             <p className="font-bold text-gray-100">WorkTrack Pro</p>
           </div>
