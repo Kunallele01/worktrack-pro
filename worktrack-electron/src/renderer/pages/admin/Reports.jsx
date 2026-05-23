@@ -406,7 +406,7 @@ export default function Reports() {
   const monthLabel = MONTHS.find(m => m.value === month)?.label || ''
 
   return (
-    <div className="h-full overflow-y-auto p-6 flex flex-col gap-5">
+    <div className="h-full overflow-y-auto p-6 space-y-5">
 
       {/* Header */}
       <div className="flex items-center justify-between">
