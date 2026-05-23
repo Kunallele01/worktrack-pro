@@ -491,7 +491,7 @@ export function CalendarWidget({ attendance = [], holidays = [], leaves = [] }) 
   const DAYS_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 
   return (
-    <div className="select-none">
+    <div className="select-none relative">
       {/* ── Month navigator ── */}
       <div className="flex items-center justify-between mb-4">
         <button onClick={prev}
@@ -585,10 +585,10 @@ export function CalendarWidget({ attendance = [], holidays = [], leaves = [] }) 
         })}
       </div>
 
-      {/* ── Tooltip ── */}
+      {/* ── Tooltip — floats above grid, never shifts layout ── */}
       {hovered && (
-        <div className="mt-2 flex items-center justify-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.08] border border-white/[0.10] text-xs">
+        <div className="absolute left-1/2 -translate-x-1/2 -top-9 z-20 pointer-events-none">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-700 border border-white/[0.12] shadow-xl text-xs whitespace-nowrap">
             <span className="font-semibold text-gray-200">{hovered.label}</span>
             <span className="text-gray-600">·</span>
             <span className="font-mono text-gray-500">{hovered.dateStr}</span>

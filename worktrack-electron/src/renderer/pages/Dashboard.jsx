@@ -42,13 +42,13 @@ function wmoInfo(code) {
 
 // Map weather code → framer-motion animation props for the icon
 function weatherAnim(code) {
-  if (code === 0)   return { animate: { rotate: [0, 360] },              transition: { duration: 10, repeat: Infinity, ease: 'linear' } }
-  if (code <= 2)    return { animate: { y: [0, -5, 0] },                 transition: { duration: 3,  repeat: Infinity, ease: 'easeInOut' } }
-  if (code <= 3)    return { animate: { x: [0, 4, -4, 0] },             transition: { duration: 5,  repeat: Infinity, ease: 'easeInOut' } }
-  if (code <= 48)   return { animate: { opacity: [1, 0.45, 1] },         transition: { duration: 3,  repeat: Infinity, ease: 'easeInOut' } }
-  if (code <= 65)   return { animate: { y: [0, 4, 0] },                  transition: { duration: 1.1,repeat: Infinity, ease: 'easeInOut' } }
-  if (code <= 86)   return { animate: { rotate: [-6, 6, -6], y:[0,2,0] },transition: { duration: 3,  repeat: Infinity, ease: 'easeInOut' } }
-  return            { animate: { opacity: [1, 0.25, 1, 0.7, 1] },        transition: { duration: 1.4,repeat: Infinity } }
+  if (code === 0)  return { animate: { rotate: [0, 360] },                         transition: { duration: 8,   repeat: Infinity, ease: 'linear'    } }  // Clear — spin
+  if (code <= 2)   return { animate: { y: [0, -8, 0], scale: [1, 1.08, 1] },       transition: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' } }  // Mostly clear — float
+  if (code <= 3)   return { animate: { x: [0, 6, -6, 0] },                         transition: { duration: 4,   repeat: Infinity, ease: 'easeInOut' } }  // Overcast — drift
+  if (code <= 48)  return { animate: { opacity: [1, 0.4, 1], scale: [1,1.05,1] },  transition: { duration: 2.8, repeat: Infinity, ease: 'easeInOut' } }  // Fog — pulse
+  if (code <= 65)  return { animate: { y: [0, 7, 0] },                             transition: { duration: 0.9, repeat: Infinity, ease: 'easeInOut' } }  // Rain — bounce down
+  if (code <= 86)  return { animate: { rotate: [-10, 10, -10], y: [0, 4, 0] },     transition: { duration: 2,   repeat: Infinity, ease: 'easeInOut' } }  // Snow — sway
+  return           { animate: { scale: [1, 1.2, 1], opacity: [1, 0.6, 1] },        transition: { duration: 0.8, repeat: Infinity                    } }  // Thunder — flash
 }
 
 function WeatherWidget({ lat, lon }) {
@@ -187,6 +187,7 @@ function DashboardInner() {
 
   // ── Motivational message — deterministic per user per day ──────────────────
   const MESSAGES = [
+    // Consistency & showing up
     "Consistency is the rarest superpower. You're building it right now.",
     "Every great record started with someone showing up today. That's you.",
     "The discipline to check in on time is the same discipline that builds careers.",
@@ -217,6 +218,107 @@ function DashboardInner() {
     "This moment is part of a bigger story you're writing.",
     "Your work matters more than you realise. Today is proof.",
     "Behind every great career is a thousand unremarkable mornings, just like this one.",
+    // Growth & learning
+    "Every expert was once a beginner who simply refused to quit.",
+    "The gap between who you are and who you want to be is called work.",
+    "Skills rust when not used. You're keeping yours sharp today.",
+    "Growth happens at the edge of comfort. Step there today.",
+    "You can't go back and change the beginning, but you can start today and change the ending.",
+    "Learning is not attained by chance. It must be sought with ardor and attended to with diligence.",
+    "The more you know, the more you realize how much there is left to know — keep going.",
+    "Invest in yourself today. It pays the best interest.",
+    "Do something today that your future self will thank you for.",
+    "The expert in anything was once a beginner. Keep your beginner's mind.",
+    "Knowledge unused is knowledge wasted. Apply something new today.",
+    "Every skill you build is a door you can walk through later.",
+    "Stretch yourself a little further than yesterday. That's where growth lives.",
+    // Focus & execution
+    "Clarity of purpose turns ordinary effort into extraordinary output.",
+    "One focused hour beats ten distracted ones every single time.",
+    "Don't count the days. Make the days count.",
+    "The secret of getting ahead is getting started.",
+    "A goal without a plan is just a wish. Today you're executing the plan.",
+    "Do the hard thing first. Everything else gets easier.",
+    "Energy follows attention. Point both at what matters most today.",
+    "Work expands to fill time — or you can choose to make time work for you.",
+    "Perfection is the enemy of done. Done beats perfect every time.",
+    "Start where you are. Use what you have. Do what you can.",
+    "Deep work is the superpower of the next decade. Guard your focus.",
+    "The difference between a dream and a goal is a deadline. Honor yours.",
+    "Stop waiting for the right moment. This moment is the right moment.",
+    "You can have results or excuses. Not both.",
+    // Team & collaboration
+    "A team is not a group of people who work together. It's people who trust each other.",
+    "Talent wins games. Teamwork wins championships.",
+    "Behind every successful person is a team they're proud to be part of.",
+    "Great teams aren't built on stars alone. They're built on reliable contributors — like you.",
+    "The strength of the team is each individual member. The strength of each member is the team.",
+    "Alone we can do so little. Together we can do so much.",
+    "Your presence on this team makes it better. Don't underestimate that.",
+    "A good team makes the work feel less like work.",
+    "When everyone rows together, the boat moves fast.",
+    "Your commitment today holds the team's momentum tomorrow.",
+    "Be the teammate you'd want to have.",
+    // Mindset & resilience
+    "Difficult roads often lead to beautiful destinations.",
+    "The obstacle is the way. Face it head-on today.",
+    "Pressure is a privilege — it means you've been given something worth fighting for.",
+    "You've survived 100% of your hard days so far. Today is no different.",
+    "The comeback is always stronger than the setback.",
+    "Strong people don't put others down. They lift them up and lead the way.",
+    "You don't have to be extreme — just consistent.",
+    "Everything you've ever wanted is on the other side of fear.",
+    "What you resist persists. What you embrace dissolves.",
+    "The mind is a muscle. Train it like one.",
+    "You are not your mood. You are your choices.",
+    "Respond, don't react. Lead, don't follow. Create, don't consume.",
+    "Storms make trees take deeper roots. Today might be building yours.",
+    "You can't control everything. Your response — that you can always control.",
+    "Champions train when they don't feel like it. Today, be a champion.",
+    // Purpose & impact
+    "Work done with passion is work that changes the world.",
+    "The impact of what you build outlasts any title you hold.",
+    "Your best work comes from a place of purpose, not pressure.",
+    "Meaningful work isn't always loud. Sometimes it's just quietly excellent.",
+    "You are building something bigger than any one day. Remember that.",
+    "Not all heroes wear capes. Some just deliver on time, every time.",
+    "What you create with your hands and mind is your gift to the world.",
+    "The legacy of great work is felt long after the work is done.",
+    "Every line of effort you put in shapes something real.",
+    "Good work speaks for itself. Let yours do the talking.",
+    // Energy & momentum
+    "Momentum is built by doing, not by waiting.",
+    "Motion creates emotion. Get moving and the motivation follows.",
+    "Inertia is the enemy. You've already beaten it by showing up.",
+    "One good decision leads to another. You've already made one today.",
+    "Ride the momentum you built yesterday into today.",
+    "Energy is contagious — bring the kind worth catching.",
+    "You can't steer a parked car. Keep moving.",
+    "Starting is the hardest part. You're past it now.",
+    "Each day you push, the next day gets a little easier.",
+    "The fire you carry today lights the way for others around you.",
+    // Calm & clarity
+    "A calm mind is the ultimate weapon against your challenges.",
+    "Take it one task at a time. The mountain is climbed one step at a time.",
+    "Breathe. Prioritize. Execute. Repeat.",
+    "Clarity comes from action, not thought. Move forward.",
+    "Slow is smooth. Smooth is fast.",
+    "Not every day needs to be a sprint. Some days, steady wins the race.",
+    "Simplicity is the ultimate sophistication. Keep it focused.",
+    "Do less, but do it well. Quality over volume, always.",
+    "Check in, settle in, dive in. Today is ready for you.",
+    "The best preparation for tomorrow is doing your best today.",
+    // Wit & lightness
+    "Coffee in hand, tasks in queue, world unaware of what's about to happen.",
+    "Another day, another chance to make the competition nervous.",
+    "You're not just clocking in — you're powering up.",
+    "Monday called. You already answered. That's the whole game.",
+    "Whatever today throws at you, you've thrown harder things back.",
+    "Plot twist: today is the day everything clicks.",
+    "Today's forecast: 100% chance of getting things done.",
+    "They said it couldn't be done. They weren't talking about you.",
+    "Be so good they can't ignore you — starting today.",
+    "Let the work do the bragging. You just do the work.",
   ]
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000)
   const userHash  = (user?.id || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)

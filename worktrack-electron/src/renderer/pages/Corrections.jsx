@@ -58,9 +58,8 @@ function CorrectionForm({ user, history, onSuccess }) {
     if (!reason.trim()){ toast('Add a reason.', 'warning');    return }
     setBusy(true)
     try {
-      const istOffset = 5.5 * 60 * 60 * 1000
-      const ci  = checkin  ? new Date(new Date(`${date}T${checkin}:00`).getTime()  - istOffset).toISOString() : null
-      const co  = checkout ? new Date(new Date(`${date}T${checkout}:00`).getTime() - istOffset).toISOString() : null
+      const ci  = checkin  ? new Date(`${date}T${checkin}:00`).toISOString()  : null
+      const co  = checkout ? new Date(`${date}T${checkout}:00`).toISOString() : null
       await submitCorrection(user.id, { date, type, requestedCheckin: ci, requestedCheckout: co, requestedStatus: status || null, reason: reason.trim() })
       toast('Correction request submitted!', 'success')
       setDate(''); setCheckin(''); setCheckout(''); setStatus(''); setReason('')

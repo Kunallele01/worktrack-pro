@@ -206,10 +206,10 @@ export default function Overview() {
       {/* Animated stat cards with activity rings */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Total', value: total, pct: pctOnsit, color: '#4F86F7',  sub: 'checked in today' },
-          { label: 'In Office', value: inOff, pct: pctInOff, color: '#10B981', sub: `${pctInOff}% of team` },
-          { label: 'WFH',       value: wfhCount, pct: pctWfh, color: '#3B82F6', sub: `${pctWfh}% of team` },
-          { label: 'Late',      value: lateCount, pct: total > 0 ? Math.round(lateCount/total*100):0, color: '#F59E0B', sub: 'arrivals today' },
+          { label: 'Total',     value: total,     pct: pctOnsit,                                       color: '#4F86F7',  sub: `of ${total} employees` },
+          { label: 'In Office', value: inOff,     pct: pctInOff,                                       color: '#10B981', sub: `${total - inOff} working remotely` },
+          { label: 'WFH',       value: wfhCount,  pct: pctWfh,                                         color: '#3B82F6', sub: `${total - wfhCount} in office / absent` },
+          { label: 'Late',      value: lateCount, pct: total > 0 ? Math.round(lateCount/total*100) : 0, color: '#F59E0B', sub: lateCount === 0 ? 'All on time today' : `${total - lateCount} on time` },
         ].map((s, i) => (
           <motion.div
             key={s.label}
