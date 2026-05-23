@@ -316,34 +316,71 @@ function DashboardInner() {
 
           {/* Check-in / Check-out */}
           <div className="grid grid-cols-2 gap-4">
-            <motion.div whileTap={{ scale: 0.975 }} transition={{ type: 'spring', stiffness: 260, damping: 22 }}>
-              <button
+            {/* ── Check-in ── */}
+            {checkedIn ? (
+              <div className="flex flex-col items-center justify-center gap-1.5 h-28 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                <div className="w-9 h-9 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                  <CheckCircle size={18} className="text-emerald-400" />
+                </div>
+                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Checked In</p>
+                <p className="text-base font-mono font-bold text-gray-100">
+                  {format(new Date(today.check_in_time), 'hh:mm a')}
+                </p>
+              </div>
+            ) : (
+              <motion.button
+                whileTap={{ scale: 0.975 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 22 }}
                 onClick={handleCheckIn}
                 disabled={!canCheckIn || checking}
-                className={`w-full flex flex-col items-center justify-center gap-2 h-24 rounded-2xl font-semibold text-sm border transition-all
+                className={`relative w-full flex flex-col items-center justify-center gap-2 h-28 rounded-2xl text-sm font-semibold overflow-hidden transition-all
                   ${canCheckIn
-                    ? 'bg-accent-500/10 border-accent-500/30 text-accent-300 hover:bg-accent-500/20 hover:border-accent-500/50 cursor-pointer'
-                    : 'bg-white/[0.02] border-white/[0.05] text-gray-600 cursor-not-allowed'
-                  }`}
+                    ? 'bg-accent-500/15 border border-accent-500/40 text-accent-300 hover:bg-accent-500/22 hover:border-accent-500/60 cursor-pointer'
+                    : 'bg-white/[0.02] border border-white/[0.06] text-gray-600 cursor-not-allowed'}`}
               >
-                <CheckCircle size={22} />
-                {checking && !checkedIn ? 'Checking in…' : 'Mark Check-In'}
-              </button>
-            </motion.div>
-            <motion.div whileTap={{ scale: 0.975 }} transition={{ type: 'spring', stiffness: 260, damping: 22 }}>
-              <button
+                {canCheckIn && <div className="absolute top-0 inset-x-0 h-12 bg-gradient-to-b from-accent-500/20 to-transparent pointer-events-none" />}
+                <div className={`relative w-9 h-9 rounded-full flex items-center justify-center ${canCheckIn ? 'bg-accent-500/20' : 'bg-white/[0.04]'}`}>
+                  {checking && !checkedIn
+                    ? <div className="w-4 h-4 border-2 border-accent-400/30 border-t-accent-400 rounded-full animate-spin" />
+                    : <CheckCircle size={19} />}
+                </div>
+                <span className="relative">{checking && !checkedIn ? 'Checking in…' : 'Mark Check-In'}</span>
+                {!canCheckIn && gpsStatus !== 'active' && (
+                  <span className="text-[10px] text-gray-600 font-normal -mt-1">Waiting for GPS…</span>
+                )}
+              </motion.button>
+            )}
+
+            {/* ── Check-out ── */}
+            {checkedOut ? (
+              <div className="flex flex-col items-center justify-center gap-1.5 h-28 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
+                <div className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center">
+                  <ArrowRightFromLine size={17} className="text-gray-500" />
+                </div>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Checked Out</p>
+                <p className="text-base font-mono font-bold text-gray-400">
+                  {format(new Date(today.check_out_time), 'hh:mm a')}
+                </p>
+              </div>
+            ) : (
+              <motion.button
+                whileTap={{ scale: 0.975 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 22 }}
                 onClick={handleCheckOut}
                 disabled={!canCheckOut || checking}
-                className={`w-full flex flex-col items-center justify-center gap-2 h-24 rounded-2xl font-semibold text-sm border transition-all
+                className={`relative w-full flex flex-col items-center justify-center gap-2 h-28 rounded-2xl text-sm font-semibold border transition-all
                   ${canCheckOut
-                    ? 'bg-white/5 border-white/10 text-gray-200 hover:bg-white/10 hover:border-white/20 cursor-pointer'
-                    : 'bg-white/[0.02] border-white/[0.05] text-gray-600 cursor-not-allowed'
-                  }`}
+                    ? 'bg-white/[0.05] border-white/[0.15] text-gray-200 hover:bg-white/[0.09] hover:border-white/[0.25] cursor-pointer'
+                    : 'bg-white/[0.02] border-white/[0.05] text-gray-600 cursor-not-allowed'}`}
               >
-                <ArrowRightFromLine size={22} />
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center ${canCheckOut ? 'bg-white/[0.08]' : 'bg-white/[0.04]'}`}>
+                  {checking && checkedIn && !checkedOut
+                    ? <div className="w-4 h-4 border-2 border-gray-500/30 border-t-gray-400 rounded-full animate-spin" />
+                    : <ArrowRightFromLine size={19} />}
+                </div>
                 {checking && checkedIn && !checkedOut ? 'Checking out…' : 'Mark Check-Out'}
-              </button>
-            </motion.div>
+              </motion.button>
+            )}
           </div>
 
           {/* Today status */}

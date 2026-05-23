@@ -193,19 +193,32 @@ function EmployeeCard({ user, onAction, onBirthdayEdit, onIdEdit }) {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-1.5">
-          <Button variant="ghost" className="text-xs h-8 justify-center"
-            onClick={() => onAction('toggle_admin', user)}>
-            {user.is_admin ? <><ShieldOff size={13} /> Remove Admin</> : <><Shield size={13} /> Make Admin</>}
-          </Button>
-          <Button variant={user.is_active ? 'danger' : 'secondary'} className="text-xs h-8 justify-center"
-            onClick={() => onAction('toggle_active', user)}>
-            {user.is_active ? <><UserX size={13} /> Deactivate</> : <><UserCheck size={13} /> Activate</>}
-          </Button>
-          <Button variant="danger" className="col-span-2 text-xs h-8 justify-center opacity-60 hover:opacity-100"
-            onClick={() => onAction('delete', user)}>
-            <Trash2 size={13} /> Delete Account Permanently
-          </Button>
+        <div className="flex items-center gap-1.5 pt-0.5">
+          <button
+            onClick={() => onAction('toggle_admin', user)}
+            className={`flex-1 flex items-center justify-center gap-1.5 h-8 rounded-xl text-xs font-medium border transition-colors
+              ${user.is_admin
+                ? 'text-amber-400 bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/20'
+                : 'text-gray-400 bg-white/[0.04] border-white/[0.08] hover:text-gray-200 hover:bg-white/[0.08]'}`}
+          >
+            {user.is_admin ? <><ShieldOff size={12} /> Remove Admin</> : <><Shield size={12} /> Make Admin</>}
+          </button>
+          <button
+            onClick={() => onAction('toggle_active', user)}
+            className={`flex-1 flex items-center justify-center gap-1.5 h-8 rounded-xl text-xs font-medium border transition-colors
+              ${user.is_active
+                ? 'text-red-400 bg-red-500/10 border-red-500/20 hover:bg-red-500/20'
+                : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/20'}`}
+          >
+            {user.is_active ? <><UserX size={12} /> Deactivate</> : <><UserCheck size={12} /> Activate</>}
+          </button>
+          <button
+            onClick={() => onAction('delete', user)}
+            title="Delete account permanently"
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-600 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all opacity-50 hover:opacity-100"
+          >
+            <Trash2 size={13} />
+          </button>
         </div>
       </Card>
     </motion.div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, differenceInCalendarDays } from 'date-fns'
 import { CheckCircle, XCircle, Clock } from 'lucide-react'
 import { getAllLeaveRequests, reviewLeave } from '../../lib/supabase'
 import { useStore } from '../../lib/store'
@@ -80,10 +80,16 @@ function ReviewModal({ req, onClose, onDone }) {
 }
 
 function PendingCard({ req, onReview }) {
-  const type  = LEAVE_TYPES.find(t => t.value === req.type) || LEAVE_TYPES[0]
-  const c     = LEAVE_COLORS[type.value]
-  const start = format(parseISO(req.start_date), 'd MMM')
-  const end   = format(parseISO(req.end_date),   'd MMM yyyy')
+  const type      = LEAVE_TYPES.find(t => t.value === req.type) || LEAVE_TYPES[0]
+  const c         = LEAVE_COLORS[type.value]
+  const startDate = parseISO(req.start_date)
+  const daysUntil = differenceInCalendarDays(startDate, new Date())
+  const urgency   = daysUntil < 0 ? 'overdue' : daysUntil === 0 ? 'today' : daysUntil <= 3 ? 'soon' : null
+
+  const urgencyChip = urgency === 'overdue' ? { label: 'Leave started', cls: 'bg-red-500/15 text-red-400 border-red-500/30' }
+    : urgency === 'today'   ? { label: 'Starts today!', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' }
+    : urgency === 'soon'    ? { label: `Starts in ${daysUntil}d`, cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' }
+    : null
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -91,34 +97,44 @@ function PendingCard({ req, onReview }) {
         <div className="flex items-start gap-4">
           <Avatar name={req.profiles?.full_name || ''} size={10} />
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
+
+            {/* Name row */}
+            <div className="flex items-center gap-2 flex-wrap mb-2">
               <p className="text-sm font-bold text-gray-100">{req.profiles?.full_name}</p>
               <span className="text-xs text-gray-500 font-mono">{req.profiles?.employee_id}</span>
               {req.profiles?.department && <span className="text-xs text-gray-500">· {req.profiles.department}</span>}
+              {urgencyChip && (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${urgencyChip.cls}`}>
+                  {urgencyChip.label}
+                </span>
+              )}
             </div>
 
+            {/* Leave meta row */}
             <div className="flex items-center gap-2 flex-wrap mb-3">
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${c.badge}`}>
                 {type.icon} {type.label}
               </span>
-              <span className="text-xs text-gray-400 font-mono">
-                {req.start_date === req.end_date ? start : `${start} – ${end}`}
+              <span className="text-xs font-semibold text-gray-200 font-mono">
+                {req.start_date === req.end_date
+                  ? format(startDate, 'd MMM yyyy')
+                  : `${format(startDate, 'd MMM')} – ${format(parseISO(req.end_date), 'd MMM yyyy')}`}
               </span>
-              <span className="text-xs font-semibold text-gray-300">
+              <span className="text-xs bg-white/[0.06] text-gray-300 px-2 py-0.5 rounded-full font-semibold">
                 {req.days} day{req.days !== 1 ? 's' : ''}
               </span>
             </div>
 
             <div className="bg-white/[0.03] rounded-xl px-3.5 py-2.5 mb-3 border border-white/[0.05]">
-              <p className="text-xs text-gray-300 leading-relaxed italic line-clamp-3">"{req.reason}"</p>
+              <p className="text-xs text-gray-300 leading-relaxed italic line-clamp-2">"{req.reason}"</p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between">
               <Button onClick={() => onReview(req)} className="gap-1.5 text-xs h-8 px-4">
                 Review Request
               </Button>
               <p className="text-xs text-gray-600">
-                Applied {format(parseISO(req.created_at), 'dd MMM, hh:mm a')}
+                Applied {format(parseISO(req.created_at), 'd MMM · hh:mm a')}
               </p>
             </div>
           </div>
@@ -133,23 +149,26 @@ function HistoryCard({ req }) {
   const c        = LEAVE_COLORS[type.value]
   const approved = req.status === 'approved'
   return (
-    <Card className="p-4 opacity-80">
+    <Card className="p-4">
       <div className="flex items-center gap-3">
         <Avatar name={req.profiles?.full_name || ''} size={8} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-sm font-medium text-gray-200">{req.profiles?.full_name}</p>
+            {req.profiles?.department && <span className="text-xs text-gray-500">{req.profiles.department}</span>}
+          </div>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className={`text-xs px-2 py-0.5 rounded-full border ${c.badge}`}>{type.icon} {type.label}</span>
+            <span className="text-xs text-gray-500 font-mono">
+              {format(parseISO(req.start_date), 'd MMM')}
+              {req.start_date !== req.end_date ? ` – ${format(parseISO(req.end_date), 'd MMM yyyy')}` : ''} · {req.days}d
+            </span>
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full
               ${approved ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
               {approved ? '✓ Approved' : '✕ Rejected'}
             </span>
           </div>
-          <p className="text-xs text-gray-500 mt-0.5 font-mono">
-            {format(parseISO(req.start_date), 'd MMM')}
-            {req.start_date !== req.end_date ? ` – ${format(parseISO(req.end_date), 'd MMM yyyy')}` : ''} · {req.days}d
-          </p>
-          {req.admin_note && <p className="text-xs text-gray-500 mt-1 italic">"{req.admin_note}"</p>}
+          {req.admin_note && <p className="text-xs text-gray-500 mt-1 italic">Note: "{req.admin_note}"</p>}
         </div>
       </div>
     </Card>

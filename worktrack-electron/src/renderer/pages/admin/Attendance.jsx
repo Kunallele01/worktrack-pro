@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { format, parseISO } from 'date-fns'
-import { Download } from 'lucide-react'
+import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
+import { Download, Search } from 'lucide-react'
 import { getAllAttendance } from '../../lib/supabase'
 import { Badge, Button, DataTable, Avatar, Card, Select } from '../../components/ui'
 import { useToast } from '../../components/ui'
@@ -127,35 +127,76 @@ export default function Attendance() {
       render: (v) => <span className="font-mono text-xs">{v}</span> },
   ]
 
+  const setQuick = (s, e) => { setStart(s); setEnd(e) }
+  const fmt = d => d.toLocaleDateString('sv-SE')
+  const now = new Date()
+  const QUICK = [
+    { label: 'Today',      s: fmt(now), e: fmt(now) },
+    { label: 'This Week',  s: fmt(startOfWeek(now, { weekStartsOn: 1 })), e: fmt(endOfWeek(now, { weekStartsOn: 1 })) },
+    { label: 'This Month', s: fmt(startOfMonth(now)), e: fmt(endOfMonth(now)) },
+  ]
+
   return (
     <div className="h-full flex flex-col p-6 gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-100">Attendance</h1>
+        <div>
+          <h1 className="text-xl font-bold text-gray-100">Attendance</h1>
+          {rows.length > 0 && (
+            <p className="text-sm text-gray-500 mt-0.5">{rows.length} record{rows.length !== 1 ? 's' : ''}</p>
+          )}
+        </div>
         <Button variant="secondary" onClick={exportExcel} className="gap-2 text-sm">
           <Download size={14} /> Export Excel
         </Button>
       </div>
 
-      <Card className="p-4 flex flex-wrap gap-3 items-end">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Start</label>
-          <input type="date" value={start} onChange={e => setStart(e.target.value)}
-            className="input-base py-2 text-sm w-40" />
+      <Card className="p-4 flex flex-col gap-3">
+        {/* Quick filter chips */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide mr-1">Quick</span>
+          {QUICK.map(q => {
+            const active = start === q.s && end === q.e
+            return (
+              <button key={q.label}
+                onClick={() => { setQuick(q.s, q.e); setTimeout(load, 0) }}
+                className={`px-3 py-1.5 text-xs font-medium rounded-xl border transition-colors
+                  ${active
+                    ? 'bg-accent-500/20 border-accent-500/30 text-accent-400'
+                    : 'bg-white/[0.04] border-white/[0.08] text-gray-400 hover:text-gray-200 hover:bg-white/[0.08]'}`}>
+                {q.label}
+              </button>
+            )
+          })}
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-400 font-semibold uppercase tracking-wide">End</label>
-          <input type="date" value={end} onChange={e => setEnd(e.target.value)}
-            className="input-base py-2 text-sm w-40" />
+
+        {/* Filter controls */}
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500 font-semibold uppercase tracking-wide">From</label>
+            <input type="date" value={start} onChange={e => setStart(e.target.value)}
+              className="input-base py-2 text-sm w-38" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500 font-semibold uppercase tracking-wide">To</label>
+            <input type="date" value={end} onChange={e => setEnd(e.target.value)}
+              className="input-base py-2 text-sm w-38" />
+          </div>
+          <div className="flex flex-col gap-1 w-40">
+            <label className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Status</label>
+            <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} />
+          </div>
+          <div className="flex flex-col gap-1 flex-1 min-w-44">
+            <label className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Search</label>
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input placeholder="Employee name or ID…" value={search}
+                onChange={e => setSearch(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && load()}
+                className="input-base pl-8 py-2 text-sm w-full" />
+            </div>
+          </div>
+          <Button onClick={load} loading={loading} className="text-sm self-end">Apply</Button>
         </div>
-        <div className="flex flex-col gap-1 w-44">
-          <label className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Status</label>
-          <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} />
-        </div>
-        <input placeholder="Search employee…" value={search}
-          onChange={e => setSearch(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && load()}
-          className="input-base py-2 text-sm w-56" />
-        <Button onClick={load} loading={loading} className="text-sm">Apply</Button>
       </Card>
 
       <Card className="flex-1 overflow-hidden">
