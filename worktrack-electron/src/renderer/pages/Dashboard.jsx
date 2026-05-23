@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { CheckCircle, ArrowRightFromLine, Users, Home, Clock, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
 import { getTodayAttendance, getMonthSummary, getMonthHistory, checkIn, checkOut, getSettings, getHolidays, getMyLeaves } from '../lib/supabase'
@@ -135,8 +135,7 @@ function DashboardInner() {
   const [history,  setHistory ] = useState([])
   const [holidays, setHolidays] = useState([])
   const [leaves,   setLeaves  ] = useState([])
-  const [checking,      setChecking     ] = useState(false)
-  const [justCheckedIn, setJustCheckedIn] = useState(false)
+  const [checking, setChecking] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!user) return
@@ -160,12 +159,8 @@ function DashboardInner() {
     setChecking(true)
     try {
       const rec = await checkIn(user.id, gpsLocation.lat, gpsLocation.lon, gpsLocation.accuracy)
-      toast(`Checked in as ${rec.status === 'in_office' ? 'In Office' : 'WFH'}!`, 'success')
-      // Play celebration animation before swapping to the static "Checked In" card
-      setJustCheckedIn(true)
-      await new Promise(r => setTimeout(r, 520))
-      setJustCheckedIn(false)
       setToday(rec)
+      toast(`Checked in as ${rec.status === 'in_office' ? 'In Office' : 'WFH'}!`, 'success')
       loadData()
     } catch (e) { toast(e.message, 'error') }
     finally { setChecking(false) }
@@ -436,51 +431,23 @@ function DashboardInner() {
               </div>
             ) : (
               <motion.button
-                whileTap={!justCheckedIn ? { scale: 0.97 } : {}}
+                whileTap={{ scale: 0.975 }}
                 transition={{ type: 'spring', stiffness: 260, damping: 22 }}
                 onClick={handleCheckIn}
                 disabled={!canCheckIn || checking}
-                className={`relative w-full flex flex-col items-center justify-center gap-2 h-28 rounded-2xl text-sm font-semibold overflow-hidden transition-all duration-300
-                  ${justCheckedIn
-                    ? 'bg-emerald-500/20 border border-emerald-500/60 text-emerald-300'
-                    : canCheckIn
-                      ? 'bg-accent-500/15 border border-accent-500/40 text-accent-300 hover:bg-accent-500/22 hover:border-accent-500/60 cursor-pointer'
-                      : 'bg-white/[0.02] border border-white/[0.06] text-gray-600 cursor-not-allowed'}`}
+                className={`relative w-full flex flex-col items-center justify-center gap-2 h-28 rounded-2xl text-sm font-semibold overflow-hidden transition-all
+                  ${canCheckIn
+                    ? 'bg-accent-500/15 border border-accent-500/40 text-accent-300 hover:bg-accent-500/22 hover:border-accent-500/60 cursor-pointer'
+                    : 'bg-white/[0.02] border border-white/[0.06] text-gray-600 cursor-not-allowed'}`}
               >
-                {/* Ripple burst on success */}
-                <AnimatePresence>
-                  {justCheckedIn && (
-                    <motion.div
-                      key="ripple"
-                      className="absolute inset-0 rounded-2xl bg-emerald-400/30 pointer-events-none"
-                      initial={{ scale: 0.4, opacity: 0.9 }}
-                      animate={{ scale: 2.8, opacity: 0 }}
-                      exit={{}}
-                      transition={{ duration: 0.5, ease: 'easeOut' }}
-                    />
-                  )}
-                </AnimatePresence>
-
-                {!justCheckedIn && canCheckIn && (
-                  <div className="absolute top-0 inset-x-0 h-12 bg-gradient-to-b from-accent-500/20 to-transparent pointer-events-none" />
-                )}
-
-                {/* Icon with bounce on success */}
-                <motion.div
-                  className={`relative w-9 h-9 rounded-full flex items-center justify-center ${justCheckedIn ? 'bg-emerald-500/30' : canCheckIn ? 'bg-accent-500/20' : 'bg-white/[0.04]'}`}
-                  animate={justCheckedIn ? { scale: [1, 1.55, 0.88, 1.18, 1], rotate: [0, -18, 18, -6, 0] } : {}}
-                  transition={{ duration: 0.45, ease: 'easeOut' }}
-                >
-                  {checking && !justCheckedIn
+                {canCheckIn && <div className="absolute top-0 inset-x-0 h-12 bg-gradient-to-b from-accent-500/20 to-transparent pointer-events-none" />}
+                <div className={`relative w-9 h-9 rounded-full flex items-center justify-center ${canCheckIn ? 'bg-accent-500/20' : 'bg-white/[0.04]'}`}>
+                  {checking && !checkedIn
                     ? <div className="w-4 h-4 border-2 border-accent-400/30 border-t-accent-400 rounded-full animate-spin" />
                     : <CheckCircle size={19} />}
-                </motion.div>
-
-                <span className="relative">
-                  {justCheckedIn ? '✓ Checked In!' : checking ? 'Checking in…' : 'Mark Check-In'}
-                </span>
-
-                {!canCheckIn && !justCheckedIn && gpsStatus !== 'active' && (
+                </div>
+                <span className="relative">{checking && !checkedIn ? 'Checking in…' : 'Mark Check-In'}</span>
+                {!canCheckIn && gpsStatus !== 'active' && (
                   <span className="text-[10px] text-gray-600 font-normal -mt-1">Waiting for GPS…</span>
                 )}
               </motion.button>

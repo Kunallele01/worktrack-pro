@@ -1,42 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { AlertCircle, MapPin, LayoutDashboard, CalendarDays } from 'lucide-react'
 import { signIn } from '../lib/supabase'
 import { useStore } from '../lib/store'
 import { Page, Button, Input, PasswordInput } from '../components/ui'
 
-const IDLE_MS = 2 * 60 * 1000 // 2 minutes
-
 function LiveClock() {
-  const [time,   setTime  ] = useState(new Date())
-  const [isIdle, setIsIdle] = useState(false)
-  const lastActivity        = useRef(Date.now())
-
+  const [time, setTime] = useState(new Date())
   useEffect(() => {
-    const wake = () => { lastActivity.current = Date.now(); setIsIdle(false) }
-    window.addEventListener('mousemove',  wake)
-    window.addEventListener('mousedown',  wake)
-    window.addEventListener('keydown',    wake)
-
-    const t = setInterval(() => {
-      setTime(new Date())
-      setIsIdle(Date.now() - lastActivity.current > IDLE_MS)
-    }, 1000)
-
-    return () => {
-      clearInterval(t)
-      window.removeEventListener('mousemove',  wake)
-      window.removeEventListener('mousedown',  wake)
-      window.removeEventListener('keydown',    wake)
-    }
+    const t = setInterval(() => setTime(new Date()), 1000)
+    return () => clearInterval(t)
   }, [])
-
-  const h    = String(time.getHours()).padStart(2, '0')
-  const m    = String(time.getMinutes()).padStart(2, '0')
-  const s    = String(time.getSeconds()).padStart(2, '0')
+  const h = String(time.getHours()).padStart(2, '0')
+  const m = String(time.getMinutes()).padStart(2, '0')
+  const s = String(time.getSeconds()).padStart(2, '0')
   const date = time.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-
   return (
     <div className="text-center select-none">
       <div className="font-mono font-bold text-white leading-none mb-2" style={{ fontSize: 72, letterSpacing: '-4px' }}>
@@ -48,37 +27,8 @@ function LiveClock() {
         >:</motion.span>
         <span>{m}</span>
       </div>
-
-      {/* Seconds — droops when idle */}
-      <motion.p
-        className="font-mono text-4xl font-light text-white/40 tabular-nums mb-5"
-        animate={isIdle
-          ? { rotate: [-4, 4, -4], y: [0, 4, 0], opacity: [0.4, 0.25, 0.4] }
-          : { rotate: 0, y: 0, opacity: 0.4 }}
-        transition={isIdle
-          ? { repeat: Infinity, duration: 3, ease: 'easeInOut' }
-          : { duration: 0.4 }}
-      >
-        {s}
-      </motion.p>
-
+      <p className="font-mono text-4xl font-light text-white/40 tabular-nums mb-5">{s}</p>
       <p className="text-white/50 text-base font-light">{date}</p>
-
-      {/* Idle nudge */}
-      <AnimatePresence>
-        {isIdle && (
-          <motion.p
-            key="idle-msg"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-            className="text-white/20 text-xs mt-3"
-          >
-            psst… still there? 👀
-          </motion.p>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
