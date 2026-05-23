@@ -101,7 +101,7 @@ export default function Login() {
         <MeshBackground />
         <div className="relative z-10 flex flex-col items-center gap-10 px-12 w-full">
           {/* Logo */}
-          <div className="flex items-center gap-3 self-start">
+          <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-accent-500 flex items-center justify-center shadow-lg shadow-accent-500/30">
               <span className="text-white font-black text-lg">W</span>
             </div>
