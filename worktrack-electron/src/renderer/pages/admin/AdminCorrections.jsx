@@ -14,6 +14,13 @@ const CORR_TYPES = {
   other:           { label: 'Other Correction',         icon: '✏️' },
 }
 
+const STATUS_LABELS = { in_office: 'In Office', wfh: 'Work From Home', auto_checkout: 'Auto Checkout' }
+
+function fmtISO(iso) {
+  if (!iso) return null
+  try { return format(parseISO(iso), 'hh:mm a · dd MMM yyyy') } catch { return iso }
+}
+
 function ReviewModal({ req, onClose, onDone }) {
   const toast = useToast()
   const user  = useStore(s => s.user)
@@ -41,13 +48,13 @@ function ReviewModal({ req, onClose, onDone }) {
         <p className="text-xs text-gray-400 mb-4">{ct.icon} {ct.label} · {req.date}</p>
 
         {req.requested_checkin && (
-          <div className="text-xs text-gray-300 mb-1">Requested check-in: <span className="font-mono text-accent-400">{req.requested_checkin}</span></div>
+          <div className="text-xs text-gray-300 mb-1">Requested check-in: <span className="text-accent-400 font-semibold">{fmtISO(req.requested_checkin)}</span></div>
         )}
         {req.requested_checkout && (
-          <div className="text-xs text-gray-300 mb-1">Requested check-out: <span className="font-mono text-accent-400">{req.requested_checkout}</span></div>
+          <div className="text-xs text-gray-300 mb-1">Requested check-out: <span className="text-accent-400 font-semibold">{fmtISO(req.requested_checkout)}</span></div>
         )}
         {req.requested_status && (
-          <div className="text-xs text-gray-300 mb-3">Requested status: <span className="font-mono text-emerald-400">{req.requested_status}</span></div>
+          <div className="text-xs text-gray-300 mb-3">Requested status: <span className="text-emerald-400 font-semibold">{STATUS_LABELS[req.requested_status] || req.requested_status}</span></div>
         )}
 
         <div className="bg-white/[0.04] rounded-xl p-3.5 mb-4 border border-white/[0.06]">

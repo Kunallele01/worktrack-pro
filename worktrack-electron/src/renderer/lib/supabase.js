@@ -400,13 +400,14 @@ export async function checkIn(userId, latitude, longitude, accuracy) {
 // never need to load external images (OSM blocks Gmail's image proxy with 418).
 async function _fetchTileB64(url) {
   try {
-    const resp = await fetch(url)   // Electron renderer has a valid Chromium UA — OSM accepts it
+    // Route through main process — Node.js has no CSP and can set a proper User-Agent
+    // that OSM accepts, unlike requests from the renderer's file:// / app:// origin.
+    if (window.api?.fetchUrlB64) return await window.api.fetchUrlB64(url)
+    // Fallback (should not be reached in Electron)
+    const resp = await fetch(url)
     if (!resp.ok) return null
-    const buf   = await resp.arrayBuffer()
-    const bytes = new Uint8Array(buf)
-    let   bin   = ''
-    for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i])
-    return `data:image/png;base64,${btoa(bin)}`
+    const buf = await resp.arrayBuffer()
+    return `data:image/png;base64,${btoa(String.fromCharCode(...new Uint8Array(buf)))}`
   } catch { return null }
 }
 
@@ -622,13 +623,14 @@ export async function getLiveOverview() {
       absent:    absentEmps.map(e => ({ full_name: e.full_name, employee_id: e.employee_id })),
     },
     feed: empRecords.filter(r => r.check_in_time).map(r => ({
-      user_id:       r.user_id,
-      full_name:     r.profiles?.full_name || '—',
-      employee_id:   r.profiles?.employee_id || '',
-      department:    r.profiles?.department || '',
-      check_in_time: r.check_in_time,
-      status:        r.status,
-      is_late:       r.is_late,
+      user_id:        r.user_id,
+      full_name:      r.profiles?.full_name || '—',
+      employee_id:    r.profiles?.employee_id || '',
+      department:     r.profiles?.department || '',
+      check_in_time:  r.check_in_time,
+      check_out_time: r.check_out_time,
+      status:         r.status,
+      is_late:        r.is_late,
     })),
   }
 }

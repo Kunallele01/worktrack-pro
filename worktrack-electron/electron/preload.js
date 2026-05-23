@@ -11,4 +11,5 @@ contextBridge.exposeInMainWorld('api', {
   getVersion:         ()        => ipcRenderer.invoke('get-version'),
   getWifiSSID:        ()        => ipcRenderer.invoke('get-wifi-ssid'),
   getWindowsLocation: ()        => ipcRenderer.invoke('get-windows-location'),
+  fetchUrlB64:        (url)     => ipcRenderer.invoke('fetch-url-b64', url),
 })

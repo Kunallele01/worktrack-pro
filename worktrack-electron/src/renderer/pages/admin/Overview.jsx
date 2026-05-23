@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Users, Building2, Home, Clock, RefreshCw } from 'lucide-react'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts'
@@ -29,25 +30,39 @@ function FloatingOrbs() {
 }
 
 function LiveFeed({ feed }) {
-  if (!feed?.length) return <p className="text-sm text-gray-500 py-6 text-center">No check-ins yet today</p>
+  const events = []
+  feed?.forEach(item => {
+    if (item.check_in_time)  events.push({ ...item, type: 'in',  time: item.check_in_time  })
+    if (item.check_out_time) events.push({ ...item, type: 'out', time: item.check_out_time })
+  })
+  events.sort((a, b) => new Date(b.time) - new Date(a.time))
+
+  if (!events.length) return <p className="text-sm text-gray-500 py-6 text-center">No activity yet today</p>
   return (
-    <div className="space-y-2 overflow-y-auto max-h-72 pr-1">
-      {feed.map((item, i) => (
+    <div className="space-y-1 overflow-y-auto max-h-72 pr-1">
+      {events.map((item, i) => (
         <motion.div
-          key={item.user_id}
+          key={`${item.user_id}-${item.type}`}
           initial={{ opacity: 0, x: 10 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: i * 0.04 }}
+          transition={{ delay: i * 0.03 }}
           className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.03] transition-colors"
         >
           <Avatar name={item.full_name} size={8} />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-200 truncate">{item.full_name}</p>
-            <p className="text-xs text-gray-500 font-mono">
-              {item.check_in_time ? format(new Date(item.check_in_time), 'hh:mm a') : '—'}
-            </p>
+            <p className="text-xs text-gray-500 font-mono">{format(new Date(item.time), 'hh:mm a')}</p>
           </div>
-          <Badge status={item.status} />
+          <div className="flex items-center gap-1.5">
+            {item.type === 'in' ? (
+              <>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">▲ IN</span>
+                <Badge status={item.status} />
+              </>
+            ) : (
+              <span className="text-[10px] font-bold text-gray-400 bg-white/[0.05] border border-white/[0.08] px-1.5 py-0.5 rounded-full">▼ OUT</span>
+            )}
+          </div>
         </motion.div>
       ))}
     </div>
@@ -56,72 +71,83 @@ function LiveFeed({ feed }) {
 
 const CHART_COLORS = ['#10B981', '#3B82F6', '#EF4444', '#F59E0B']
 
-// Donut chart card with hover-to-see-employees tooltip on each legend row
+// Donut chart card — tooltip rendered in document.body via portal so it always
+// appears above every other element regardless of stacking context.
 function DonutCard({ donut, byCategory }) {
-  const [hovered, setHovered] = useState(null)
+  const [hovered,  setHovered ] = useState(null)
+  const [tipPos,   setTipPos  ] = useState({ top: 0, left: 0 })
   const categoryKey = { 'In Office': 'in_office', 'WFH': 'wfh', 'Absent': 'absent', 'Late': 'late' }
 
+  const handleEnter = (e, name) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setTipPos({ top: rect.top, left: rect.right + 10 })
+    setHovered(name)
+  }
+
+  const hovIdx  = donut.findIndex(d => d.name === hovered)
+  const hovList = hovered ? (byCategory?.[categoryKey[hovered]] || []) : []
+
   return (
-    <Card className="p-5">
-      <p className="text-sm font-semibold text-gray-300 mb-4">Today's Distribution</p>
-      <div className="flex items-center gap-6">
-        <ResponsiveContainer width={160} height={160}>
-          <PieChart>
-            <Pie data={donut} cx="50%" cy="50%" innerRadius={50} outerRadius={72}
-              dataKey="value" strokeWidth={2} stroke="rgba(255,255,255,0.05)">
-              {donut.map((_, i) => <Cell key={i} fill={CHART_COLORS[i]} />)}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-        <div className="space-y-2 flex-1">
-          {donut.map((d, i) => {
-            const key  = categoryKey[d.name]
-            const list = byCategory?.[key] || []
-            const isHovered = hovered === d.name
-            return (
-              <div key={d.name} className="relative">
-                <div
-                  className={`flex items-center gap-2 text-sm px-2 py-1 rounded-lg cursor-default transition-colors
-                    ${isHovered ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'}`}
-                  onMouseEnter={() => setHovered(d.name)}
-                  onMouseLeave={() => setHovered(null)}
-                >
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CHART_COLORS[i] }} />
-                  <span className="text-gray-300">{d.name}</span>
-                  <span className="text-gray-500 ml-auto font-mono font-semibold">{d.value}</span>
-                  {d.value > 0 && <span className="text-gray-600 text-xs">›</span>}
-                </div>
-                <AnimatePresence>
-                  {isHovered && list.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, x: -8, scale: 0.96 }}
-                      animate={{ opacity: 1, x:  0, scale: 1    }}
-                      exit={{   opacity: 0, x: -8, scale: 0.96 }}
-                      transition={{ duration: 0.12 }}
-                      className="absolute left-full top-0 ml-2 z-50
-                                 bg-surface-700 border border-white/10 rounded-xl
-                                 shadow-2xl p-3 w-48 pointer-events-none"
-                    >
-                      <p className="text-xs font-semibold text-gray-300 mb-2 pb-1 border-b border-white/10">
-                        {d.name} ({list.length})
-                      </p>
-                      {list.slice(0, 10).map((e, j) => (
-                        <div key={j} className="flex items-center gap-2 py-0.5">
-                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: CHART_COLORS[i] }} />
-                          <p className="text-xs text-gray-300 truncate">{e.full_name}</p>
-                          {e.employee_id && <span className="text-xs text-gray-500 ml-auto shrink-0">{e.employee_id}</span>}
-                        </div>
-                      ))}
-                      {list.length > 10 && <p className="text-xs text-gray-500 mt-1">+{list.length - 10} more</p>}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+    <>
+      <Card className="p-5">
+        <p className="text-sm font-semibold text-gray-300 mb-4">Today's Distribution</p>
+        <div className="flex items-center gap-6">
+          <ResponsiveContainer width={160} height={160}>
+            <PieChart>
+              <Pie data={donut} cx="50%" cy="50%" innerRadius={50} outerRadius={72}
+                dataKey="value" strokeWidth={2} stroke="rgba(255,255,255,0.05)">
+                {donut.map((_, i) => <Cell key={i} fill={CHART_COLORS[i]} />)}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="space-y-2 flex-1">
+            {donut.map((d, i) => (
+              <div
+                key={d.name}
+                className={`flex items-center gap-2 text-sm px-2 py-1 rounded-lg cursor-default transition-colors
+                  ${hovered === d.name ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'}`}
+                onMouseEnter={e => handleEnter(e, d.name)}
+                onMouseLeave={() => setHovered(null)}
+              >
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CHART_COLORS[i] }} />
+                <span className="text-gray-300">{d.name}</span>
+                <span className="text-gray-500 ml-auto font-mono font-semibold">{d.value}</span>
+                {d.value > 0 && <span className="text-gray-600 text-xs">›</span>}
               </div>
-            )
-          })}
+            ))}
+          </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+
+      {createPortal(
+        <AnimatePresence>
+          {hovered && hovList.length > 0 && (
+            <motion.div
+              key={hovered}
+              initial={{ opacity: 0, x: -8, scale: 0.96 }}
+              animate={{ opacity: 1, x:  0, scale: 1    }}
+              exit={{   opacity: 0, x: -8, scale: 0.96 }}
+              transition={{ duration: 0.12 }}
+              style={{ position: 'fixed', top: tipPos.top, left: tipPos.left, zIndex: 9999 }}
+              className="bg-surface-700 border border-white/10 rounded-xl shadow-2xl p-3 w-52 pointer-events-none"
+            >
+              <p className="text-xs font-semibold text-gray-300 mb-2 pb-1 border-b border-white/10">
+                {hovered} ({hovList.length})
+              </p>
+              {hovList.slice(0, 10).map((e, j) => (
+                <div key={j} className="flex items-center gap-2 py-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: CHART_COLORS[hovIdx] }} />
+                  <p className="text-xs text-gray-300 truncate">{e.full_name}</p>
+                  {e.employee_id && <span className="text-xs text-gray-500 ml-auto shrink-0 font-mono">{e.employee_id}</span>}
+                </div>
+              ))}
+              {hovList.length > 10 && <p className="text-xs text-gray-500 mt-1.5">+{hovList.length - 10} more</p>}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+    </>
   )
 }
 
@@ -216,7 +242,7 @@ export default function Overview() {
         {/* Live feed */}
         <Card className="p-5">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-gray-300">● Live Check-ins</p>
+            <p className="text-sm font-semibold text-gray-300">● Live Check-ins / Check-outs</p>
             <span className="text-xs text-gray-500">Updates in real-time</span>
           </div>
           <LiveFeed feed={data?.feed} />

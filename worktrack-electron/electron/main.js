@@ -135,6 +135,26 @@ ipcMain.handle('destroy-tray', () => {
 
 ipcMain.handle('get-version', () => app.getVersion())
 
+// Fetch a URL from the main process (bypasses renderer CSP + sets proper UA for OSM tiles)
+ipcMain.handle('fetch-url-b64', async (_event, url) => {
+  const https = await import('https')
+  const http  = await import('http')
+  const mod   = url.startsWith('https') ? https.default : http.default
+  return new Promise((resolve) => {
+    const req = mod.get(url, {
+      headers: { 'User-Agent': 'WorkTrack Pro/2.0 (Electron; Windows NT 10.0) Mozilla/5.0' },
+      timeout: 8000,
+    }, (res) => {
+      if (res.statusCode !== 200) { res.resume(); resolve(null); return }
+      const chunks = []
+      res.on('data', chunk => chunks.push(chunk))
+      res.on('end', () => resolve(`data:image/png;base64,${Buffer.concat(chunks).toString('base64')}`))
+    })
+    req.on('error', () => resolve(null))
+    req.on('timeout', () => { req.destroy(); resolve(null) })
+  })
+})
+
 // ── App lifecycle ────────────────────────────────────────────────────────── //
 
 app.whenReady().then(() => {
