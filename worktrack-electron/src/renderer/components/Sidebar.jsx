@@ -38,7 +38,7 @@ export default function Sidebar() {
   const setNotifications= useStore(s => s.setNotifications)
   const timerRef        = useRef(null)
   const [notifOpen,  setNotifOpen ] = useState(false)
-  const [lastSeen,   setLastSeen  ] = useState(() => localStorage.getItem('wt-notif-seen') || '1970-01-01T00:00:00Z')
+  const [lastSeen,   setLastSeen  ] = useState('1970-01-01T00:00:00Z')
   const notifRef = useRef(null)
 
   const companyName = settings?.company_name || 'Your Company'
@@ -79,9 +79,7 @@ export default function Sidebar() {
 
   function openNotifications() {
     setNotifOpen(o => !o)
-    const now = new Date().toISOString()
-    setLastSeen(now)
-    localStorage.setItem('wt-notif-seen', now)
+    setLastSeen(new Date().toISOString())
   }
 
   function relTime(iso) {
