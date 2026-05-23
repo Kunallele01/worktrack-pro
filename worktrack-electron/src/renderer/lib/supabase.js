@@ -1368,3 +1368,13 @@ export async function sendCheckInReminders() {
   ))
   return missing.length
 }
+
+export async function flushTestData() {
+  const [a, l, c] = await Promise.all([
+    supabase.from('attendance').delete().not('id', 'is', null),
+    supabase.from('leave_requests').delete().not('id', 'is', null),
+    supabase.from('correction_requests').delete().not('id', 'is', null),
+  ])
+  const err = a.error || l.error || c.error
+  if (err) throw new Error(err.message)
+}

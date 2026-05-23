@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { getSettings, updateSettings, getHolidays, saveHolidays } from '../../lib/supabase'
+import { getSettings, updateSettings, getHolidays, saveHolidays, flushTestData } from '../../lib/supabase'
 import { Card, Button, Input, PasswordInput } from '../../components/ui'
 import { useToast } from '../../components/ui'
-import { Trash2, Plus, MapPin, CalendarDays, Bell, Mail, Palmtree } from 'lucide-react'
+import { Trash2, Plus, MapPin, CalendarDays, Bell, Mail, Palmtree, AlertTriangle } from 'lucide-react'
 
 function Section({ icon, title, accent = 'bg-accent-500/15 border-accent-500/30 text-accent-400', children }) {
   return (
@@ -192,7 +192,100 @@ export default function AdminSettings() {
       </Section>
 
       <HolidaySection />
+      <DangerZone />
     </div>
+  )
+}
+
+// ── Danger Zone ───────────────────────────────────────────────────────────── //
+
+function DangerZone() {
+  const toast = useToast()
+  const [confirm, setConfirm] = useState('')
+  const [flushing, setFlushing] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  const ready = confirm.trim().toUpperCase() === 'FLUSH'
+
+  async function handleFlush() {
+    if (!ready) return
+    setFlushing(true)
+    try {
+      await flushTestData()
+      toast('All test data flushed. Attendance, leave requests and corrections cleared.', 'success')
+      setOpen(false)
+      setConfirm('')
+    } catch (e) {
+      toast(e.message, 'error')
+    } finally {
+      setFlushing(false)
+    }
+  }
+
+  return (
+    <Card className="p-5 border border-red-500/20">
+      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-red-500/10">
+        <div className="w-7 h-7 rounded-lg border bg-red-500/15 border-red-500/30 text-red-400 flex items-center justify-center shrink-0">
+          <AlertTriangle size={13} />
+        </div>
+        <h3 className="text-sm font-semibold text-red-400">Danger Zone</h3>
+      </div>
+
+      {!open ? (
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-200">Flush All Test Data</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Wipes attendance, leave requests and correction records. Profiles, settings and holidays stay.
+            </p>
+          </div>
+          <button
+            onClick={() => setOpen(true)}
+            className="shrink-0 ml-4 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-400 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-colors"
+          >
+            Flush Data…
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <p className="text-xs text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2.5 leading-relaxed">
+            ⚠️ This will permanently delete <strong>all attendance records, leave requests and correction requests</strong>.
+            Profiles, settings and holidays will not be affected. This cannot be undone.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+              Type <span className="text-red-400 font-mono">FLUSH</span> to confirm
+            </label>
+            <input
+              value={confirm}
+              onChange={e => setConfirm(e.target.value)}
+              placeholder="FLUSH"
+              className="input-base py-2 text-sm font-mono tracking-widest"
+              autoFocus
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleFlush}
+              disabled={!ready || flushing}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                ready
+                  ? 'bg-red-500 text-white hover:bg-red-600 cursor-pointer'
+                  : 'bg-red-500/20 text-red-800 cursor-not-allowed'
+              }`}
+            >
+              {flushing ? 'Flushing…' : 'Confirm Flush'}
+            </button>
+            <button
+              onClick={() => { setOpen(false); setConfirm('') }}
+              className="px-4 py-2 rounded-xl text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </Card>
   )
 }
 
