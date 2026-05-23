@@ -1224,7 +1224,43 @@ export async function getNotifications(userId, isAdmin) {
   const since = new Date(); since.setDate(since.getDate() - 7)
   const sinceISO = since.toISOString()
   const today    = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Kolkata' })
+  const now      = new Date()
   const items    = []
+
+  // Birthday notifications — team-wide, shown to everyone
+  const { data: allProfiles } = await supabase.from('profiles')
+    .select('id,full_name,department,employee_id,birthday').eq('is_active', true)
+  for (const p of allProfiles || []) {
+    if (!p.birthday) continue
+    const b = new Date(p.birthday)
+    if (b.getMonth() === now.getMonth() && b.getDate() === now.getDate() && p.id !== userId) {
+      items.push({
+        id:       `bd-${p.id}`,
+        icon:     '🎂',
+        title:    `It's ${p.full_name}'s birthday today!`,
+        subtitle: p.department ? `🎉 Wish them well · ${p.department}` : '🎉 Send them your wishes!',
+        time:     today + 'T00:00:00.000Z',
+        link:     isAdmin ? '/admin/employees' : null,
+      })
+    }
+  }
+
+  // Own birthday reminder
+  const { data: selfProfile } = await supabase.from('profiles')
+    .select('birthday').eq('id', userId).single()
+  if (selfProfile?.birthday) {
+    const b = new Date(selfProfile.birthday)
+    if (b.getMonth() === now.getMonth() && b.getDate() === now.getDate()) {
+      items.push({
+        id:       `bd-self-${userId}`,
+        icon:     '🎂',
+        title:    'Happy Birthday! 🎉',
+        subtitle: 'Wishing you an amazing day from the whole team!',
+        time:     today + 'T00:00:00.001Z',
+        link:     null,
+      })
+    }
+  }
 
   if (isAdmin) {
     const [{ data: lv }, { data: cr }, { data: late }] = await Promise.all([

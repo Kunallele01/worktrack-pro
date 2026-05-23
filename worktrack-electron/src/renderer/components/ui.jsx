@@ -441,148 +441,171 @@ export function Avatar({ name = '', size = 8, textSize = 'text-xs' }) {
 
 // ── Calendar widget ───────────────────────────────────────────────────────── //
 
-const STATUS_COLORS = {
-  in_office:    'bg-emerald-500/80 text-white',
-  wfh:          'bg-blue-500/80 text-white',
-  absent:       'bg-red-500/80 text-white',
-  late:         'bg-amber-500/80 text-white',
-  auto_checkout:'bg-gray-500/50 text-gray-300',
-}
 
-const LEAVE_CELL_COLORS = {
-  sick:      'bg-rose-500/80 text-white',
-  casual:    'bg-amber-500/80 text-white',
-  planned:   'bg-teal-500/80 text-white',
-  emergency: 'bg-orange-500/80 text-white',
+// Pill config for each attendance + leave + holiday state
+const CAL_STATES = {
+  in_office:    { bg: 'bg-emerald-500',   text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(16,185,129,0.5)]',  label: 'In Office',     dot: 'bg-emerald-400' },
+  wfh:          { bg: 'bg-blue-500',      text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(59,130,246,0.5)]',  label: 'WFH',           dot: 'bg-blue-400'    },
+  absent:       { bg: 'bg-red-500/80',    text: 'text-white',        glow: '',                                        label: 'Absent',         dot: 'bg-red-400'     },
+  auto_checkout:{ bg: 'bg-gray-500/60',   text: 'text-gray-200',     glow: '',                                        label: 'Auto-out',       dot: 'bg-gray-400'    },
+  sick:         { bg: 'bg-rose-500',      text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(244,63,94,0.4)]',   label: 'Sick Leave',     dot: 'bg-rose-400'    },
+  casual:       { bg: 'bg-amber-500',     text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(245,158,11,0.4)]',  label: 'Casual Leave',   dot: 'bg-amber-400'   },
+  planned:      { bg: 'bg-teal-500',      text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(20,184,166,0.4)]',  label: 'Planned Leave',  dot: 'bg-teal-400'    },
+  emergency:    { bg: 'bg-orange-500',    text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(249,115,22,0.4)]',  label: 'Emergency Leave',dot: 'bg-orange-400'  },
+  holiday:      { bg: 'bg-violet-500/25', text: 'text-violet-300',   glow: '',                                        label: 'Holiday',        dot: 'bg-violet-400'  },
 }
 
 export function CalendarWidget({ attendance = [], holidays = [], leaves = [] }) {
-  const today   = new Date()
-  const [year, setYear]   = useState(today.getFullYear())
+  const today = new Date()
+  const [year,  setYear ] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
+  const [hovered, setHovered] = useState(null) // { day, label, x, y }
 
-  // Build leave date map: date → type
+  // Build maps
   const leaveMap = {}
   for (const l of leaves) {
     if (l.status !== 'approved') continue
     const cur = new Date(l.start_date + 'T12:00:00')
     const end = new Date(l.end_date   + 'T12:00:00')
-    while (cur <= end) {
-      leaveMap[cur.toLocaleDateString('sv-SE')] = l.type
-      cur.setDate(cur.getDate() + 1)
-    }
+    while (cur <= end) { leaveMap[cur.toLocaleDateString('sv-SE')] = l.type; cur.setDate(cur.getDate() + 1) }
   }
-  const [tooltip, setTooltip] = useState(null) // { date, name }
-
-  const byDate   = {}
+  const byDate     = {}
   attendance.forEach(r => { byDate[r.date] = r.status })
-
-  // Build a holiday lookup: date string → holiday name
   const holidayMap = {}
   holidays.forEach(h => { holidayMap[h.date] = h.name })
 
-  const firstDay    = new Date(year, month, 1).getDay() || 7
+  const firstDay    = new Date(year, month, 1).getDay() || 7   // Mon=1…Sun=7
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const blanks      = firstDay - 1
   const cells       = [...Array(blanks).fill(null), ...Array(daysInMonth).fill(0).map((_,i) => i+1)]
 
-  const prev = () => { if (month === 0) { setYear(y=>y-1); setMonth(11) } else setMonth(m=>m-1) }
-  const next = () => { if (month === 11) { setYear(y=>y+1); setMonth(0)  } else setMonth(m=>m+1) }
+  const prev = () => month === 0  ? (setYear(y=>y-1), setMonth(11)) : setMonth(m=>m-1)
+  const next = () => month === 11 ? (setYear(y=>y+1), setMonth(0))  : setMonth(m=>m+1)
+
+  // Present/working stats for header strip
+  const monthStr   = `${year}-${String(month+1).padStart(2,'0')}`
+  const presentDays = attendance.filter(r => r.date.startsWith(monthStr) && ['in_office','wfh'].includes(r.status)).length
+  const lateDays    = attendance.filter(r => r.date.startsWith(monthStr) && r.is_late).length
+  const absentDays  = attendance.filter(r => r.date.startsWith(monthStr) && r.status === 'absent').length
+
+  const DAYS_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 
   return (
-    <div className="relative">
-      <div className="flex items-center justify-between mb-3">
-        <button onClick={prev} className="text-gray-400 hover:text-gray-200 p-1 rounded-lg hover:bg-white/5 transition">←</button>
-        <p className="text-sm font-semibold text-gray-200">
-          {new Date(year, month).toLocaleDateString('en', { month: 'long', year: 'numeric' })}
-        </p>
-        <button onClick={next} className="text-gray-400 hover:text-gray-200 p-1 rounded-lg hover:bg-white/5 transition">→</button>
+    <div className="select-none">
+      {/* ── Month navigator ── */}
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={prev}
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-100 hover:bg-white/8 transition-all text-sm font-bold">
+          ‹
+        </button>
+        <div className="text-center">
+          <p className="text-sm font-bold text-gray-100 tracking-wide">
+            {new Date(year, month).toLocaleDateString('en', { month: 'long' })}
+          </p>
+          <p className="text-[10px] text-gray-600 font-mono">{year}</p>
+        </div>
+        <button onClick={next}
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-100 hover:bg-white/8 transition-all text-sm font-bold">
+          ›
+        </button>
       </div>
-      <div className="grid grid-cols-7 gap-1 text-center">
-        {['M','T','W','T','F','S','S'].map((d,i) => (
-          <div key={i} className={`text-xs font-semibold py-1 ${i >= 5 ? 'text-gray-600' : 'text-gray-500'}`}>{d}</div>
+
+      {/* ── Mini stats strip ── */}
+      {(presentDays + lateDays + absentDays) > 0 && (
+        <div className="flex gap-1.5 mb-4">
+          <div className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+            <span className="text-sm font-bold text-emerald-400 font-mono tabular-nums leading-none">{presentDays}</span>
+            <span className="text-[9px] text-emerald-600 font-semibold uppercase tracking-wide">Present</span>
+          </div>
+          <div className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
+            <span className="text-sm font-bold text-amber-400 font-mono tabular-nums leading-none">{lateDays}</span>
+            <span className="text-[9px] text-amber-600 font-semibold uppercase tracking-wide">Late</span>
+          </div>
+          <div className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-red-500/10 border border-red-500/20">
+            <span className="text-sm font-bold text-red-400 font-mono tabular-nums leading-none">{absentDays}</span>
+            <span className="text-[9px] text-red-600 font-semibold uppercase tracking-wide">Absent</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Day-of-week header ── */}
+      <div className="grid grid-cols-7 mb-1">
+        {DAYS_SHORT.map((d, i) => (
+          <div key={i} className={`text-center text-[10px] font-bold py-1 uppercase tracking-wider
+            ${i >= 5 ? 'text-gray-700' : 'text-gray-500'}`}>{d.slice(0,1)}<span className="hidden sm:inline">{d.slice(1)}</span>
+          </div>
         ))}
+      </div>
+
+      {/* ── Day cells ── */}
+      <div className="grid grid-cols-7 gap-1">
         {cells.map((day, i) => {
           if (!day) return <div key={i} />
-          const dateStr   = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-          const status    = byDate[dateStr]
-          const isHoliday  = !!holidayMap[dateStr]
-          const leaveType  = leaveMap[dateStr]
-          const isToday    = day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
-          const isWeekend  = (i % 7) >= 5
-          const isFuture   = new Date(year, month, day) > today
-          const todayRing  = isToday ? 'ring-2 ring-accent-500 ring-offset-1 ring-offset-surface-800' : ''
+          const dateStr  = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+          const status   = byDate[dateStr]
+          const isHoliday = !!holidayMap[dateStr]
+          const leaveType = leaveMap[dateStr]
+          const isToday   = day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
+          const isWeekend = (i % 7) >= 5
+          const isFuture  = new Date(year, month, day) > today
 
-          // Approved leave — show with leave-type color
-          if (leaveType && !isHoliday) {
-            return (
-              <div key={i}
-                className={`relative flex flex-col items-center justify-center w-full aspect-square rounded-lg text-xs font-medium cursor-default
-                  ${LEAVE_CELL_COLORS[leaveType] || 'bg-teal-500/80 text-white'} ${todayRing}`}>
-                <span>{day}</span>
-                <span style={{ fontSize: 7 }}>🏖</span>
-              </div>
-            )
-          }
-
-          // Holiday overrides remaining states
-          if (isHoliday) {
-            return (
-              <div
-                key={i}
-                className={`relative flex flex-col items-center justify-center w-full aspect-square rounded-lg text-xs font-medium cursor-default
-                  bg-violet-500/20 text-violet-400
-                  ${isToday ? 'ring-2 ring-accent-500 ring-offset-1 ring-offset-surface-800' : ''}`}
-                onMouseEnter={() => setTooltip({ date: dateStr, name: holidayMap[dateStr] })}
-                onMouseLeave={() => setTooltip(null)}
-              >
-                <span>{day}</span>
-                <span style={{ fontSize: 8 }}>🏖</span>
-              </div>
-            )
-          }
+          // Resolve which state applies (priority: holiday > leave > attendance)
+          const stateKey = isHoliday ? 'holiday' : (leaveType || status || null)
+          const st       = stateKey ? CAL_STATES[stateKey] : null
+          const tooltipLabel = isHoliday ? `🏖 ${holidayMap[dateStr]}` : st?.label
 
           return (
             <div
               key={i}
               className={`
-                relative flex items-center justify-center w-full aspect-square rounded-lg text-xs font-medium transition-all
-                ${status ? STATUS_COLORS[status] : ''}
-                ${!status && !isFuture && !isWeekend ? 'text-gray-500 hover:bg-white/5' : ''}
-                ${isWeekend && !status ? 'text-gray-700' : ''}
-                ${isFuture ? 'text-gray-700' : ''}
-                ${isToday ? 'ring-2 ring-accent-500 ring-offset-1 ring-offset-surface-800' : ''}
+                relative flex flex-col items-center justify-center w-full rounded-xl transition-all duration-150 cursor-default
+                ${st ? `${st.bg} ${st.text} ${st.glow}` : ''}
+                ${!st && isWeekend ? 'text-gray-700' : ''}
+                ${!st && isFuture  ? 'text-gray-800' : ''}
+                ${!st && !isFuture && !isWeekend ? 'text-gray-500 hover:bg-white/[0.06] hover:text-gray-300' : ''}
+                ${isToday ? 'ring-2 ring-accent-400 ring-offset-1 ring-offset-surface-800' : ''}
               `}
+              style={{ paddingTop: '100%', position: 'relative' }}
+              onMouseEnter={e => tooltipLabel && setHovered({ day, label: tooltipLabel, dateStr })}
+              onMouseLeave={() => setHovered(null)}
             >
-              {day}
+              <span style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center',
+                fontSize: 11, fontWeight: isToday ? 800 : st ? 700 : 500,
+                gap: 1,
+              }}>
+                {day}
+                {stateKey === 'holiday' && <span style={{ fontSize: 7, lineHeight: 1 }}>🏖</span>}
+                {leaveType && !isHoliday && <span style={{ fontSize: 7, lineHeight: 1 }}>✈</span>}
+              </span>
             </div>
           )
         })}
       </div>
 
-      {/* Holiday tooltip */}
-      {tooltip && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-surface-700 border border-white/10 rounded-xl px-3 py-2 shadow-xl z-10 whitespace-nowrap text-xs pointer-events-none">
-          <span className="text-violet-400 font-semibold">🏖 {tooltip.name}</span>
-          <span className="text-gray-500 ml-2">{tooltip.date}</span>
+      {/* ── Tooltip ── */}
+      {hovered && (
+        <div className="mt-2 flex items-center justify-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.08] border border-white/[0.10] text-xs">
+            <span className="font-semibold text-gray-200">{hovered.label}</span>
+            <span className="text-gray-600">·</span>
+            <span className="font-mono text-gray-500">{hovered.dateStr}</span>
+          </div>
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 mt-3">
-        {[
-          ['bg-emerald-500/80','In Office'],
-          ['bg-blue-500/80','WFH'],
-          ['bg-amber-500/80','Late'],
-          ['bg-red-500/80','Absent'],
-          ['bg-rose-500/80','Sick Leave'],
-          ['bg-teal-500/80','Planned Leave'],
-          ['bg-violet-500/50','Holiday'],
-        ].map(([bg,label]) => (
-          <div key={label} className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${bg}`} />
-            <span className="text-xs text-gray-500">{label}</span>
-          </div>
-        ))}
+      {/* ── Legend ── */}
+      <div className="mt-3 pt-3 border-t border-white/[0.05]">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+          {Object.entries(CAL_STATES).map(([key, s]) => (
+            <div key={key} className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${s.dot}`} />
+              <span className="text-[10px] text-gray-600">{s.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

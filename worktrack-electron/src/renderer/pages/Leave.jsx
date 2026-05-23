@@ -39,26 +39,48 @@ function calcWorkDays(start, end, holidays = []) {
 }
 
 function BalanceCard({ type, used, quota }) {
-  const c = LEAVE_COLORS[type.value]
+  const c      = LEAVE_COLORS[type.value]
   const remain = quota ? Math.max(0, quota - used) : null
-  const pct    = quota ? Math.round((used / quota) * 100) : 0
+  const pct    = quota ? Math.min(100, Math.round((used / quota) * 100)) : 0
+  const barColor = pct >= 90 ? '#ef4444' : pct >= 65 ? '#f59e0b' : null
+
+  // Map leave type to a concrete hex for the progress bar fill
+  const BAR_COLOR = { sick: '#f43f5e', casual: '#f59e0b', planned: '#14b8a6', emergency: '#f97316' }
+  const fillColor = barColor || BAR_COLOR[type.value] || '#6366f1'
+
   return (
-    <Card className={`p-4 border ${c.border}`}>
-      <div className="flex justify-between items-start mb-3">
-        <span className="text-2xl">{type.icon}</span>
-        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${c.bg} ${c.text}`}>
-          {type.value === 'emergency' ? 'EL' : type.value.slice(0,2).toUpperCase()}
-        </span>
-      </div>
-      <p className={`text-3xl font-bold font-mono ${c.text}`}>{remain !== null ? remain : '∞'}</p>
-      <p className="text-xs text-gray-500 mt-0.5">{quota ? `of ${quota} days left` : 'no limit'}</p>
-      <p className="text-xs font-medium text-gray-400 mt-2">{type.label}</p>
-      {quota > 0 && (
-        <div className="mt-2 h-1 rounded-full bg-white/10">
-          <div className="h-1 rounded-full transition-all duration-700"
-            style={{ width: `${Math.min(100, pct)}%`, background: pct > 80 ? '#ef4444' : pct > 50 ? '#f59e0b' : 'rgba(99,102,241,0.6)' }} />
+    <Card className={`relative overflow-hidden border-l-4 border ${c.border}`}>
+      <div className="p-4">
+        {/* Header row */}
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xl leading-none">{type.icon}</span>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${c.bg} ${c.border} ${c.text}`}>
+            {type.value === 'emergency' ? 'EL' : type.value.slice(0,2).toUpperCase()}
+          </span>
         </div>
-      )}
+
+        {/* Big remaining number */}
+        <p className={`text-4xl font-black font-mono tabular-nums leading-none ${c.text}`}>
+          {remain !== null ? remain : '∞'}
+        </p>
+        <p className="text-xs text-gray-500 mt-1 font-medium">{type.label}</p>
+
+        {/* Progress bar */}
+        {quota > 0 ? (
+          <div className="mt-3">
+            <div className="flex justify-between text-[10px] text-gray-600 mb-1.5">
+              <span>{used} used</span>
+              <span>{quota} total</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-white/[0.08] overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-700 ease-out"
+                style={{ width: `${pct}%`, backgroundColor: fillColor }} />
+            </div>
+          </div>
+        ) : (
+          <p className="text-[10px] text-gray-600 mt-3">No annual limit</p>
+        )}
+      </div>
     </Card>
   )
 }

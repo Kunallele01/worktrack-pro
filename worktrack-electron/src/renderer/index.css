@@ -112,7 +112,10 @@
            transition-all duration-150 cursor-pointer;
   }
   .nav-item-active {
-    @apply nav-item bg-accent-500/10 text-accent-400 border border-accent-500/20;
+    @apply nav-item text-accent-400;
+    background: linear-gradient(90deg, rgba(79,134,247,0.18) 0%, rgba(79,134,247,0.07) 100%);
+    box-shadow: inset 3px 0 0 rgba(79,134,247,0.75);
+    border-radius: 0 12px 12px 12px;
   }
 
   /* Stat number */
@@ -212,7 +215,7 @@ html:not(.dark) .bg-surface-700 { background-color: #f1f5f9 !important; }
 html:not(.dark) aside              { background-color: #f1f5f9 !important; border-color: #e2e8f0 !important; }
 html:not(.dark) .nav-item          { color: #64748b; }
 html:not(.dark) .nav-item:hover    { background: rgba(79,134,247,0.08); color: #334155; }
-html:not(.dark) .nav-item-active   { background: rgba(79,134,247,0.12) !important; }
+html:not(.dark) .nav-item-active   { background: linear-gradient(90deg, rgba(79,134,247,0.14) 0%, rgba(79,134,247,0.05) 100%) !important; box-shadow: inset 3px 0 0 rgba(79,134,247,0.6) !important; }
 
 /* Borders */
 html:not(.dark) .border-white\/\[0\.06\] { border-color: #e2e8f0 !important; }

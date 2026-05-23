@@ -2,12 +2,19 @@ import React, { useState, useEffect } from 'react'
 import { getSettings, updateSettings, getHolidays, saveHolidays } from '../../lib/supabase'
 import { Card, Button, Input, PasswordInput } from '../../components/ui'
 import { useToast } from '../../components/ui'
-import { Trash2, Plus } from 'lucide-react'
+import { Trash2, Plus, MapPin, CalendarDays, Bell, Mail, Palmtree } from 'lucide-react'
 
-function Section({ title, children }) {
+function Section({ icon, title, accent = 'bg-accent-500/15 border-accent-500/30 text-accent-400', children }) {
   return (
     <Card className="p-5">
-      <h3 className="text-sm font-semibold text-gray-200 mb-4 pb-3 border-b border-white/[0.06]">{title}</h3>
+      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
+        {icon && (
+          <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 ${accent}`}>
+            {icon}
+          </div>
+        )}
+        <h3 className="text-sm font-semibold text-gray-200">{title}</h3>
+      </div>
       <div className="flex flex-col gap-4">{children}</div>
     </Card>
   )
@@ -52,7 +59,8 @@ export default function AdminSettings() {
     <div className="h-full overflow-y-auto p-6 flex flex-col gap-5">
       <h1 className="text-xl font-bold text-gray-100">Admin Settings</h1>
 
-      <Section title="Office Location & Hours">
+      <Section icon={<MapPin size={13} />} title="Office Location & Hours"
+        accent="bg-emerald-500/15 border-emerald-500/30 text-emerald-400">
         <div className="grid grid-cols-2 gap-4">
           <Input label="Office Latitude"  value={s.office_latitude  || ''} onChange={set('office_latitude')}  placeholder="18.46020…" />
           <Input label="Office Longitude" value={s.office_longitude || ''} onChange={set('office_longitude')} placeholder="73.79893…" />
@@ -108,7 +116,8 @@ export default function AdminSettings() {
         </Button>
       </Section>
 
-      <Section title="Leave Quotas (Days per Year)">
+      <Section icon={<CalendarDays size={13} />} title="Leave Quotas (Days per Year)"
+        accent="bg-blue-500/15 border-blue-500/30 text-blue-400">
         <div className="grid grid-cols-3 gap-4">
           <Input label="Sick Leave (SL)" type="number" min="0" max="365"
             value={s.leave_sick_quota || '10'} onChange={set('leave_sick_quota')} placeholder="10" />
@@ -124,7 +133,8 @@ export default function AdminSettings() {
         </Button>
       </Section>
 
-      <Section title="Check-in Reminders">
+      <Section icon={<Bell size={13} />} title="Check-in Reminders"
+        accent="bg-amber-500/15 border-amber-500/30 text-amber-400">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-200">Auto-remind employees who haven't checked in</p>
@@ -152,7 +162,8 @@ export default function AdminSettings() {
         </Button>
       </Section>
 
-      <Section title="Email (SMTP)">
+      <Section icon={<Mail size={13} />} title="Email (SMTP)"
+        accent="bg-violet-500/15 border-violet-500/30 text-violet-400">
         <p className="text-xs text-gray-400">
           Gmail: host=smtp.gmail.com port=587 — use an <strong>App Password</strong> (not your Google account password).<br/>
           Outlook: host=smtp-mail.outlook.com port=587
@@ -216,9 +227,12 @@ function HolidaySection() {
 
   return (
     <Card className="p-5">
-      <h3 className="text-sm font-semibold text-gray-200 mb-1 pb-3 border-b border-white/[0.06]">
-        Company Holidays
-      </h3>
+      <div className="flex items-center gap-3 mb-1 pb-3 border-b border-white/[0.06]">
+        <div className="w-7 h-7 rounded-lg border bg-rose-500/15 border-rose-500/30 text-rose-400 flex items-center justify-center shrink-0">
+          <Palmtree size={13} />
+        </div>
+        <h3 className="text-sm font-semibold text-gray-200">Company Holidays</h3>
+      </div>
       <p className="text-xs text-gray-400 mb-4">
         Holidays are excluded from working day counts. Employees won't be marked absent on these dates.
       </p>
