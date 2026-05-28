@@ -341,6 +341,23 @@ export async function checkIn(userId, latitude, longitude, accuracy) {
     .select('id,check_in_time').eq('user_id', userId).eq('date', today).maybeSingle()
   if (existing?.check_in_time) throw new Error('Already checked in today.')
 
+  // Auto-checkout any previous days where employee forgot to check out
+  const { data: stale } = await supabase.from('attendance')
+    .select('id,date').eq('user_id', userId)
+    .not('check_in_time', 'is', null)
+    .is('check_out_time', null)
+    .neq('date', today)
+  if (stale?.length) {
+    const [cH, cM] = (settings.auto_checkout_time || '20:00').split(':').map(Number)
+    const hh = String(cH).padStart(2, '0')
+    const mm = String(cM).padStart(2, '0')
+    await Promise.all(stale.map(rec =>
+      supabase.from('attendance')
+        .update({ check_out_time: `${rec.date}T${hh}:${mm}:00+05:30` })
+        .eq('id', rec.id)
+    ))
+  }
+
   // Determine status via GPS + WiFi SSID
   const offLat  = parseFloat(settings.office_latitude)
   const offLon  = parseFloat(settings.office_longitude)
@@ -682,8 +699,10 @@ export async function getWeeklyData() {
 export async function getTodayMapData() {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Kolkata' })
   const { data } = await supabase.from('attendance')
-    .select('latitude,longitude,status,is_late,check_in_time,profiles(full_name,employee_id)')
-    .eq('date', today).not('check_in_time', 'is', null)
+    .select('latitude,longitude,status,is_late,check_in_time,check_out_time,profiles(full_name,employee_id)')
+    .eq('date', today)
+    .not('check_in_time', 'is', null)
+    .is('check_out_time', null)
   return data || []
 }
 
@@ -1263,7 +1282,7 @@ export async function getNotifications(userId, isAdmin) {
   }
 
   if (isAdmin) {
-    const [{ data: lv }, { data: cr }, { data: late }] = await Promise.all([
+    const [{ data: lv }, { data: cr }, { data: late }, { data: wfhToday }] = await Promise.all([
       supabase.from('leave_requests')
         .select('id,type,days,created_at,profiles:user_id(full_name)')
         .eq('status','pending').gte('created_at', sinceISO)
@@ -1276,11 +1295,16 @@ export async function getNotifications(userId, isAdmin) {
         .select('id,check_in_time,profiles(full_name)')
         .eq('date',today).eq('is_late',true)
         .order('check_in_time',{ascending:false}).limit(5),
+      supabase.from('attendance')
+        .select('id,check_in_time,profiles(full_name)')
+        .eq('date',today).eq('status','wfh')
+        .order('check_in_time',{ascending:false}).limit(10),
     ])
     const LEAVE_LABEL = { sick:'Sick Leave', casual:'Casual Leave', planned:'Planned Leave', emergency:'Emergency Leave' }
-    for (const r of lv||[])   items.push({ id:`lv-${r.id}`, icon:'📋', title:`${r.profiles?.full_name} requested ${r.days}d leave`, subtitle:`${LEAVE_LABEL[r.type]||r.type} · awaiting review`, time:r.created_at, link:'/admin/leaves' })
-    for (const r of cr||[])   items.push({ id:`cr-${r.id}`, icon:'✏️',  title:`${r.profiles?.full_name} submitted a correction`,        subtitle:'Needs your review',                                  time:r.created_at, link:'/admin/corrections' })
-    for (const r of late||[]) items.push({ id:`lt-${r.id}`, icon:'⏰',  title:`${r.profiles?.full_name} checked in late`,               subtitle:`Today · ${r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : ''}`, time:r.check_in_time||today, link:'/admin/attendance' })
+    for (const r of lv||[])       items.push({ id:`lv-${r.id}`,  icon:'📋', title:`${r.profiles?.full_name} requested ${r.days}d leave`, subtitle:`${LEAVE_LABEL[r.type]||r.type} · awaiting review`,                                                                                      time:r.created_at,         link:'/admin/leaves'      })
+    for (const r of cr||[])       items.push({ id:`cr-${r.id}`,  icon:'✏️',  title:`${r.profiles?.full_name} submitted a correction`,        subtitle:'Needs your review',                                                                                                                    time:r.created_at,         link:'/admin/corrections' })
+    for (const r of late||[])     items.push({ id:`lt-${r.id}`,  icon:'⏰',  title:`${r.profiles?.full_name} checked in late`,               subtitle:`Today · ${r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : ''}`,           time:r.check_in_time||today, link:'/admin/attendance'  })
+    for (const r of wfhToday||[]) items.push({ id:`wfh-${r.id}`, icon:'🏠',  title:`${r.profiles?.full_name} is working from home`,          subtitle:`Checked in at ${r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : 'today'}`, time:r.check_in_time||today, link:'/admin/map'         })
   } else {
     const [{ data: lv }, { data: cr }] = await Promise.all([
       supabase.from('leave_requests')

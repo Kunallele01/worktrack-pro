@@ -337,9 +337,9 @@ export default function Register() {
 
       {/* ── Right form panel ── */}
       <div className="flex-1 flex items-center justify-center relative overflow-hidden">
-        {/* Background */}
-        <div className="absolute inset-0 bg-surface-900" />
-        <div className="absolute inset-0 bg-gradient-to-br from-surface-900 via-surface-900 to-violet-950/15 pointer-events-none" />
+        {/* Background — hardcoded dark so light-mode theme doesn't bleed through */}
+        <div className="absolute inset-0" style={{ background: '#0a0e1a' }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom right, #0a0e1a, #0a0e1a, rgba(109,40,217,0.12))' }} />
         <FloatingParticles />
 
         <div className="w-full max-w-sm relative z-10 px-8 py-8 overflow-y-auto max-h-screen">

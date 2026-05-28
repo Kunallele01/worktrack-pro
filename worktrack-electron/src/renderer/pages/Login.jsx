@@ -146,8 +146,8 @@ export default function Login() {
       {/* Right panel */}
       <div className="flex-1 flex items-center justify-center relative overflow-hidden px-8">
         {/* Subtle background that echoes the left panel */}
-        <div className="absolute inset-0 bg-surface-900" />
-        <div className="absolute inset-0 bg-gradient-to-br from-surface-900 via-surface-900 to-accent-950/20 pointer-events-none" />
+        <div className="absolute inset-0" style={{ background: '#0a0e1a' }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom right, #0a0e1a, #0a0e1a, rgba(67,56,202,0.14))' }} />
         <svg className="absolute inset-0 w-full h-full opacity-[0.025] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <pattern id="rdots" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">

@@ -346,9 +346,12 @@ export default function Reports() {
         getUsers(),
       ])
 
+      // Use elapsed working days for current month, full month for past months
+      const today = new Date()
+      const isCurrentMonth = year === today.getFullYear() && month === (today.getMonth() + 1)
+      const lastDay = isCurrentMonth ? today.getDate() : new Date(year, month, 0).getDate()
       let workdays = 0
-      const daysInMonth = new Date(year, month, 0).getDate()
-      for (let d = 1; d <= daysInMonth; d++) {
+      for (let d = 1; d <= lastDay; d++) {
         const wd = new Date(year, month - 1, d).getDay()
         if (wd !== 0 && wd !== 6) workdays++
       }
@@ -377,7 +380,7 @@ export default function Reports() {
         absent:  acc.absent  + r.absent,
       }), { present: 0, wfh: 0, late: 0, absent: 0 })
 
-      setPreview({ rows, workdays, totals, totalItems: items.length })
+      setPreview({ rows, workdays, totals, totalItems: items.length, isCurrentMonth })
     } catch (e) {
       toast(e.message, 'error')
     } finally {
@@ -424,21 +427,31 @@ export default function Reports() {
       </div>
 
       {/* Summary band */}
-      {preview && (
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            { label: 'Total Check-ins',  value: preview.totalItems,      color: 'text-accent-400',   bg: 'bg-accent-500/10',   border: 'border-accent-500/20' },
-            { label: 'Present Days',     value: preview.totals.present,  color: 'text-emerald-400',  bg: 'bg-emerald-500/10',  border: 'border-emerald-500/20' },
-            { label: 'WFH Days',         value: preview.totals.wfh,      color: 'text-blue-400',     bg: 'bg-blue-500/10',     border: 'border-blue-500/20' },
-            { label: 'Late Arrivals',    value: preview.totals.late,     color: 'text-amber-400',    bg: 'bg-amber-500/10',    border: 'border-amber-500/20' },
-          ].map(s => (
-            <div key={s.label} className={`${s.bg} border ${s.border} rounded-2xl px-4 py-3`}>
-              <p className={`text-2xl font-bold font-mono tabular-nums ${s.color}`}>{s.value}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      {preview && (() => {
+        const totalSlots  = preview.workdays * preview.rows.length
+        const teamAttPct  = totalSlots > 0 ? Math.round(preview.totals.present / totalSlots * 100) : 0
+        const onTimePct   = preview.totals.present > 0 ? Math.round((preview.totals.present - preview.totals.late) / preview.totals.present * 100) : 0
+        const wfhPct      = preview.totals.present > 0 ? Math.round(preview.totals.wfh / preview.totals.present * 100) : 0
+        const avgDaily    = preview.workdays > 0 ? Math.round(preview.totals.present / preview.workdays) : 0
+        const daysSuffix  = preview.isCurrentMonth ? ' working days so far' : ' working days'
+        const stats = [
+          { label: 'Team Attendance',  value: `${teamAttPct}%`, sub: `${preview.workdays}${daysSuffix}`,                    color: 'text-accent-400',  bg: 'bg-accent-500/10',  border: 'border-accent-500/20'  },
+          { label: 'On-time Rate',     value: `${onTimePct}%`,  sub: `${preview.totals.late} late arrival${preview.totals.late !== 1 ? 's' : ''}`, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+          { label: 'WFH Rate',         value: `${wfhPct}%`,     sub: `of all present days`,                                  color: 'text-blue-400',    bg: 'bg-blue-500/10',    border: 'border-blue-500/20'    },
+          { label: 'Avg Daily Presence', value: `${avgDaily}`,  sub: `employees per working day`,                            color: 'text-amber-400',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20'   },
+        ]
+        return (
+          <div className="grid grid-cols-4 gap-3">
+            {stats.map(s => (
+              <div key={s.label} className={`${s.bg} border ${s.border} rounded-2xl px-4 py-3`}>
+                <p className={`text-2xl font-bold font-mono tabular-nums ${s.color}`}>{s.value}</p>
+                <p className="text-xs text-gray-300 mt-0.5 font-medium">{s.label}</p>
+                <p className="text-[11px] text-gray-500 mt-0.5">{s.sub}</p>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* Preview table */}
       <Card className="overflow-hidden">
@@ -447,7 +460,7 @@ export default function Reports() {
             {monthLabel} {year} — Team Attendance
             {preview && (
               <span className="ml-2 text-xs font-normal text-gray-500">
-                {preview.workdays} working days · {preview.rows.length} employees
+                {preview.workdays} working day{preview.workdays !== 1 ? 's' : ''}{preview.isCurrentMonth ? ' so far' : ''} · {preview.rows.length} employees
               </span>
             )}
           </p>
