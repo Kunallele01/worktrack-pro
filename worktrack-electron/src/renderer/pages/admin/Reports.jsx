@@ -537,6 +537,15 @@ export default function Reports() {
       const graceMin = parseInt(settings?.grace_period_minutes || '10', 10)
       const lateThreshold = officeStartMin + graceMin
 
+      const toISTMinutes = (iso) => {
+        const parts = new Intl.DateTimeFormat('en-GB', {
+          timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false,
+        }).formatToParts(new Date(iso))
+        const h = parseInt(parts.find(p => p.type === 'hour').value,   10)
+        const m = parseInt(parts.find(p => p.type === 'minute').value, 10)
+        return h * 60 + m
+      }
+
       const timeSlots = []
       for (let h = 8; h <= 11; h++) {
         for (let m = 0; m < 60; m += 30) {
@@ -544,8 +553,7 @@ export default function Reports() {
           const label   = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`
           const count   = empItems.filter(r => {
             if (!r.check_in_time) return false
-            const ist    = new Date(new Date(r.check_in_time).getTime() + 5.5 * 3600000)
-            const arrMin = ist.getHours() * 60 + ist.getMinutes()
+            const arrMin = toISTMinutes(r.check_in_time)
             return arrMin >= slotMin && arrMin < slotMin + 30
           }).length
           timeSlots.push({ label, count, isLate: slotMin >= lateThreshold })
@@ -553,8 +561,7 @@ export default function Reports() {
       }
       const after12 = empItems.filter(r => {
         if (!r.check_in_time) return false
-        const ist = new Date(new Date(r.check_in_time).getTime() + 5.5 * 3600000)
-        return ist.getHours() >= 12
+        return toISTMinutes(r.check_in_time) >= 12 * 60
       }).length
       if (after12 > 0) timeSlots.push({ label: '12:00+', count: after12, isLate: true })
 
