@@ -31,14 +31,18 @@ export default function Attendance() {
   const [start, setStart]   = useState(today)
   const [end,   setEnd  ]   = useState(today)
   const [status, setStatus] = useState('')
+  const [dept,   setDept  ] = useState('')
   const [search, setSearch] = useState('')
   const [rows,  setRows ]   = useState([])
+  const [depts,  setDepts ] = useState([])
   const [loading, setLoading] = useState(false)
 
   const load = async () => {
     setLoading(true)
     try {
       const { items } = await getAllAttendance({ start, end, status: status || undefined, limit: 2000 })
+      const uniqueDepts = [...new Set(items.map(r => r.profiles?.department).filter(Boolean))].sort()
+      setDepts(uniqueDepts)
       let filtered = items
       if (search) {
         const s = search.toLowerCase()
@@ -46,6 +50,9 @@ export default function Attendance() {
           r.profiles?.full_name?.toLowerCase().includes(s) ||
           r.profiles?.employee_id?.toLowerCase().includes(s)
         )
+      }
+      if (dept) {
+        filtered = filtered.filter(r => r.profiles?.department === dept)
       }
       // Build rows with keys matching DataTable column keys so sorting works
       setRows(filtered.map(r => ({
@@ -68,7 +75,7 @@ export default function Attendance() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [start, end, status])
+  useEffect(() => { load() }, [start, end, status, dept])
 
   async function exportExcel() {
     toast('Generating Excel report…', 'info')
@@ -185,6 +192,16 @@ export default function Attendance() {
             <label className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Status</label>
             <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} />
           </div>
+          {depts.length > 0 && (
+            <div className="flex flex-col gap-1 w-36">
+              <label className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Dept</label>
+              <Select
+                value={dept}
+                onChange={setDept}
+                options={[{ value: '', label: 'All Depts' }, ...depts.map(d => ({ value: d, label: d }))]}
+              />
+            </div>
+          )}
           <div className="flex flex-col gap-1 flex-1 min-w-44">
             <label className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Search</label>
             <div className="relative">

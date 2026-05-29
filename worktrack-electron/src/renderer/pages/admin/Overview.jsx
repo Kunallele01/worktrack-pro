@@ -185,7 +185,7 @@ export default function Overview() {
   const inOff      = stats.in_office       || 0
   const wfhCount   = stats.wfh             || 0
   const lateCount  = stats.late            || 0
-  const checkedIn  = inOff + wfhCount
+  const checkedIn  = stats.checked_in      || 0
   const absent     = Math.max(0, total - checkedIn)
   const pctInOff   = total > 0 ? Math.round(inOff      / total      * 100) : 0
   const pctWfh     = total > 0 ? Math.round(wfhCount   / total      * 100) : 0

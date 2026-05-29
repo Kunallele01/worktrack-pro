@@ -227,6 +227,20 @@ html:not(.dark) .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.07) 
 html:not(.dark) .bg-white\/\[0\.03\]       { background-color: rgba(0,0,0,0.03) !important; }
 html:not(.dark) .bg-white\/\[0\.05\]       { background-color: rgba(0,0,0,0.05) !important; }
 
+/* Leaflet light mode */
+html:not(.dark) .leaflet-container {
+  background: #f0f4f8 !important;
+}
+html:not(.dark) .leaflet-control-zoom a {
+  background: #ffffff !important;
+  color: #475569 !important;
+  border-color: #e2e8f0 !important;
+}
+html:not(.dark) .leaflet-control-zoom a:hover {
+  background: #f1f5f9 !important;
+  color: #1e293b !important;
+}
+
 /* ── Range slider styles ─────────────────────────────────────────────────── */
 input[type="range"] {
   -webkit-appearance: none;

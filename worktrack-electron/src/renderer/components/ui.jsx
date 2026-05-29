@@ -213,7 +213,7 @@ function Toast({ id, message, type, onDismiss }) {
 
 // ── GPS Widget ───────────────────────────────────────────────────────────── //
 
-export function GpsWidget({ onReady }) {
+export function GpsWidget({ onReady, onAcquiring }) {
   const [status, setStatus] = useState('idle')
   const [coords, setCoords] = useState(null)
   const [error,  setError ] = useState(null)
@@ -222,6 +222,7 @@ export function GpsWidget({ onReady }) {
   const acquire = () => {
     setStatus('acquiring')
     setError(null)
+    if (onAcquiring) onAcquiring()
 
     // Apply location from whatever source resolved
     const applyLocation = (lat, lon, accuracy) => {

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Shield, ShieldOff, UserX, UserCheck, Trash2, Cake, Hash } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { getUsers, updateUser, deleteUser, getMonthHistory } from '../../lib/supabase'
-import { Card, Badge, Avatar, Button, Input } from '../../components/ui'
+import { Card, Badge, Avatar, Button, Input, Select } from '../../components/ui'
 import { useToast, useConfirm } from '../../components/ui'
 
 function AttendancePill({ userId }) {
@@ -230,6 +230,7 @@ export default function Employees() {
   const { confirm, Dialog } = useConfirm()
   const [users,      setUsers     ] = useState([])
   const [search,     setSearch    ] = useState('')
+  const [dept,       setDept      ] = useState('')
   const [loading,    setLoading   ] = useState(false)
   const [bdayTarget, setBdayTarget] = useState(null)
   const [idTarget,   setIdTarget  ] = useState(null)
@@ -272,7 +273,10 @@ export default function Employees() {
     } catch (e) { toast(e.message, 'error') }
   }
 
+  const depts = [...new Set(users.map(u => u.department).filter(Boolean))].sort()
+
   const filtered = users.filter(u => {
+    if (dept && u.department !== dept) return false
     if (!search) return true
     const s = search.toLowerCase()
     return u.full_name?.toLowerCase().includes(s) || u.employee_id?.toLowerCase().includes(s)
@@ -296,11 +300,22 @@ export default function Employees() {
         </h1>
         <Button onClick={load} loading={loading} variant="secondary" className="text-sm">Refresh</Button>
       </div>
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-        <input placeholder="Search by name or ID…" value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="input-base pl-9 text-sm" />
+      <div className="flex gap-3">
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <input placeholder="Search by name or ID…" value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="input-base pl-9 text-sm w-full" />
+        </div>
+        {depts.length > 0 && (
+          <div className="w-36 shrink-0">
+            <Select
+              value={dept}
+              onChange={setDept}
+              options={[{ value: '', label: 'All Depts' }, ...depts.map(d => ({ value: d, label: d }))]}
+            />
+          </div>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto">
         <div className="grid grid-cols-3 gap-4 pb-4">

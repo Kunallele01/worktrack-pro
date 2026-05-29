@@ -123,12 +123,54 @@ function FloatingParticles() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Personalized birthday messages — one per person (deterministic by name hash)
+// ─────────────────────────────────────────────────────────────────────────────
+const BIRTHDAY_MESSAGES = [
+  {
+    body: (name) => `Today the universe made a brilliant decision — it gave us ${name}. You show up, you deliver, you make this place worth coming to every single day. That's not ordinary — that's extraordinary. Today is entirely yours. 🚀`,
+    quote: `"May this year bring you everything you deserve — which is absolutely everything."`,
+    cta: `🎉  Let's Make It Legendary!`,
+  },
+  {
+    body: (name) => `${name}, some people light up a room when they walk in. You somehow manage to do that every single day. On your birthday, we just want to say: you are genuinely one of a kind. Have the most epic day. 🌟`,
+    quote: `"The secret to a great life? Be exactly who you are. You've clearly figured it out."`,
+    cta: `🎂  Thanks, I'll Accept This Greatness`,
+  },
+  {
+    body: (name) => `Here's to ${name} — the person who somehow makes deadlines look easy, meetings bearable, and Monday mornings slightly less terrible. The team wouldn't be the same without you. Happy birthday! 🎊`,
+    quote: `"Every year you get wiser, sharper, and more dangerously good at what you do."`,
+    cta: `🚀  Onward to an Amazing Year!`,
+  },
+  {
+    body: (name) => `${name}, you don't just do the work — you raise the bar for everyone around you. Today's your day to forget all that and just celebrate yourself. You've earned every single second of it. 🏆`,
+    quote: `"Success is getting what you want; happiness is wanting what you get. You've got both."`,
+    cta: `🎈  Let the Celebration Begin!`,
+  },
+  {
+    body: (name) => `A year older, a year more legendary. ${name}, your energy, your work ethic, and your ability to somehow stay calm under pressure never stop impressing us. Here's to you — today and every day. 🥂`,
+    quote: `"The best investment you'll ever make is in yourself. Happy returns on that today."`,
+    cta: `✨  Cheers to Me!`,
+  },
+  {
+    body: (name) => `${name} — on the day you were born, the world got measurably better. That hasn't changed. We're lucky to work alongside someone who brings this much dedication, warmth, and talent every single day. 💫`,
+    quote: `"Another trip around the sun, and you only keep getting better."`,
+    cta: `🎉  Here We Go!`,
+  },
+]
+
+function pickBirthdayMsg(name) {
+  const hash = (name || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  return BIRTHDAY_MESSAGES[hash % BIRTHDAY_MESSAGES.length]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Birthday modal — for the birthday person
 // ─────────────────────────────────────────────────────────────────────────────
 const stagger = (i) => ({ initial:{ opacity:0, y:24 }, animate:{ opacity:1, y:0 }, transition:{ delay: 0.2 + i*0.12, type:'spring', damping:22, stiffness:220 } })
 
 function BirthdaySelfModal({ user, onClose }) {
   const firstName = user.full_name?.split(' ')[0] || user.full_name
+  const msg = pickBirthdayMsg(user.full_name)
 
   return (
     <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
@@ -200,16 +242,13 @@ function BirthdaySelfModal({ user, onClose }) {
             padding:'18px 20px', marginBottom:18, textAlign:'left',
           }}>
             <p style={{ color:'#e2e8f0', fontSize:13.5, lineHeight:1.8, margin:0 }}>
-              Today the universe made a brilliant decision — it gave us{' '}
-              <strong style={{ color:'#f9a8d4' }}>{firstName}</strong>. You show up, you deliver,
-              you make this place worth coming to every single day. That's not ordinary —
-              that's <strong style={{ color:'#c084fc' }}>extraordinary</strong>. Today is entirely yours. 🚀
+              {msg.body(firstName)}
             </p>
           </motion.div>
 
           {/* Quote */}
           <motion.p {...stagger(5)} style={{ color:'#6d28d9', fontSize:12, fontStyle:'italic', marginBottom:24, lineHeight:1.65 }}>
-            "May this year bring you everything you deserve — which is absolutely everything."
+            {msg.quote}
           </motion.p>
 
           {/* CTA button */}
@@ -225,7 +264,7 @@ function BirthdaySelfModal({ user, onClose }) {
                 boxShadow:'0 4px 24px rgba(244,114,182,0.4)', letterSpacing:0.3,
               }}
             >
-              🎉&nbsp;&nbsp;Let's Make It Legendary!
+              {msg.cta}
             </motion.button>
             <button
               onClick={onClose}

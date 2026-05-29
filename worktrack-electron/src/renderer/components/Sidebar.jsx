@@ -157,14 +157,16 @@ export default function Sidebar() {
       {/* Notification bell */}
       <div className="px-3 pb-1 pt-2 border-t border-white/[0.06]" ref={notifRef}>
         <button onClick={openNotifications}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-all relative">
-          <Bell size={15} />
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-all">
+          <div className="relative shrink-0">
+            <Bell size={15} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-0.5 leading-none z-10">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </div>
           <span className="flex-1 text-left">Notifications</span>
-          {unreadCount > 0 && (
-            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 leading-none">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
         </button>
 
         {/* Dropdown panel — slides out to the right of the sidebar */}

@@ -612,8 +612,8 @@ export async function getLiveOverview() {
   const checkedIn   = empRecords.filter(r => r.check_in_time).length
   const checkedInIds= new Set(empRecords.filter(r => r.check_in_time).map(r => r.user_id))
 
-  const inOfficeRecs = empRecords.filter(r => r.status === 'in_office' && r.check_in_time)
-  const wfhRecs      = empRecords.filter(r => r.status === 'wfh'       && r.check_in_time)
+  const inOfficeRecs = empRecords.filter(r => (r.status === 'in_office' || r.status === 'auto_checkout') && r.check_in_time)
+  const wfhRecs      = empRecords.filter(r => r.status === 'wfh' && r.check_in_time)
   const lateRecs     = empRecords.filter(r => r.is_late && r.check_in_time)
   const absentEmps   = employees.filter(e => !checkedInIds.has(e.id))
 
@@ -749,7 +749,7 @@ export async function runAutoCheckout(settings) {
   if (!data?.length) { localStorage.setItem(cacheK, '1'); return 0 }
 
   await supabase.from('attendance')
-    .update({ check_out_time: checkoutTime.toISOString(), status: 'auto_checkout' })
+    .update({ check_out_time: checkoutTime.toISOString() })
     .in('id', data.map(r => r.id))
 
   localStorage.setItem(cacheK, '1')
@@ -990,14 +990,36 @@ export async function reviewCorrection(corrId, reviewerId, approved, adminNote =
     .select('*').eq('id', corrId).single()
 
   if (approved && corr) {
-    const updates = {}
+    const settings = await getSettings()
+    const updates  = {}
     if (corr.requested_checkin)  updates.check_in_time  = corr.requested_checkin
     if (corr.requested_checkout) updates.check_out_time = corr.requested_checkout
     if (corr.requested_status)   updates.status         = corr.requested_status
+
+    // Recalculate is_late whenever check_in_time is being corrected
+    if (updates.check_in_time) {
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false,
+      }).formatToParts(new Date(updates.check_in_time))
+      const h  = parseInt(parts.find(p => p.type === 'hour').value,   10)
+      const m  = parseInt(parts.find(p => p.type === 'minute').value, 10)
+      const [sh, sm] = (settings.office_start_time || '09:30').split(':').map(Number)
+      const grace    = parseInt(settings.grace_period_minutes || '10', 10)
+      updates.is_late = (h * 60 + m) > (sh * 60 + sm + grace)
+    }
+
     if (Object.keys(updates).length > 0) {
-      await supabase.from('attendance').upsert({
-        user_id: corr.user_id, date: corr.date, ...updates,
-      })
+      const { data: existing } = await supabase.from('attendance')
+        .select('id').eq('user_id', corr.user_id).eq('date', corr.date).maybeSingle()
+      if (existing) {
+        await supabase.from('attendance').update(updates)
+          .eq('user_id', corr.user_id).eq('date', corr.date)
+      } else {
+        // forgot_checkin with no existing row — create the record
+        await supabase.from('attendance').insert({
+          user_id: corr.user_id, date: corr.date, ...updates,
+        })
+      }
     }
   }
 
@@ -1401,4 +1423,9 @@ export async function flushTestData() {
   ])
   const err = a.error || l.error || c.error
   if (err) throw new Error(err.message)
+}
+
+export async function flushAttendanceByDate(date) {
+  const { error } = await supabase.from('attendance').delete().eq('date', date)
+  if (error) throw new Error(error.message)
 }

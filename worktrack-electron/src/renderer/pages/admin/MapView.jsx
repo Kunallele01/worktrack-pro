@@ -4,6 +4,7 @@ import L from 'leaflet'
 import { getTodayMapData, getSettings } from '../../lib/supabase'
 import { Button, Avatar } from '../../components/ui'
 import { useToast } from '../../components/ui'
+import { useStore } from '../../lib/store'
 import { format } from 'date-fns'
 
 delete L.Icon.Default.prototype._getIconUrl
@@ -99,6 +100,7 @@ function EmployeeRow({ r }) {
 
 export default function MapView() {
   const toast = useToast()
+  const theme = useStore(s => s.theme)
   const [checkins, setCheckins] = useState([])
   const [settings, setSettings] = useState(null)
   const [loading,  setLoading ] = useState(true)
@@ -171,9 +173,11 @@ export default function MapView() {
 
         {/* Map */}
         <div className="flex-1 relative">
-          <MapContainer center={mapCenter} zoom={13} className="h-full w-full" style={{ background: '#0A0E1A' }}>
+          <MapContainer center={mapCenter} zoom={13} className="h-full w-full" style={{ background: theme === 'light' ? '#f0f4f8' : '#0A0E1A' }}>
             <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              url={theme === 'light'
+                ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+                : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'}
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
             />
 

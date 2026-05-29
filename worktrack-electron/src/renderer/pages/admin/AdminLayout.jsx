@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { getSettings, runAutoCheckout, sendCheckInReminders } from '../../lib/supabase'
+import { getSettings, sendCheckInReminders } from '../../lib/supabase'
 import { useStore } from '../../lib/store'
 import Sidebar from '../../components/Sidebar'
 import { Page, ToastProvider } from '../../components/ui'
@@ -39,14 +39,12 @@ export default function AdminLayout() {
     getSettings(true).then(s => {
       setSettings(s)
       checkAndSendReminders(s)
-      runAutoCheckout(s).then(n => { if (n > 0) console.log(`Auto-checkout: ${n} records updated`) })
     })
 
-    // Check every 5 minutes for reminders and auto-checkout
+    // Check every 5 minutes for check-in reminders
     const interval = setInterval(() => {
       getSettings().then(s => {
         checkAndSendReminders(s)
-        runAutoCheckout(s).then(n => { if (n > 0) console.log(`Auto-checkout: ${n} records updated`) })
       })
     }, 5 * 60 * 1000)
     return () => clearInterval(interval)

@@ -126,7 +126,8 @@ function DashboardInner() {
   const user        = useStore(s => s.user)
   const gpsLocation = useStore(s => s.gpsLocation)
   const gpsStatus   = useStore(s => s.gpsStatus)
-  const setGps      = useStore(s => s.setGps)
+  const setGps          = useStore(s => s.setGps)
+  const setGpsAcquiring = useStore(s => s.setGpsAcquiring)
   const settings    = useStore(s => s.settings)
   const setSettings = useStore(s => s.setSettings)
 
@@ -414,7 +415,10 @@ function DashboardInner() {
           </div>
 
           {/* GPS Widget */}
-          <GpsWidget onReady={(lat, lon, acc) => setGps({ lat, lon, accuracy: acc })} />
+          <GpsWidget
+            onAcquiring={setGpsAcquiring}
+            onReady={(lat, lon, acc) => setGps({ lat, lon, accuracy: acc })}
+          />
 
           {/* Check-in / Check-out */}
           <div className="grid grid-cols-2 gap-4">

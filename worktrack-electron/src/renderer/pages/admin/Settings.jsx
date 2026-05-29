@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { getSettings, updateSettings, getHolidays, saveHolidays, flushTestData } from '../../lib/supabase'
+import { getSettings, updateSettings, getHolidays, saveHolidays, flushTestData, flushAttendanceByDate } from '../../lib/supabase'
 import { Card, Button, Input, PasswordInput } from '../../components/ui'
 import { useToast } from '../../components/ui'
 import { Trash2, Plus, MapPin, CalendarDays, Bell, Mail, Palmtree, AlertTriangle } from 'lucide-react'
@@ -192,8 +192,96 @@ export default function AdminSettings() {
       </Section>
 
       <HolidaySection />
+      <FlushByDate />
       <DangerZone />
     </div>
+  )
+}
+
+// ── Flush by date ─────────────────────────────────────────────────────────── //
+
+function FlushByDate() {
+  const toast = useToast()
+  const today = new Date().toLocaleDateString('sv-SE')
+  const [date,     setDate    ] = useState(today)
+  const [open,     setOpen    ] = useState(false)
+  const [confirm,  setConfirm ] = useState('')
+  const [flushing, setFlushing] = useState(false)
+
+  const ready = confirm.trim().toUpperCase() === 'DELETE'
+
+  async function handleFlush() {
+    if (!ready || !date) return
+    setFlushing(true)
+    try {
+      await flushAttendanceByDate(date)
+      toast(`All attendance records for ${date} deleted.`, 'success')
+      setOpen(false)
+      setConfirm('')
+    } catch (e) {
+      toast(e.message, 'error')
+    } finally {
+      setFlushing(false)
+    }
+  }
+
+  return (
+    <Card className="p-5 border border-red-500/20">
+      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-red-500/10">
+        <div className="w-7 h-7 rounded-lg border bg-red-500/15 border-red-500/30 text-red-400 flex items-center justify-center shrink-0">
+          <AlertTriangle size={13} />
+        </div>
+        <h3 className="text-sm font-semibold text-red-400">Flush Attendance — Specific Date</h3>
+      </div>
+
+      {!open ? (
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-200">Delete all attendance for a date</p>
+            <p className="text-xs text-gray-500 mt-0.5">Use this to wipe a day's records if data was corrupted (e.g. wrong auto-checkout).</p>
+          </div>
+          <button
+            onClick={() => setOpen(true)}
+            className="shrink-0 ml-4 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-400 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-colors"
+          >
+            Flush Date…
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <p className="text-xs text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2.5 leading-relaxed">
+            ⚠️ This will permanently delete <strong>all attendance records for the selected date</strong>. Cannot be undone.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Date</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              className="input-base py-2 text-sm w-44" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+              Type <span className="text-red-400 font-mono">DELETE</span> to confirm
+            </label>
+            <input value={confirm} onChange={e => setConfirm(e.target.value)}
+              placeholder="DELETE" className="input-base py-2 text-sm font-mono tracking-widest" autoFocus />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleFlush}
+              disabled={!ready || flushing}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                ready ? 'bg-red-500 text-white hover:bg-red-600 cursor-pointer' : 'bg-red-500/20 text-red-800 cursor-not-allowed'
+              }`}
+            >
+              {flushing ? 'Deleting…' : `Delete ${date}`}
+            </button>
+            <button onClick={() => { setOpen(false); setConfirm('') }}
+              className="px-4 py-2 rounded-xl text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </Card>
   )
 }
 
