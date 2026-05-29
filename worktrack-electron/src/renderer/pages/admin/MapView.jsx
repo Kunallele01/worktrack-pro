@@ -176,7 +176,7 @@ export default function MapView() {
           <MapContainer center={mapCenter} zoom={13} className="h-full w-full" style={{ background: theme === 'light' ? '#f0f4f8' : '#0A0E1A' }}>
             <TileLayer
               url={theme === 'light'
-                ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+                ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
                 : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'}
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
             />

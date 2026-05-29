@@ -144,7 +144,7 @@ export default function Login() {
       <div className="hidden lg:block w-px bg-gradient-to-b from-transparent via-white/[0.08] to-transparent" />
 
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center relative overflow-hidden px-8">
+      <div className="login-panel flex-1 flex items-center justify-center relative overflow-hidden px-8">
         {/* Subtle background that echoes the left panel */}
         <div className="absolute inset-0" style={{ background: '#0a0e1a' }} />
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom right, #0a0e1a, #0a0e1a, rgba(67,56,202,0.14))' }} />

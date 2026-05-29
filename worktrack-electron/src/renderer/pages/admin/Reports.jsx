@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Download, RefreshCw } from 'lucide-react'
+import { Download, RefreshCw, X } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { AnimatePresence, motion } from 'framer-motion'
 import { getAllAttendance, getUsers, getSettings } from '../../lib/supabase'
-import { Card, Button, Select } from '../../components/ui'
+import { Card, Button, Select, Avatar } from '../../components/ui'
 import { useToast } from '../../components/ui'
 import { format } from 'date-fns'
 
@@ -424,6 +425,273 @@ const REPORT_TYPES = [
   { kind: 'wfh',    icon: '⌂',  title: 'WFH Summary',     desc: 'Work-from-home check-ins' },
 ]
 
+// ── Employee Deep-Dive panel ───────────────────────────────────────────────── //
+
+function ScoreBar({ label, value, max, color }) {
+  const pct = max > 0 ? (value / max) * 100 : 0
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[11px] text-gray-500 w-24 shrink-0">{label}</span>
+      <div className="flex-1 h-1.5 rounded-full bg-white/[0.07] overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span className="text-[11px] font-mono text-gray-400 w-10 text-right shrink-0">
+        {Math.round(value)}<span className="text-gray-600">/{max}</span>
+      </span>
+    </div>
+  )
+}
+
+function ArrivalMiniChart({ records, officeStartMin, graceMin }) {
+  const lateMin = officeStartMin + graceMin
+  const data = records
+    .filter(r => r.check_in_time)
+    .map(r => {
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false,
+      }).formatToParts(new Date(r.check_in_time))
+      const h = parseInt(parts.find(p => p.type === 'hour').value, 10)
+      const m = parseInt(parts.find(p => p.type === 'minute').value, 10)
+      return { date: r.date.slice(8), minutes: h * 60 + m, isLate: r.is_late }
+    })
+    .sort((a, b) => a.date.localeCompare(b.date))
+
+  if (!data.length) return <p className="text-xs text-gray-600 text-center py-6">No check-in data</p>
+
+  const allMins = data.map(d => d.minutes)
+  // Snap Y range to 30-min grid, anchored to office hours context
+  const rawMin = Math.min(...allMins, officeStartMin - 40)
+  const rawMax = Math.max(...allMins, lateMin + 25)
+  const minT   = Math.floor(rawMin / 30) * 30
+  const maxT   = Math.ceil(rawMax  / 30) * 30
+  const range  = maxT - minT || 60
+
+  const W = 340, H = 150
+  const PL = 36, PR = 28, PT = 8, PB = 20
+  const cW = W - PL - PR, cH = H - PT - PB
+  const xStep = data.length > 1 ? cW / (data.length - 1) : cW / 2
+  const yPos  = (m) => PT + cH - ((m - minT) / range) * cH
+  const fmt   = (m) => `${String(Math.floor(m / 60)).padStart(2,'0')}:${String(m % 60).padStart(2,'0')}`
+
+  // 30-min Y gridlines
+  const yTicks = []
+  for (let t = minT; t <= maxT; t += 30) yTicks.push(t)
+
+  // ~5 x-axis labels
+  const labelStep = Math.max(1, Math.ceil(data.length / 5))
+  const showLabel = (i) => i === 0 || i === data.length - 1 || i % labelStep === 0
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible' }}>
+      {/* Subtle horizontal gridlines + left time labels */}
+      {yTicks.map(t => (
+        <g key={t}>
+          <line x1={PL} y1={yPos(t)} x2={W - PR} y2={yPos(t)}
+            stroke="rgba(255,255,255,0.05)" strokeWidth={1} />
+          <text x={PL - 4} y={yPos(t) + 3.5} textAnchor="end" fill="#475569" fontSize={7.5}>{fmt(t)}</text>
+        </g>
+      ))}
+
+      {/* Office start reference line — label on the right */}
+      <line x1={PL} y1={yPos(officeStartMin)} x2={W - PR} y2={yPos(officeStartMin)}
+        stroke="#4F86F7" strokeWidth={1.5} strokeDasharray="4 3" opacity={0.6} />
+      <text x={W - PR + 3} y={yPos(officeStartMin) + 3.5} textAnchor="start" fill="#4F86F7" fontSize={7.5} opacity={0.85}>Start</text>
+
+      {/* Late threshold reference line — label on the right */}
+      <line x1={PL} y1={yPos(lateMin)} x2={W - PR} y2={yPos(lateMin)}
+        stroke="#F59E0B" strokeWidth={1.5} strokeDasharray="4 3" opacity={0.6} />
+      <text x={W - PR + 3} y={yPos(lateMin) + 3.5} textAnchor="start" fill="#F59E0B" fontSize={7.5} opacity={0.85}>Late</text>
+
+      {/* Connecting line */}
+      {data.length > 1 && (
+        <polyline
+          points={data.map((d, i) => `${PL + i * xStep},${yPos(d.minutes)}`).join(' ')}
+          fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth={1}
+        />
+      )}
+
+      {/* Dots + sparse date labels */}
+      {data.map((d, i) => (
+        <g key={i}>
+          <circle cx={PL + i * xStep} cy={yPos(d.minutes)} r={3}
+            fill={d.isLate ? '#F59E0B' : '#4F86F7'} opacity={0.9} />
+          {showLabel(i) && (
+            <text x={PL + i * xStep} y={H - 4} textAnchor="middle" fill="#64748b" fontSize={7.5}>{d.date}</text>
+          )}
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+function MonthCalendar({ records, year, month }) {
+  const dim    = new Date(year, month, 0).getDate()
+  const byDate = {}
+  records.forEach(r => { byDate[r.date] = r })
+
+  const firstDow    = new Date(year, month - 1, 1).getDay()
+  const firstMonDow = firstDow === 0 ? 6 : firstDow - 1
+  const totalCells  = Math.ceil((firstMonDow + dim) / 7) * 7
+
+  const cells = []
+  for (let i = 0; i < totalCells; i++) {
+    const dayNum = i - firstMonDow + 1
+    if (dayNum < 1 || dayNum > dim) { cells.push(null); continue }
+    const date    = `${year}-${String(month).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`
+    const dow     = new Date(year, month - 1, dayNum).getDay()
+    const isWknd  = dow === 0 || dow === 6
+    const rec     = byDate[date]
+    const isFuture = date > new Date().toLocaleDateString('sv-SE')
+    cells.push({ dayNum, isWknd, rec, isFuture })
+  }
+
+  const cellStyle = (cell) => {
+    if (!cell) return 'bg-transparent'
+    if (cell.isWknd)   return 'bg-white/[0.03] text-gray-700'
+    if (cell.isFuture) return 'bg-white/[0.03] text-gray-700'
+    if (!cell.rec)     return 'bg-red-500/20 text-red-400'
+    if (cell.rec.is_late) return 'bg-amber-500/20 text-amber-400'
+    if (cell.rec.status === 'wfh') return 'bg-blue-500/20 text-blue-400'
+    return 'bg-emerald-500/20 text-emerald-400'
+  }
+
+  return (
+    <div>
+      <div className="grid grid-cols-7 gap-0.5 mb-0.5">
+        {['M','T','W','T','F','S','S'].map((d, i) => (
+          <div key={i} className="text-center text-[9px] font-bold text-gray-600 py-0.5">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-0.5">
+        {cells.map((cell, i) => (
+          <div key={i} className={`aspect-square rounded flex items-center justify-center text-[10px] font-semibold transition-colors ${cellStyle(cell)}`}>
+            {cell?.dayNum || ''}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-3 mt-2 flex-wrap">
+        {[['bg-emerald-500/20 text-emerald-400','On Time'],['bg-blue-500/20 text-blue-400','WFH'],
+          ['bg-amber-500/20 text-amber-400','Late'],['bg-red-500/20 text-red-400','Absent']].map(([cls, lbl]) => (
+          <div key={lbl} className="flex items-center gap-1">
+            <span className={`w-3 h-3 rounded-sm ${cls.split(' ')[0]}`} />
+            <span className="text-[9px] text-gray-500">{lbl}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
+  const { full_name, employee_id, department, score, present, wfh, inOffice, late, absent, records = [] } = row
+  const grade = scoreGrade(score)
+
+  const consistency    = workdays > 0 ? (present / workdays) * 40        : 0
+  const punctuality    = present  > 0 ? ((present - late) / present) * 35 : 0
+  const officePresence = present  > 0 ? (inOffice / present) * 25         : 0
+
+  const officeStartMin = (() => {
+    const [h, m] = (settings?.office_start_time || '09:30').split(':').map(Number)
+    return h * 60 + m
+  })()
+  const graceMin = parseInt(settings?.grace_period_minutes || '10', 10)
+
+  const avgHours = (() => {
+    const withBoth = records.filter(r => r.check_in_time && r.check_out_time)
+    if (!withBoth.length) return null
+    const avg = withBoth.reduce((acc, r) => acc + (new Date(r.check_out_time) - new Date(r.check_in_time)), 0) / withBoth.length / 3600000
+    return `${Math.floor(avg)}h ${Math.round((avg % 1) * 60)}m`
+  })()
+
+  return (
+    <>
+      {/* Backdrop */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onClose}
+        style={{ position: 'fixed', inset: 0, zIndex: 499, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }}
+      />
+
+      {/* Panel */}
+      <motion.div
+        initial={{ x: 440 }} animate={{ x: 0 }} exit={{ x: 440 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+        style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: 420, zIndex: 500, overflowY: 'auto' }}
+        className="bg-surface-800 border-l border-white/10 flex flex-col"
+      >
+        {/* Header */}
+        <div className="flex items-start gap-3 px-5 pt-5 pb-4 border-b border-white/[0.06] shrink-0">
+          <Avatar name={full_name || ''} size={10} textSize="text-sm" />
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-bold text-gray-100 leading-tight">{full_name}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{department || '—'} · <span className="font-mono">{employee_id}</span></p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.07] text-gray-500 hover:text-gray-300 transition-colors shrink-0">
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="flex-1 px-5 py-4 flex flex-col gap-5">
+
+          {/* Score */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Attendance Score</p>
+                <div className="flex items-center gap-2">
+                  <span className={`text-3xl font-black font-mono tabular-nums ${grade.color}`}>{score}</span>
+                  <span className={`text-xs font-bold px-2 py-1 rounded-full ${grade.bg} ${grade.color}`}>{grade.label}</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-gray-600">out of 100</p>
+                {avgHours && <p className="text-xs text-gray-400 mt-1">Avg <span className="font-mono font-semibold">{avgHours}</span>/day</p>}
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <ScoreBar label="Consistency"   value={consistency}    max={40} color="#4F86F7" />
+              <ScoreBar label="Punctuality"   value={punctuality}    max={35} color="#10B981" />
+              <ScoreBar label="Office Presence" value={officePresence} max={25} color="#8B5CF6" />
+            </div>
+          </div>
+
+          {/* Stat pills */}
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { label: 'Present', value: present, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+              { label: 'Absent',  value: absent,  color: 'text-red-400',     bg: 'bg-red-500/10'     },
+              { label: 'Late',    value: late,     color: 'text-amber-400',   bg: 'bg-amber-500/10'   },
+              { label: 'WFH',     value: wfh,      color: 'text-blue-400',    bg: 'bg-blue-500/10'    },
+            ].map(s => (
+              <div key={s.label} className={`${s.bg} rounded-xl px-2 py-2.5 text-center`}>
+                <p className={`text-lg font-bold font-mono tabular-nums ${s.color}`}>{s.value}</p>
+                <p className="text-[9px] text-gray-500 uppercase tracking-wide mt-0.5">{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              {new Date(year, month - 1).toLocaleString('en', { month: 'long' })} {year}
+            </p>
+            <MonthCalendar records={records} year={year} month={month} />
+          </div>
+
+          {/* Arrival time chart */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Arrival Times</p>
+            <p className="text-[10px] text-gray-600 mb-3">
+              Blue line = office start · Amber line = late threshold
+            </p>
+            <ArrivalMiniChart records={records} officeStartMin={officeStartMin} graceMin={graceMin} />
+          </div>
+
+        </div>
+      </motion.div>
+    </>
+  )
+}
+
 export default function Reports() {
   const now   = new Date()
   const toast = useToast()
@@ -432,6 +700,7 @@ export default function Reports() {
   const [preview,     setPreview    ] = useState(null)
   const [loadingPrev, setLoadingPrev] = useState(false)
   const [busyKind,    setBusyKind   ] = useState(null)
+  const [deepDive,    setDeepDive   ] = useState(null)
 
   const loadPreview = useCallback(async () => {
     setLoadingPrev(true)
@@ -473,7 +742,7 @@ export default function Reports() {
         const absent   = Math.max(0, workdays - present)
         const pct      = workdays > 0 ? Math.round(present / workdays * 100) : 0
         const score    = calcScore(present, late, inOffice, workdays)
-        return { ...u, present, wfh, inOffice, late, absent, pct, score }
+        return { ...u, present, wfh, inOffice, late, absent, pct, score, records: recs }
       }).sort((a, b) => b.score - a.score)
 
       // Summary totals
@@ -565,7 +834,7 @@ export default function Reports() {
       }).length
       if (after12 > 0) timeSlots.push({ label: '12:00+', count: after12, isLate: true })
 
-      setPreview({ rows, workdays, totals, totalItems: items.length, isCurrentMonth, weekTrend, dowData, timeSlots })
+      setPreview({ rows, workdays, totals, totalItems: items.length, isCurrentMonth, weekTrend, dowData, timeSlots, settings })
     } catch (e) {
       toast(e.message, 'error')
     } finally {
@@ -685,7 +954,8 @@ export default function Reports() {
                   const grade = scoreGrade(r.score)
                   return (
                     <tr key={r.id}
-                      className={`border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors ${i % 2 === 1 ? 'bg-white/[0.015]' : ''}`}>
+                      onClick={() => setDeepDive(r)}
+                      className={`border-b border-white/[0.04] hover:bg-white/[0.05] transition-colors cursor-pointer ${i % 2 === 1 ? 'bg-white/[0.015]' : ''}`}>
                       <td className="px-3 py-2.5 text-xs text-gray-600 font-mono w-8">{i + 1}</td>
                       <td className="px-3 py-2.5">
                         <p className="text-sm text-gray-200 font-medium truncate max-w-[150px]">{r.full_name}</p>
@@ -762,6 +1032,20 @@ export default function Reports() {
           Daily report always exports today's data. All other reports use the selected month above.
         </p>
       </div>
+
+      {/* Employee deep-dive panel */}
+      <AnimatePresence>
+        {deepDive && (
+          <EmployeeDeepDive
+            row={deepDive}
+            workdays={preview?.workdays ?? 0}
+            month={month}
+            year={year}
+            settings={preview?.settings}
+            onClose={() => setDeepDive(null)}
+          />
+        )}
+      </AnimatePresence>
 
     </div>
   )
