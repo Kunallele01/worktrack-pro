@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Download, RefreshCw } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { getAllAttendance, getUsers, getSettings } from '../../lib/supabase'
 import { Card, Button, Select } from '../../components/ui'
 import { useToast } from '../../components/ui'
@@ -34,6 +35,102 @@ function calcHours(ci, co) {
 }
 function attendancePct(present, workdays) { return workdays > 0 ? Math.round(present / workdays * 100) : 0 }
 function pctColor(p) { return p >= 80 ? 'FF059669' : p >= 60 ? 'FFD97706' : 'FFDC2626' }
+
+function calcScore(present, late, inOffice, workdays) {
+  if (workdays === 0 || present === 0) return 0
+  const consistency    = (present / workdays) * 40
+  const punctuality    = ((present - late) / present) * 35
+  const officePresence = (inOffice / present) * 25
+  return Math.round(consistency + punctuality + officePresence)
+}
+function scoreGrade(s) {
+  if (s >= 90) return { label: 'Excellent', color: 'text-emerald-400', bg: 'bg-emerald-500/15', hex: '#10B981' }
+  if (s >= 75) return { label: 'Good',      color: 'text-accent-400',  bg: 'bg-accent-500/15',  hex: '#4F86F7' }
+  if (s >= 60) return { label: 'Fair',       color: 'text-amber-400',   bg: 'bg-amber-500/15',   hex: '#F59E0B' }
+  return              { label: 'At Risk',    color: 'text-red-400',     bg: 'bg-red-500/15',     hex: '#EF4444' }
+}
+
+const CHART_TOOLTIP = {
+  contentStyle: { background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, fontSize: 11 },
+  labelStyle:   { color: '#e2e8f0', fontWeight: 600 },
+  itemStyle:    { color: '#94a3b8' },
+  cursor:       { fill: 'rgba(255,255,255,0.04)' },
+}
+
+function WeekTrendChart({ data }) {
+  if (!data?.length) return null
+  return (
+    <Card className="p-4">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Weekly Breakdown</p>
+      <ResponsiveContainer width="100%" height={150}>
+        <BarChart data={data} barGap={2} barCategoryGap="28%">
+          <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} width={22} />
+          <Tooltip {...CHART_TOOLTIP} />
+          <Bar dataKey="inOffice" name="In Office" stackId="a" fill="#10B981" />
+          <Bar dataKey="wfh"      name="WFH"       stackId="a" fill="#3B82F6" />
+          <Bar dataKey="absent"   name="Absent"    stackId="a" fill="#EF4444" radius={[3,3,0,0]} />
+        </BarChart>
+      </ResponsiveContainer>
+      <div className="flex items-center gap-4 mt-2 justify-center">
+        {[['#10B981','In Office'],['#3B82F6','WFH'],['#EF4444','Absent']].map(([c,l]) => (
+          <div key={l} className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: c }} />
+            <span className="text-[10px] text-gray-500">{l}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
+function DayOfWeekChart({ data }) {
+  if (!data?.length) return null
+  return (
+    <Card className="p-4">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Presence by Day</p>
+      <ResponsiveContainer width="100%" height={150}>
+        <BarChart data={data} barCategoryGap="30%">
+          <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} domain={[0,100]} unit="%" width={30} />
+          <Tooltip {...CHART_TOOLTIP} formatter={(v) => [`${v}%`, 'Presence Rate']} />
+          <Bar dataKey="rate" name="Presence Rate" radius={[4,4,0,0]}>
+            {data.map((d, i) => (
+              <Cell key={i} fill={d.rate >= 80 ? '#10B981' : d.rate >= 60 ? '#F59E0B' : '#EF4444'} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+      <p className="text-[10px] text-gray-600 text-center mt-2">Based on {data[0]?.occurrences} occurrence{data[0]?.occurrences !== 1 ? 's' : ''} of each weekday this month</p>
+    </Card>
+  )
+}
+
+function ArrivalTimeChart({ data }) {
+  if (!data?.length || data.every(d => d.count === 0)) return null
+  return (
+    <Card className="p-4">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Arrival Time Distribution</p>
+      <p className="text-[10px] text-gray-600 mb-3">When does your team actually show up?</p>
+      <ResponsiveContainer width="100%" height={150}>
+        <BarChart data={data} barCategoryGap="15%">
+          <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} interval={1} />
+          <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} width={20} allowDecimals={false} />
+          <Tooltip {...CHART_TOOLTIP} formatter={(v) => [v, 'Check-ins']} />
+          <Bar dataKey="count" name="Check-ins" radius={[3,3,0,0]}>
+            {data.map((d, i) => (
+              <Cell key={i} fill={d.isLate ? '#F59E0B' : '#4F86F7'} fillOpacity={d.count === 0 ? 0.15 : 1} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+      <div className="flex items-center gap-4 mt-2 justify-center">
+        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-accent-500" /><span className="text-[10px] text-gray-500">On time</span></div>
+        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-amber-500" /><span className="text-[10px] text-gray-500">After grace period</span></div>
+      </div>
+    </Card>
+  )
+}
 
 function sc(cell, value, { fill, font, align, border = BORDER } = {}) {
   cell.value = value
@@ -341,15 +438,20 @@ export default function Reports() {
     try {
       const start = `${year}-${String(month).padStart(2,'0')}-01`
       const end   = `${year}-${String(month).padStart(2,'0')}-${new Date(year, month, 0).getDate()}`
-      const [{ items }, users] = await Promise.all([
+      const [{ items: allItems }, users, settings] = await Promise.all([
         getAllAttendance({ start, end, limit: 5000 }),
         getUsers(),
+        getSettings(),
       ])
+      // Only non-admin employees for analytics
+      const empUsers = users.filter(u => !u.is_admin)
+      const items    = allItems // keep all for table; analytics use empUsers cross-ref
 
       // Use elapsed working days for current month, full month for past months
       const today = new Date()
       const isCurrentMonth = year === today.getFullYear() && month === (today.getMonth() + 1)
       const lastDay = isCurrentMonth ? today.getDate() : new Date(year, month, 0).getDate()
+      const dim     = new Date(year, month, 0).getDate()
       let workdays = 0
       for (let d = 1; d <= lastDay; d++) {
         const wd = new Date(year, month - 1, d).getDay()
@@ -363,14 +465,16 @@ export default function Reports() {
       })
 
       const rows = users.map(u => {
-        const recs    = byUser[u.id] || []
-        const present = recs.filter(r => ['in_office','wfh'].includes(r.status)).length
-        const wfh     = recs.filter(r => r.status === 'wfh').length
-        const late    = recs.filter(r => r.is_late).length
-        const absent  = Math.max(0, workdays - present)
-        const pct     = workdays > 0 ? Math.round(present / workdays * 100) : 0
-        return { ...u, present, wfh, late, absent, pct }
-      })
+        const recs     = byUser[u.id] || []
+        const present  = recs.filter(r => ['in_office','wfh'].includes(r.status)).length
+        const wfh      = recs.filter(r => r.status === 'wfh').length
+        const inOffice = recs.filter(r => r.status === 'in_office').length
+        const late     = recs.filter(r => r.is_late).length
+        const absent   = Math.max(0, workdays - present)
+        const pct      = workdays > 0 ? Math.round(present / workdays * 100) : 0
+        const score    = calcScore(present, late, inOffice, workdays)
+        return { ...u, present, wfh, inOffice, late, absent, pct, score }
+      }).sort((a, b) => b.score - a.score)
 
       // Summary totals
       const totals = rows.reduce((acc, r) => ({
@@ -380,7 +484,81 @@ export default function Reports() {
         absent:  acc.absent  + r.absent,
       }), { present: 0, wfh: 0, late: 0, absent: 0 })
 
-      setPreview({ rows, workdays, totals, totalItems: items.length, isCurrentMonth })
+      // ── Chart data (all computed from already-fetched items) ──────────────
+
+      // 1. Week-by-week trend
+      const empIds = new Set(empUsers.map(u => u.id))
+      const empItems = items.filter(r => empIds.has(r.user_id))
+
+      const weekTrend = []
+      let wkStart = 1
+      while (wkStart <= dim) {
+        const wkEnd = Math.min(wkStart + 6, dim)
+        const dates = []
+        for (let d = wkStart; d <= wkEnd; d++) {
+          const dow = new Date(year, month - 1, d).getDay()
+          if (dow !== 0 && dow !== 6) {
+            dates.push(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`)
+          }
+        }
+        if (dates.length) {
+          const wkItems  = empItems.filter(r => dates.includes(r.date))
+          const office   = wkItems.filter(r => r.status === 'in_office').length
+          const wfhCount = wkItems.filter(r => r.status === 'wfh').length
+          const expected = dates.length * empUsers.length
+          const absent   = Math.max(0, expected - office - wfhCount)
+          weekTrend.push({ label: `Wk ${Math.ceil(wkStart / 7)}`, inOffice: office, wfh: wfhCount, absent })
+        }
+        wkStart += 7
+      }
+
+      // 2. Day-of-week presence rate
+      const DOW = ['Mon','Tue','Wed','Thu','Fri']
+      const dowData = DOW.map((label, i) => {
+        const dayNum = i + 1
+        const dates = []
+        for (let d = 1; d <= lastDay; d++) {
+          if (new Date(year, month - 1, d).getDay() === dayNum)
+            dates.push(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`)
+        }
+        if (!dates.length) return null
+        const dayItems = empItems.filter(r => dates.includes(r.date))
+        const present  = dayItems.filter(r => ['in_office','wfh'].includes(r.status)).length
+        const expected = dates.length * empUsers.length
+        const rate     = expected > 0 ? Math.round(present / expected * 100) : 0
+        return { label, rate, occurrences: dates.length }
+      }).filter(Boolean)
+
+      // 3. Arrival time distribution (IST, 30-min buckets 8:00–12:00)
+      const officeStartMin = (() => {
+        const [h, m] = (settings?.office_start_time || '09:30').split(':').map(Number)
+        return h * 60 + m
+      })()
+      const graceMin = parseInt(settings?.grace_period_minutes || '10', 10)
+      const lateThreshold = officeStartMin + graceMin
+
+      const timeSlots = []
+      for (let h = 8; h <= 11; h++) {
+        for (let m = 0; m < 60; m += 30) {
+          const slotMin = h * 60 + m
+          const label   = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`
+          const count   = empItems.filter(r => {
+            if (!r.check_in_time) return false
+            const ist    = new Date(new Date(r.check_in_time).getTime() + 5.5 * 3600000)
+            const arrMin = ist.getHours() * 60 + ist.getMinutes()
+            return arrMin >= slotMin && arrMin < slotMin + 30
+          }).length
+          timeSlots.push({ label, count, isLate: slotMin >= lateThreshold })
+        }
+      }
+      const after12 = empItems.filter(r => {
+        if (!r.check_in_time) return false
+        const ist = new Date(new Date(r.check_in_time).getTime() + 5.5 * 3600000)
+        return ist.getHours() >= 12
+      }).length
+      if (after12 > 0) timeSlots.push({ label: '12:00+', count: after12, isLate: true })
+
+      setPreview({ rows, workdays, totals, totalItems: items.length, isCurrentMonth, weekTrend, dowData, timeSlots })
     } catch (e) {
       toast(e.message, 'error')
     } finally {
@@ -453,6 +631,15 @@ export default function Reports() {
         )
       })()}
 
+      {/* Analytics charts */}
+      {preview && (preview.weekTrend?.length > 0 || preview.dowData?.length > 0 || preview.timeSlots?.some(s => s.count > 0)) && (
+        <div className="grid grid-cols-3 gap-3">
+          <WeekTrendChart   data={preview.weekTrend} />
+          <DayOfWeekChart   data={preview.dowData}   />
+          <ArrivalTimeChart data={preview.timeSlots} />
+        </div>
+      )}
+
       {/* Preview table */}
       <Card className="overflow-hidden">
         <div className="px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between">
@@ -464,6 +651,7 @@ export default function Reports() {
               </span>
             )}
           </p>
+          <p className="text-[10px] text-gray-600">Sorted by Attendance Score ↓</p>
         </div>
 
         {loadingPrev ? (
@@ -478,35 +666,47 @@ export default function Reports() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-white/[0.06]">
-                  {['Employee', 'Department', 'Present', 'WFH', 'Late', 'Absent', 'Att %'].map(h => (
-                    <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                  {['#', 'Employee', 'Dept', 'Present', 'WFH', 'Late', 'Absent', 'Att %', 'Score'].map(h => (
+                    <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {preview.rows.map((r, i) => (
-                  <tr key={r.id}
-                    className={`border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors ${i % 2 === 1 ? 'bg-white/[0.015]' : ''}`}>
-                    <td className="px-4 py-2.5">
-                      <p className="text-sm text-gray-200 font-medium truncate max-w-[160px]">{r.full_name}</p>
-                      <p className="text-xs text-gray-600 font-mono">{r.employee_id}</p>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">{r.department || '—'}</td>
-                    <td className="px-4 py-2.5 text-sm font-mono font-semibold text-emerald-400">{r.present}</td>
-                    <td className="px-4 py-2.5 text-sm font-mono text-blue-400">{r.wfh || '—'}</td>
-                    <td className="px-4 py-2.5 text-sm font-mono text-amber-400">{r.late || '—'}</td>
-                    <td className="px-4 py-2.5 text-sm font-mono text-red-400">{r.absent}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                        r.pct >= 80 ? 'bg-emerald-500/15 text-emerald-400' :
-                        r.pct >= 60 ? 'bg-amber-500/15 text-amber-400' :
-                                      'bg-red-500/15 text-red-400'
-                      }`}>{r.pct}%</span>
-                    </td>
-                  </tr>
-                ))}
+                {preview.rows.map((r, i) => {
+                  const grade = scoreGrade(r.score)
+                  return (
+                    <tr key={r.id}
+                      className={`border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors ${i % 2 === 1 ? 'bg-white/[0.015]' : ''}`}>
+                      <td className="px-3 py-2.5 text-xs text-gray-600 font-mono w-8">{i + 1}</td>
+                      <td className="px-3 py-2.5">
+                        <p className="text-sm text-gray-200 font-medium truncate max-w-[150px]">{r.full_name}</p>
+                        <p className="text-xs text-gray-600 font-mono">{r.employee_id}</p>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-gray-400 whitespace-nowrap">{r.department || '—'}</td>
+                      <td className="px-3 py-2.5 text-sm font-mono font-semibold text-emerald-400">{r.present}</td>
+                      <td className="px-3 py-2.5 text-sm font-mono text-blue-400">{r.wfh || '—'}</td>
+                      <td className="px-3 py-2.5 text-sm font-mono text-amber-400">{r.late || '—'}</td>
+                      <td className="px-3 py-2.5 text-sm font-mono text-red-400">{r.absent}</td>
+                      <td className="px-3 py-2.5">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          r.pct >= 80 ? 'bg-emerald-500/15 text-emerald-400' :
+                          r.pct >= 60 ? 'bg-amber-500/15 text-amber-400' :
+                                        'bg-red-500/15 text-red-400'
+                        }`}>{r.pct}%</span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-sm font-bold font-mono tabular-nums ${grade.color}`}>{r.score}</span>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${grade.bg} ${grade.color}`}>
+                            {grade.label}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
