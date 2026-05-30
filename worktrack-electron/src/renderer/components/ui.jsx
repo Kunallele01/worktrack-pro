@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle, Eye, EyeOff, MapPin, Wifi, ChevronDown } from 'lucide-react'
+import gsap from 'gsap'
 
 // ── Page wrapper with fade transition ────────────────────────────────────── //
 
@@ -138,17 +139,17 @@ export function StatCard({ icon: Icon, value, label, delta, accentColor = 'accen
   const bc = borderMap[accentColor] || borderMap.accent
 
   return (
-    <Card className={`p-5 border-l-2 ${bc}`}>
+    <Card className={`p-3.5 border-l-2 ${bc}`}>
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">{label}</p>
+          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1">{label}</p>
           <p className="stat-number"><AnimatedNumber value={value} /></p>
           {delta && (
-            <p className={`text-xs mt-1 ${delta.startsWith('+') ? 'text-emerald-400' : 'text-red-400'}`}>{delta}</p>
+            <p className={`text-xs mt-0.5 ${delta.startsWith('+') ? 'text-emerald-400' : 'text-red-400'}`}>{delta}</p>
           )}
         </div>
-        <div className={`p-2.5 rounded-xl ${ic}`}>
-          <Icon size={20} />
+        <div className={`p-2 rounded-lg ${ic}`}>
+          <Icon size={16} />
         </div>
       </div>
     </Card>
@@ -358,11 +359,7 @@ export function GpsWidget({ onReady, onAcquiring }) {
           {status === 'active' && (
             <>
               <p className="text-xs text-gray-400 mt-0.5">{tierConfig[tier]?.sub}</p>
-              {(coords.lat !== 0 || coords.lon !== 0) ? (
-                <p className="font-mono text-xs text-accent-400 mt-1">
-                  {coords.lat.toFixed(6)}, {coords.lon.toFixed(6)}
-                </p>
-              ) : (
+              {coords.lat === 0 && coords.lon === 0 && (
                 <p className="text-xs text-amber-400/70 mt-1">Approximate location unavailable</p>
               )}
             </>
@@ -578,8 +575,12 @@ export function CalendarWidget({ attendance = [], holidays = [], leaves = [] }) 
                 gap: 1,
               }}>
                 {day}
-                {stateKey === 'holiday' && <span style={{ fontSize: 7, lineHeight: 1 }}>🏖</span>}
-                {leaveType && !isHoliday && <span style={{ fontSize: 7, lineHeight: 1 }}>✈</span>}
+                {isHoliday && (
+                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#F97316', flexShrink: 0 }} />
+                )}
+                {leaveType && !isHoliday && (
+                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: leaveType === 'approved' ? '#A78BFA' : '#FCD34D', flexShrink: 0 }} />
+                )}
               </span>
             </div>
           )
@@ -755,25 +756,20 @@ export function Select({ value, onChange, options = [], placeholder = 'Select…
 export function AnimatedNumber({ value, className = '' }) {
   const isNum = typeof value === 'number' || (typeof value === 'string' && !isNaN(Number(value)) && value !== '—')
   const target = isNum ? (Number(value) || 0) : 0
-  const [display, setDisplay] = useState(isNum ? 0 : value)
-  const rafRef = useRef(null)
+  const elRef  = useRef(null)
+  const objRef = useRef({ val: 0 })
 
   useEffect(() => {
-    if (!isNum) { setDisplay(value); return }
-    const t0  = performance.now()
-    const dur = 650
-    const tick = (now) => {
-      const p = Math.min((now - t0) / dur, 1)
-      const e = 1 - Math.pow(1 - p, 3)
-      setDisplay(Math.round(target * e))
-      if (p < 1) rafRef.current = requestAnimationFrame(tick)
-    }
-    cancelAnimationFrame(rafRef.current)
-    rafRef.current = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [target, isNum])
+    if (!isNum || !elRef.current) { if (elRef.current) elRef.current.textContent = value; return }
+    gsap.killTweensOf(objRef.current)
+    gsap.to(objRef.current, {
+      val: target, duration: 1.6, ease: 'power2.inOut',
+      onUpdate: () => { if (elRef.current) elRef.current.textContent = Math.round(objRef.current.val) },
+    })
+    return () => gsap.killTweensOf(objRef.current)
+  }, [target, isNum, value])
 
-  return <span className={className}>{display}</span>
+  return <span ref={elRef} className={className}>{isNum ? 0 : value}</span>
 }
 
 // ── ActivityRing — animated SVG attendance ring ───────────────────────────── //

@@ -333,10 +333,10 @@ export default function Register() {
       </div>
 
       {/* Divider */}
-      <div className="hidden lg:block w-px bg-gradient-to-b from-transparent via-white/[0.08] to-transparent" />
+      <div className="auth-divider hidden lg:block w-px bg-gradient-to-b from-transparent via-white/[0.08] to-transparent" />
 
       {/* ── Right form panel ── */}
-      <div className="flex-1 flex items-center justify-center relative overflow-hidden">
+      <div className="login-panel flex-1 flex items-center justify-center relative overflow-hidden">
         {/* Background — hardcoded dark so light-mode theme doesn't bleed through */}
         <div className="absolute inset-0" style={{ background: '#0a0e1a' }} />
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom right, #0a0e1a, #0a0e1a, rgba(109,40,217,0.12))' }} />

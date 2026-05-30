@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
+import gsap from 'gsap'
 import { CheckCircle, ArrowRightFromLine, Users, Home, Clock, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
 import { getTodayAttendance, getMonthSummary, getMonthHistory, checkIn, checkOut, getSettings, getHolidays, getMyLeaves } from '../lib/supabase'
@@ -109,15 +110,107 @@ function TodayStatus({ record }) {
   const fmt = (iso) => {
     try { return format(new Date(iso), 'hh:mm a') } catch { return '—' }
   }
+  const hoursWorked = (() => {
+    const end = record.check_out_time ? new Date(record.check_out_time) : new Date()
+    const ms  = end - new Date(record.check_in_time)
+    if (ms <= 0) return null
+    const h = Math.floor(ms / 3600000)
+    const m = Math.floor((ms % 3600000) / 60000)
+    return record.check_out_time
+      ? `${h}h ${m}m worked`
+      : `${h}h ${m}m so far`
+  })()
+
   return (
-    <div className="flex flex-wrap gap-2 items-center">
-      <Badge status={record.status} />
-      {record.is_late && <Badge status="late" />}
-      <span className="text-sm text-gray-400 font-mono">In: {fmt(record.check_in_time)}</span>
-      {record.check_out_time && (
-        <span className="text-sm text-gray-400 font-mono">Out: {fmt(record.check_out_time)}</span>
-      )}
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap gap-2 items-center">
+        <Badge status={record.status} />
+        {record.is_late && <Badge status="late" />}
+      </div>
+      <div className="flex items-center justify-between text-xs text-gray-500">
+        <span className="font-mono">In: <span className="text-gray-300">{fmt(record.check_in_time)}</span></span>
+        {record.check_out_time
+          ? <span className="font-mono">Out: <span className="text-gray-300">{fmt(record.check_out_time)}</span></span>
+          : <span className="text-gray-600 italic">Not checked out</span>
+        }
+        {hoursWorked && (
+          <span className="font-semibold text-accent-400">{hoursWorked}</span>
+        )}
+      </div>
     </div>
+  )
+}
+
+function AttendanceScoreCard({ score, grade, consistency, punctuality, officePresence, passedWD, totalWD, monthName }) {
+  const bars = [
+    { label: 'Consistency',     value: consistency,    max: 40, color: '#4F86F7' },
+    { label: 'Punctuality',     value: punctuality,    max: 35, color: '#10B981' },
+    { label: 'Office Presence', value: officePresence, max: 25, color: '#8B5CF6' },
+  ]
+  const barRefs  = useRef([])
+  const scoreRef = useRef(null)
+
+  useEffect(() => {
+    // Stagger bars one after another
+    const tl = gsap.timeline({ delay: 0.3 })
+    barRefs.current.forEach((el, i) => {
+      if (!el) return
+      const pct = bars[i].max > 0 ? (bars[i].value / bars[i].max) * 100 : 0
+      tl.fromTo(el,
+        { width: '0%' },
+        { width: `${pct}%`, duration: 1.1, ease: 'sine.inOut' },
+        i * 0.28,
+      )
+    })
+    // Count up the score number
+    if (scoreRef.current) {
+      const obj = { val: 0 }
+      gsap.to(obj, {
+        val: score, duration: 1.8, ease: 'power2.inOut', delay: 0.3,
+        onUpdate: () => { if (scoreRef.current) scoreRef.current.textContent = Math.round(obj.val) },
+      })
+    }
+    return () => { tl.kill(); gsap.killTweensOf({}) }
+  }, [score])
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Attendance Score</p>
+        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${grade.bg} ${grade.color}`}>
+          {grade.label}
+        </span>
+      </div>
+
+      <div className="flex items-end gap-2 mb-5">
+        <span ref={scoreRef} className={`text-4xl font-black font-mono tabular-nums leading-none ${grade.color}`}>0</span>
+        <span className="text-base text-gray-600 mb-1.5">/ 100</span>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {bars.map(({ label, value, max, color }, i) => (
+          <div key={label}>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs text-gray-400">{label}</span>
+              <span className="text-xs font-mono text-gray-400">
+                {Math.round(value)}<span className="text-gray-600">/{max}</span>
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+              <div
+                ref={el => barRefs.current[i] = el}
+                className="h-full rounded-full"
+                style={{ width: 0, background: color }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-[10px] text-gray-600 mt-4">
+        Based on {passedWD} of {totalWD} working days in {monthName}
+      </p>
+    </Card>
   )
 }
 
@@ -161,6 +254,12 @@ function DashboardInner() {
     try {
       const rec = await checkIn(user.id, gpsLocation.lat, gpsLocation.lon, gpsLocation.accuracy)
       setToday(rec)
+      if (burstRef.current) {
+        gsap.timeline()
+          .set(burstRef.current,  { scale: 0.6, opacity: 0.5, display: 'block' })
+          .to(burstRef.current,   { scale: 2.2, opacity: 0, duration: 1.1, ease: 'sine.out' })
+          .set(burstRef.current,  { display: 'none' })
+      }
       toast(`Checked in as ${rec.status === 'in_office' ? 'In Office' : 'WFH'}!`, 'success')
       loadData()
     } catch (e) { toast(e.message, 'error') }
@@ -181,6 +280,7 @@ function DashboardInner() {
   const checkedOut = Boolean(today?.check_out_time)
   const canCheckIn  = gpsStatus === 'active' && !checkedIn
   const canCheckOut = checkedIn && !checkedOut
+  const burstRef    = useRef(null)
 
   const hour      = new Date().getHours()
   const greeting  = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
@@ -350,7 +450,26 @@ function DashboardInner() {
     const wd = new Date(now.getFullYear(), now.getMonth(), d).getDay()
     if (wd !== 0 && wd !== 6) { totalWD++; if (d <= now.getDate()) passedWD++ }
   }
-  const monthPct = totalWD ? Math.round((passedWD / totalWD) * 100) : 0
+  const monthPct  = totalWD ? Math.round((passedWD / totalWD) * 100) : 0
+  const monthName = format(new Date(), 'MMMM')
+
+  // ── Attendance score ───────────────────────────────────────────────────────
+  const present      = summary.present  || 0
+  const late         = summary.late     || 0
+  const wfh          = summary.wfh      || 0
+  const inOffice     = Math.max(0, present - wfh)
+  const score        = passedWD === 0 || present === 0 ? 0
+    : Math.round((present / passedWD) * 40 + ((present - late) / present) * 35 + (inOffice / present) * 25)
+  const consistency    = passedWD > 0 ? (present  / passedWD) * 40        : 0
+  const punctuality    = present  > 0 ? ((present - late) / present) * 35 : 0
+  const officePresence = present  > 0 ? (inOffice / present) * 25         : 0
+  const grade = score >= 90
+    ? { label: 'Excellent', color: 'text-emerald-400', bg: 'bg-emerald-500/15' }
+    : score >= 75
+    ? { label: 'Good',      color: 'text-accent-400',  bg: 'bg-accent-500/15'  }
+    : score >= 60
+    ? { label: 'Fair',      color: 'text-amber-400',   bg: 'bg-amber-500/15'   }
+    : { label: 'At Risk',   color: 'text-red-400',     bg: 'bg-red-500/15'     }
 
   return (
     <div className="h-full flex overflow-hidden">
@@ -358,16 +477,13 @@ function DashboardInner() {
         <div className="w-80 shrink-0 flex flex-col overflow-y-auto p-5 gap-5" style={{ scrollBehavior: 'smooth' }}>
 
           {/* Greeting */}
-          <div>
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-100">{greeting}, {firstName} 👋</h2>
-              {streak > 0 && (
-                <span className="flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
-                  🔥 {streak}d
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-gray-500 mt-0.5">{format(new Date(), 'EEEE, d MMMM yyyy')}</p>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-100">{greeting}, {firstName} 👋</h2>
+            {streak > 0 && (
+              <span className="flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                🔥 {streak}d
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -445,6 +561,7 @@ function DashboardInner() {
                     : 'bg-white/[0.02] border border-white/[0.06] text-gray-600 cursor-not-allowed'}`}
               >
                 {canCheckIn && <div className="absolute top-0 inset-x-0 h-12 bg-gradient-to-b from-accent-500/20 to-transparent pointer-events-none" />}
+                <div ref={burstRef} className="absolute inset-0 rounded-2xl bg-accent-400/40 pointer-events-none" style={{ display: 'none' }} />
                 <div className={`relative w-9 h-9 rounded-full flex items-center justify-center ${canCheckIn ? 'bg-accent-500/20' : 'bg-white/[0.04]'}`}>
                   {checking && !checkedIn
                     ? <div className="w-4 h-4 border-2 border-accent-400/30 border-t-accent-400 rounded-full animate-spin" />
@@ -494,6 +611,20 @@ function DashboardInner() {
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Today's Status</p>
             <TodayStatus record={today} />
           </Card>
+
+          {/* Attendance score */}
+          {passedWD > 0 && (
+            <AttendanceScoreCard
+              score={score}
+              grade={grade}
+              consistency={consistency}
+              punctuality={punctuality}
+              officePresence={officePresence}
+              passedWD={passedWD}
+              totalWD={totalWD}
+              monthName={monthName}
+            />
+          )}
 
           {/* Daily motivational quote */}
           <div className="text-center px-6 pb-2">

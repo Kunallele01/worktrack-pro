@@ -1,11 +1,108 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Users, Building2, Home, Clock, RefreshCw } from 'lucide-react'
+import { Users, Building2, Home, Clock, RefreshCw, AlertTriangle, UserX, Timer, TrendingDown } from 'lucide-react'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { format } from 'date-fns'
 import { getLiveOverview, getWeeklyData, supabase } from '../../lib/supabase'
 import { StatCard, Card, Badge, Avatar, Button, AnimatedNumber, ActivityRing } from '../../components/ui'
+
+function getISTMinutes() {
+  const ist = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+  return ist.getHours() * 60 + ist.getMinutes()
+}
+
+function SmartAlerts({ data, stats }) {
+  const istMins = getISTMinutes()
+  const absent   = data?.by_category?.absent || []
+  const late     = data?.by_category?.late   || []
+  const total    = stats?.total_employees || 0
+  const checkedIn = stats?.checked_in    || 0
+  const lateCount = stats?.late          || 0
+
+  const alerts = []
+
+  // After 11:00 AM IST — surface employees who still haven't checked in
+  if (istMins >= 11 * 60 && absent.length > 0) {
+    const names = absent.slice(0, 3).map(e => e.full_name).join(', ')
+    const overflow = absent.length > 3 ? ` +${absent.length - 3} more` : ''
+    alerts.push({
+      id: 'absent',
+      Icon: UserX,
+      title: `${absent.length} employee${absent.length !== 1 ? 's' : ''} haven't checked in`,
+      detail: names + overflow,
+      color: '#EF4444',
+      ring: 'border-red-500/25',
+      bg: 'bg-red-500/[0.08]',
+    })
+  }
+
+  // Any late arrivals today (show as soon as they exist)
+  if (lateCount > 0) {
+    const names = late.slice(0, 3).map(e => e.full_name).join(', ')
+    const overflow = late.length > 3 ? ` +${late.length - 3} more` : ''
+    const pct = checkedIn > 0 ? Math.round(lateCount / checkedIn * 100) : 0
+    alerts.push({
+      id: 'late',
+      Icon: Timer,
+      title: `${lateCount} late arrival${lateCount !== 1 ? 's' : ''} today${pct ? ` · ${pct}% of present` : ''}`,
+      detail: names + overflow,
+      color: '#F59E0B',
+      ring: 'border-amber-500/25',
+      bg: 'bg-amber-500/[0.08]',
+    })
+  }
+
+  // Attendance well below 50% after 11 AM
+  const pctPresent = total > 0 ? checkedIn / total : 1
+  if (istMins >= 11 * 60 && total >= 4 && pctPresent < 0.5) {
+    const missed = total - checkedIn
+    alerts.push({
+      id: 'low',
+      Icon: TrendingDown,
+      title: `Low turnout — only ${checkedIn}/${total} employees present`,
+      detail: `${missed} employee${missed !== 1 ? 's' : ''} yet to check in`,
+      color: '#8B5CF6',
+      ring: 'border-violet-500/25',
+      bg: 'bg-violet-500/[0.08]',
+    })
+  }
+
+  if (alerts.length === 0) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      className="mb-5"
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <AlertTriangle size={12} className="text-gray-500" />
+        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest">Needs Attention</p>
+      </div>
+      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(alerts.length, 3)}, 1fr)` }}>
+        {alerts.map((alert, i) => (
+          <motion.div
+            key={alert.id}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: i * 0.07, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className={`flex items-start gap-3 p-3.5 rounded-xl border ${alert.bg} ${alert.ring}`}
+          >
+            <div className="mt-0.5 p-1.5 rounded-lg" style={{ background: `${alert.color}20` }}>
+              <alert.Icon size={13} style={{ color: alert.color }} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold leading-tight" style={{ color: alert.color }}>{alert.title}</p>
+              <p className="text-xs text-gray-400 mt-1 truncate">{alert.detail}</p>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
+  )
+}
 
 // Subtle floating orbs behind the content
 function FloatingOrbs() {
@@ -205,6 +302,9 @@ export default function Overview() {
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
         </Button>
       </div>
+
+      {/* Smart Alerts — time-aware, only renders when there is something to flag */}
+      {!loading && data && <SmartAlerts data={data} stats={stats} />}
 
       {/* Animated stat cards with activity rings */}
       <div className="grid grid-cols-4 gap-4 mb-6">

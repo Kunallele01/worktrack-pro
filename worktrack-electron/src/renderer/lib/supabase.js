@@ -11,6 +11,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   },
 })
 
+const toTitleCase = s => s?.replace(/\b\w+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()) || s
+const normaliseName = p => p ? { ...p, full_name: toTitleCase(p.full_name) } : p
+
 // ── Auth ─────────────────────────────────────────────────────────────────── //
 
 export async function signIn(identifier, password) {
@@ -253,7 +256,7 @@ export async function changePassword(newPassword) {
 export async function fetchProfile(userId) {
   const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single()
   if (error) throw new Error(`Could not load profile: ${error.message}`)
-  return data
+  return normaliseName(data)
 }
 
 export async function getUsers({ search = '', department = '', isActive = null, page = 1, limit = 100 } = {}) {
@@ -271,7 +274,7 @@ export async function getUsers({ search = '', department = '', isActive = null, 
       u.email?.toLowerCase().includes(s)
     )
   }
-  return items
+  return items.map(normaliseName)
 }
 
 export async function updateUser(userId, fields) {
@@ -618,7 +621,7 @@ export async function getLiveOverview() {
   const absentEmps   = employees.filter(e => !checkedInIds.has(e.id))
 
   const mkList = (arr) => arr.map(r => ({
-    full_name:   r.profiles?.full_name   || r.full_name   || '—',
+    full_name:   toTitleCase(r.profiles?.full_name   || r.full_name)   || '—',
     employee_id: r.profiles?.employee_id || r.employee_id || '',
   }))
 
@@ -637,11 +640,11 @@ export async function getLiveOverview() {
       in_office: mkList(inOfficeRecs),
       wfh:       mkList(wfhRecs),
       late:      mkList(lateRecs),
-      absent:    absentEmps.map(e => ({ full_name: e.full_name, employee_id: e.employee_id })),
+      absent:    absentEmps.map(e => ({ full_name: toTitleCase(e.full_name) || e.full_name, employee_id: e.employee_id })),
     },
     feed: empRecords.filter(r => r.check_in_time).map(r => ({
       user_id:        r.user_id,
-      full_name:      r.profiles?.full_name || '—',
+      full_name:      toTitleCase(r.profiles?.full_name) || '—',
       employee_id:    r.profiles?.employee_id || '',
       department:     r.profiles?.department || '',
       check_in_time:  r.check_in_time,

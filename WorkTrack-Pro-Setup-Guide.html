@@ -264,11 +264,16 @@
   <h1>WorkTrack Pro v2</h1>
   <div style="font-size:15px; color:#64748b; margin-top:4px;">Setup, Build &amp; Distribution Guide</div>
   <p>Complete instructions for packaging the desktop app as a <code>.exe</code><br>and deploying it to every employee's Windows PC.</p>
+  <div style="display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:7px 16px;font-size:12px;color:#15803d;">
+    <span style="font-weight:700;">v2.1 — May 2026</span>
+    <span style="color:#86efac;">|</span>
+    Attendance Score &nbsp;·&nbsp; Employee Deep-Dive Reports &nbsp;·&nbsp; GSAP Animations &nbsp;·&nbsp; Light Mode Polish
+  </div>
   <div class="meta">
     <span>Platform: Windows 10 / 11 (64-bit)</span>
     <span>Database: Supabase (free tier)</span>
-    <span>Tech: Electron 32 + React</span>
-    <span>April 2026</span>
+    <span>Tech: Electron 32 + React + GSAP</span>
+    <span>May 2026</span>
   </div>
 </div>
 
@@ -539,7 +544,10 @@
     <tr><th>Action</th><th>How</th></tr>
     <tr><td>Check in</td><td>Open app → Dashboard → click <strong>"Mark Check-In"</strong> button</td></tr>
     <tr><td>Check out</td><td>Open app → Dashboard → click <strong>"Mark Check-Out"</strong> button</td></tr>
-    <tr><td>View my history</td><td>Calendar on the left side of the Dashboard</td></tr>
+    <tr><td>View my history</td><td>Calendar on the left side of the Dashboard (coloured dots = leave/holiday)</td></tr>
+    <tr><td>View my Attendance Score</td><td>Dashboard → right column — Score card shows Consistency, Punctuality &amp; Office Presence breakdown for the current month</td></tr>
+    <tr><td>Request a correction</td><td>Dashboard → <strong>Corrections</strong> in the sidebar → fill in date and reason → Submit</td></tr>
+    <tr><td>Apply for leave</td><td>Dashboard → <strong>Leave</strong> in the sidebar → select dates → Submit request</td></tr>
     <tr><td>Open from tray</td><td>Click the WorkTrack icon in the system tray (bottom-right)</td></tr>
     <tr><td>Forgot password</td><td>Login screen → "Forgot password?" → enter email → check inbox for 6-digit code</td></tr>
     <tr><td>Login with Employee ID</td><td>Enter <code>EMP001</code> (their ID) instead of email in the login field</td></tr>
@@ -671,6 +679,16 @@
       <td>Admin → Employees tab → find the user → click "Activate".</td>
     </tr>
     <tr>
+      <td>Attendance Score shows 0 at start of month</td>
+      <td>No check-ins recorded yet for the current month</td>
+      <td>Normal. The score populates once there are working days with attendance data in the current month.</td>
+    </tr>
+    <tr>
+      <td>Employee name shows in wrong case (ALL CAPS etc.)</td>
+      <td>Name was entered in all-caps during registration</td>
+      <td>The app auto-formats names to Title Case on display. If the underlying record needs fixing, Admin → Settings → User Management → update the profile.</td>
+    </tr>
+    <tr>
       <td>App shows "GPU Cache Creation failed"</td>
       <td>Harmless error — VS Code also uses Electron</td>
       <td>Ignore. Doesn't affect functionality. Disappears on employee machines (they won't have VS Code running).</td>
@@ -682,6 +700,10 @@
     <tr><th>Task</th><th>Where in App</th></tr>
     <tr><td>See who's in office right now</td><td>Admin → Overview (live feed, updates in real-time)</td></tr>
     <tr><td>See full attendance records</td><td>Admin → Attendance (filter by date, employee, status)</td></tr>
+    <tr><td>View an employee's detailed breakdown</td><td>Admin → Reports → Monthly Report → <strong>click any employee row</strong> — opens the Employee Deep-Dive panel with full day-by-day log, arrival trend chart, and score breakdown</td></tr>
+    <tr><td>Review an employee's Attendance Score</td><td>Deep-Dive panel (above) or ask the employee to share their Dashboard score card. Score = Consistency (40) + Punctuality (35) + Office Presence (25)</td></tr>
+    <tr><td>Approve / reject leave requests</td><td>Admin → Leave → Pending Requests tab → Approve or Reject</td></tr>
+    <tr><td>Approve / reject corrections</td><td>Admin → Corrections → Pending tab → review and action</td></tr>
     <tr><td>Make someone an admin</td><td>Admin → Employees → find card → click "Make Admin"</td></tr>
     <tr><td>Deactivate a departed employee</td><td>Admin → Employees → find card → click "Deactivate"</td></tr>
     <tr><td>Download monthly attendance Excel</td><td>Admin → Reports → Monthly Report → select month → Download</td></tr>
@@ -691,7 +713,7 @@
   </table>
 
   <div style="margin-top:40px; padding-top:24px; border-top:1px solid #e2e8f0; text-align:center; color:#94a3b8; font-size:12px;">
-    <p><strong style="color:#334155;">WorkTrack Pro v2.0</strong> &nbsp;·&nbsp; Built with Electron + React + Supabase &nbsp;·&nbsp; Database: <code>lwnuunwxfgvketjtmreo.supabase.co</code></p>
+    <p><strong style="color:#334155;">WorkTrack Pro v2.1</strong> &nbsp;·&nbsp; Built with Electron 32 + React 18 + Supabase + GSAP &nbsp;·&nbsp; Database: <code>lwnuunwxfgvketjtmreo.supabase.co</code></p>
     <p style="margin-top:4px;">For support, contact the person who set this up. This document covers all common scenarios.</p>
   </div>
 </div>

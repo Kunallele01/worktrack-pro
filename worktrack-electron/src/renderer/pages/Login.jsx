@@ -141,7 +141,7 @@ export default function Login() {
       </div>
 
       {/* Divider */}
-      <div className="hidden lg:block w-px bg-gradient-to-b from-transparent via-white/[0.08] to-transparent" />
+      <div className="auth-divider hidden lg:block w-px bg-gradient-to-b from-transparent via-white/[0.08] to-transparent" />
 
       {/* Right panel */}
       <div className="login-panel flex-1 flex items-center justify-center relative overflow-hidden px-8">
