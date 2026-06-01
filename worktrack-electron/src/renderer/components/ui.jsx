@@ -444,6 +444,7 @@ export function Avatar({ name = '', size = 8, textSize = 'text-xs' }) {
 const CAL_STATES = {
   in_office:    { bg: 'bg-emerald-500',   text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(16,185,129,0.5)]',  label: 'In Office',     dot: 'bg-emerald-400' },
   wfh:          { bg: 'bg-blue-500',      text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(59,130,246,0.5)]',  label: 'WFH',           dot: 'bg-blue-400'    },
+  late:         { bg: 'bg-amber-500',     text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(245,158,11,0.4)]',  label: 'Late',          dot: 'bg-amber-400'   },
   absent:       { bg: 'bg-red-500/80',    text: 'text-white',        glow: '',                                        label: 'Absent',         dot: 'bg-red-400'     },
   auto_checkout:{ bg: 'bg-gray-500/60',   text: 'text-gray-200',     glow: '',                                        label: 'Auto-out',       dot: 'bg-gray-400'    },
   sick:         { bg: 'bg-rose-500',      text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(244,63,94,0.4)]',   label: 'Sick Leave',     dot: 'bg-rose-400'    },
@@ -468,7 +469,7 @@ export function CalendarWidget({ attendance = [], holidays = [], leaves = [] }) 
     while (cur <= end) { leaveMap[cur.toLocaleDateString('sv-SE')] = l.type; cur.setDate(cur.getDate() + 1) }
   }
   const byDate     = {}
-  attendance.forEach(r => { byDate[r.date] = r.status })
+  attendance.forEach(r => { byDate[r.date] = { status: r.status, is_late: r.is_late } })
   const holidayMap = {}
   holidays.forEach(h => { holidayMap[h.date] = h.name })
 
@@ -540,15 +541,17 @@ export function CalendarWidget({ attendance = [], holidays = [], leaves = [] }) 
         {cells.map((day, i) => {
           if (!day) return <div key={i} />
           const dateStr  = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-          const status   = byDate[dateStr]
+          const rec      = byDate[dateStr]
+          const status   = rec?.status
+          const isLate   = rec?.is_late
           const isHoliday = !!holidayMap[dateStr]
           const leaveType = leaveMap[dateStr]
           const isToday   = day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
           const isWeekend = (i % 7) >= 5
           const isFuture  = new Date(year, month, day) > today
 
-          // Resolve which state applies (priority: holiday > leave > attendance)
-          const stateKey = isHoliday ? 'holiday' : (leaveType || status || null)
+          // Priority: holiday > approved leave > late > status (in_office / wfh / absent)
+          const stateKey = isHoliday ? 'holiday' : leaveType ? leaveType : isLate ? 'late' : (status || null)
           const st       = stateKey ? CAL_STATES[stateKey] : null
           const tooltipLabel = isHoliday ? `🏖 ${holidayMap[dateStr]}` : st?.label
 
@@ -558,8 +561,8 @@ export function CalendarWidget({ attendance = [], holidays = [], leaves = [] }) 
               className={`
                 relative flex flex-col items-center justify-center w-full rounded-xl transition-all duration-150 cursor-default
                 ${st ? `${st.bg} ${st.text} ${st.glow}` : ''}
-                ${!st && isWeekend ? 'text-gray-700' : ''}
-                ${!st && isFuture  ? 'text-gray-800' : ''}
+                ${!st && isWeekend ? 'text-gray-600' : ''}
+                ${!st && isFuture  ? 'text-gray-600' : ''}
                 ${!st && !isFuture && !isWeekend ? 'text-gray-500 hover:bg-white/[0.06] hover:text-gray-300' : ''}
                 ${isToday ? 'ring-2 ring-accent-400 ring-offset-1 ring-offset-surface-800' : ''}
               `}

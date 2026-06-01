@@ -37,12 +37,26 @@ function calcHours(ci, co) {
 function attendancePct(present, workdays) { return workdays > 0 ? Math.round(present / workdays * 100) : 0 }
 function pctColor(p) { return p >= 80 ? 'FF059669' : p >= 60 ? 'FFD97706' : 'FFDC2626' }
 
-function calcScore(present, late, inOffice, workdays) {
+function calcPunctualityScore(records, lateThreshold) {
+  const present = records.filter(r => ['in_office','wfh'].includes(r.status))
+  if (!present.length) return 0
+  const sum = present.reduce((acc, r) => {
+    if (!r.is_late || !r.check_in_time) return acc + 1
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(new Date(r.check_in_time))
+    const h = parseInt(parts.find(p => p.type === 'hour').value, 10)
+    const m = parseInt(parts.find(p => p.type === 'minute').value, 10)
+    return acc + Math.min(1, Math.max(0, 1 - ((h * 60 + m) - lateThreshold) / 60))
+  }, 0)
+  return (sum / present.length) * 35
+}
+
+function calcScore(present, inOffice, workdays, punctualityScore) {
   if (workdays === 0 || present === 0) return 0
   const consistency    = (present / workdays) * 40
-  const punctuality    = ((present - late) / present) * 35
   const officePresence = (inOffice / present) * 25
-  return Math.round(consistency + punctuality + officePresence)
+  return Math.round(consistency + punctualityScore + officePresence)
 }
 function scoreGrade(s) {
   if (s >= 90) return { label: 'Excellent', color: 'text-emerald-400', bg: 'bg-emerald-500/15', hex: '#10B981' }
@@ -586,15 +600,15 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
   const { full_name, employee_id, department, score, present, wfh, inOffice, late, absent, records = [] } = row
   const grade = scoreGrade(score)
 
-  const consistency    = workdays > 0 ? (present / workdays) * 40        : 0
-  const punctuality    = present  > 0 ? ((present - late) / present) * 35 : 0
-  const officePresence = present  > 0 ? (inOffice / present) * 25         : 0
-
   const officeStartMin = (() => {
     const [h, m] = (settings?.office_start_time || '09:30').split(':').map(Number)
     return h * 60 + m
   })()
   const graceMin = parseInt(settings?.grace_period_minutes || '10', 10)
+
+  const consistency    = workdays > 0 ? (present / workdays) * 40                : 0
+  const punctuality    = calcPunctualityScore(records, officeStartMin + graceMin)
+  const officePresence = present  > 0 ? (inOffice / present) * 25                : 0
 
   const avgHours = (() => {
     const withBoth = records.filter(r => r.check_in_time && r.check_out_time)
@@ -727,6 +741,13 @@ export default function Reports() {
         if (wd !== 0 && wd !== 6) workdays++
       }
 
+      const officeStartMin = (() => {
+        const [h, m] = (settings?.office_start_time || '09:30').split(':').map(Number)
+        return h * 60 + m
+      })()
+      const graceMin = parseInt(settings?.grace_period_minutes || '10', 10)
+      const lateThreshold = officeStartMin + graceMin
+
       const byUser = {}
       items.forEach(r => {
         if (!byUser[r.user_id]) byUser[r.user_id] = []
@@ -741,7 +762,8 @@ export default function Reports() {
         const late     = recs.filter(r => r.is_late).length
         const absent   = Math.max(0, workdays - present)
         const pct      = workdays > 0 ? Math.round(present / workdays * 100) : 0
-        const score    = calcScore(present, late, inOffice, workdays)
+        const punct    = calcPunctualityScore(recs, lateThreshold)
+        const score    = calcScore(present, inOffice, workdays, punct)
         return { ...u, present, wfh, inOffice, late, absent, pct, score, records: recs }
       }).sort((a, b) => b.score - a.score)
 
@@ -759,6 +781,7 @@ export default function Reports() {
       const empIds = new Set(empUsers.map(u => u.id))
       const empItems = items.filter(r => empIds.has(r.user_id))
 
+      const todayStr = today.toLocaleDateString('sv-SE', { timeZone: 'Asia/Kolkata' })
       const weekTrend = []
       let wkStart = 1
       while (wkStart <= dim) {
@@ -771,10 +794,12 @@ export default function Reports() {
           }
         }
         if (dates.length) {
-          const wkItems  = empItems.filter(r => dates.includes(r.date))
+          const pastDates = isCurrentMonth ? dates.filter(d => d <= todayStr) : dates
+          if (!pastDates.length) { wkStart += 7; continue }
+          const wkItems  = empItems.filter(r => pastDates.includes(r.date))
           const office   = wkItems.filter(r => r.status === 'in_office').length
           const wfhCount = wkItems.filter(r => r.status === 'wfh').length
-          const expected = dates.length * empUsers.length
+          const expected = pastDates.length * empUsers.length
           const absent   = Math.max(0, expected - office - wfhCount)
           weekTrend.push({ label: `Wk ${Math.ceil(wkStart / 7)}`, inOffice: office, wfh: wfhCount, absent })
         }
@@ -799,13 +824,6 @@ export default function Reports() {
       }).filter(Boolean)
 
       // 3. Arrival time distribution (IST, 30-min buckets 8:00–12:00)
-      const officeStartMin = (() => {
-        const [h, m] = (settings?.office_start_time || '09:30').split(':').map(Number)
-        return h * 60 + m
-      })()
-      const graceMin = parseInt(settings?.grace_period_minutes || '10', 10)
-      const lateThreshold = officeStartMin + graceMin
-
       const toISTMinutes = (iso) => {
         const parts = new Intl.DateTimeFormat('en-GB', {
           timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false,

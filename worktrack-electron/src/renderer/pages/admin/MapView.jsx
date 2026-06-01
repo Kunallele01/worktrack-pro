@@ -38,7 +38,8 @@ function createOfficeIcon(inOfficeCount) {
     ? `<div style="position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;border-radius:10px;
         background:#10B981;border:2px solid #0A0E1A;
         display:flex;align-items:center;justify-content:center;
-        font-size:10px;font-weight:800;color:#fff;font-family:Inter,Arial,sans-serif;padding:0 4px;">
+        font-size:10px;font-weight:800;color:#fff;font-family:Inter,Arial,sans-serif;padding:0 4px;
+        z-index:2;">
         ${inOfficeCount}
       </div>`
     : ''

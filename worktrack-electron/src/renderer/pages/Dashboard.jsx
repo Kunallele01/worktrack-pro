@@ -458,11 +458,34 @@ function DashboardInner() {
   const late         = summary.late     || 0
   const wfh          = summary.wfh      || 0
   const inOffice     = Math.max(0, present - wfh)
-  const score        = passedWD === 0 || present === 0 ? 0
-    : Math.round((present / passedWD) * 40 + ((present - late) / present) * 35 + (inOffice / present) * 25)
-  const consistency    = passedWD > 0 ? (present  / passedWD) * 40        : 0
-  const punctuality    = present  > 0 ? ((present - late) / present) * 35 : 0
-  const officePresence = present  > 0 ? (inOffice / present) * 25         : 0
+
+  const _offStartMin = (() => {
+    const [h, m] = (settings?.office_start_time || '09:30').split(':').map(Number)
+    return h * 60 + m
+  })()
+  const _graceMin      = parseInt(settings?.grace_period_minutes || '10', 10)
+  const _lateThreshold = _offStartMin + _graceMin
+
+  const presentRecs = history.filter(r => ['in_office','wfh'].includes(r.status))
+  const punctScore = (() => {
+    if (!presentRecs.length) return 0
+    const sum = presentRecs.reduce((acc, r) => {
+      if (!r.is_late || !r.check_in_time) return acc + 1
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false,
+      }).formatToParts(new Date(r.check_in_time))
+      const h = parseInt(parts.find(p => p.type === 'hour').value, 10)
+      const m = parseInt(parts.find(p => p.type === 'minute').value, 10)
+      return acc + Math.min(1, Math.max(0, 1 - ((h * 60 + m) - _lateThreshold) / 60))
+    }, 0)
+    return (sum / presentRecs.length) * 35
+  })()
+
+  const consistency    = passedWD > 0 ? (present / passedWD) * 40 : 0
+  const punctuality    = punctScore
+  const officePresence = present  > 0 ? (inOffice / present) * 25  : 0
+  const score          = passedWD === 0 || present === 0 ? 0
+    : Math.round(consistency + punctuality + officePresence)
   const grade = score >= 90
     ? { label: 'Excellent', color: 'text-emerald-400', bg: 'bg-emerald-500/15' }
     : score >= 75
