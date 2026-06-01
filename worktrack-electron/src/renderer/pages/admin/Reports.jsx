@@ -230,7 +230,7 @@ async function buildExcel(kind, year, month) {
 
   // ── MONTHLY ────────────────────────────────────────────────────────────── //
   if (kind === 'monthly') {
-    const users  = await getUsers()
+    const users  = (await getUsers()).filter(u => !u.is_admin)
     const byUser = {}
     items.forEach(r => {
       if (!byUser[r.user_id]) byUser[r.user_id] = []
@@ -754,7 +754,7 @@ export default function Reports() {
         byUser[r.user_id].push(r)
       })
 
-      const rows = users.map(u => {
+      const rows = empUsers.map(u => {
         const recs     = byUser[u.id] || []
         const present  = recs.filter(r => ['in_office','wfh'].includes(r.status)).length
         const wfh      = recs.filter(r => r.status === 'wfh').length
