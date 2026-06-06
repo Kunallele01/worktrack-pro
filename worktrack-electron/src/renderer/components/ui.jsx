@@ -335,7 +335,7 @@ export function GpsWidget({ onReady, onAcquiring }) {
       <div className="flex items-start gap-3">
         <div className="mt-0.5">
           {status === 'acquiring' && (
-            <span className="flex h-3 w-3">
+            <span className="relative flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-amber-400 opacity-75"/>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"/>
             </span>

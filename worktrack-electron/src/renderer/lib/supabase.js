@@ -585,7 +585,14 @@ export async function getMonthHistory(userId, year, month) {
 
 export async function getMonthSummary(userId, year, month) {
   const records = await getMonthHistory(userId, year, month)
-  const workdays = countWeekdays(year, month)
+  const now = new Date()
+  const isCurrentMonth = year === now.getFullYear() && month === (now.getMonth() + 1)
+  const lastDay = isCurrentMonth ? now.getDate() : new Date(year, month, 0).getDate()
+  let workdays = 0
+  for (let d = 1; d <= lastDay; d++) {
+    const day = new Date(year, month - 1, d).getDay()
+    if (day !== 0 && day !== 6) workdays++
+  }
   return {
     present:      records.filter(r => r.status === 'in_office' || r.status === 'wfh').length,
     wfh:          records.filter(r => r.status === 'wfh').length,
@@ -599,16 +606,21 @@ export async function getLiveOverview() {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Kolkata' })
 
   // Fetch non-admin active employees (admins have no check-in screen so exclude from stats)
-  const [{ data: att }, { data: allEmployees }] = await Promise.all([
+  const [{ data: att }, { data: allEmployees }, { data: todayHolidays }, { data: onLeaveToday }] = await Promise.all([
     supabase.from('attendance').select('*,profiles(full_name,employee_id,department,is_admin)')
       .eq('date', today).order('check_in_time'),
     supabase.from('profiles').select('id,full_name,employee_id,department')
       .eq('is_active', true).eq('is_admin', false),
+    supabase.from('holidays').select('date').eq('date', today),
+    supabase.from('leave_requests').select('user_id').eq('status', 'approved')
+      .lte('start_date', today).gte('end_date', today),
   ])
 
-  const records   = att || []
-  const employees = allEmployees || []                     // non-admin employees only
-  const empIds    = new Set(employees.map(e => e.id))
+  const records     = att || []
+  const employees   = allEmployees || []                   // non-admin employees only
+  const empIds      = new Set(employees.map(e => e.id))
+  const onLeaveIds  = new Set((onLeaveToday || []).map(l => l.user_id))
+  const isHoliday   = (todayHolidays || []).length > 0
 
   // Only count non-admin check-ins in stats
   const empRecords  = records.filter(r => empIds.has(r.user_id))
@@ -618,7 +630,8 @@ export async function getLiveOverview() {
   const inOfficeRecs = empRecords.filter(r => (r.status === 'in_office' || r.status === 'auto_checkout') && r.check_in_time)
   const wfhRecs      = empRecords.filter(r => r.status === 'wfh' && r.check_in_time)
   const lateRecs     = empRecords.filter(r => r.is_late && r.check_in_time)
-  const absentEmps   = employees.filter(e => !checkedInIds.has(e.id))
+  // Exclude employees on approved leave — they are accounted for, not truly absent
+  const absentEmps   = employees.filter(e => !checkedInIds.has(e.id) && !onLeaveIds.has(e.id))
 
   const mkList = (arr) => arr.map(r => ({
     full_name:   toTitleCase(r.profiles?.full_name   || r.full_name)   || '—',
@@ -627,12 +640,13 @@ export async function getLiveOverview() {
 
   return {
     date: today,
+    isHoliday,
     stats: {
       total_employees: employees.length,
       checked_in:      checkedIn,
       in_office:       inOfficeRecs.length,
       wfh:             wfhRecs.length,
-      absent:          employees.length - checkedIn,
+      absent:          absentEmps.length,
       late:            lateRecs.length,
     },
     // Employee lists per category — used for hover tooltips in Overview

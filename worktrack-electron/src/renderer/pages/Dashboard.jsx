@@ -3,7 +3,8 @@ import { motion } from 'framer-motion'
 import gsap from 'gsap'
 import { CheckCircle, ArrowRightFromLine, Users, Home, Clock, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
-import { getTodayAttendance, getMonthSummary, getMonthHistory, checkIn, checkOut, getSettings, getHolidays, getMyLeaves } from '../lib/supabase'
+import { getTodayAttendance, getMonthSummary, getMonthHistory, checkIn, checkOut, getSettings, getHolidays, getMyLeaves, getLeaveBalance, getMyCorrections } from '../lib/supabase'
+import { LEAVE_TYPES, LEAVE_COLORS } from '../lib/leaveConstants'
 import { useStore } from '../lib/store'
 import { GpsWidget, StatCard, CalendarWidget, Button, Badge, Card } from '../components/ui'
 import { useToast } from '../components/ui'
@@ -224,26 +225,31 @@ function DashboardInner() {
   const settings    = useStore(s => s.settings)
   const setSettings = useStore(s => s.setSettings)
 
-  const [today,    setToday   ] = useState(null)
-  const [summary,  setSummary ] = useState({})
-  const [history,  setHistory ] = useState([])
-  const [holidays, setHolidays] = useState([])
-  const [leaves,   setLeaves  ] = useState([])
-  const [checking, setChecking] = useState(false)
+  const [today,       setToday      ] = useState(null)
+  const [summary,     setSummary    ] = useState({})
+  const [history,     setHistory    ] = useState([])
+  const [holidays,    setHolidays   ] = useState([])
+  const [leaves,      setLeaves     ] = useState([])
+  const [balance,     setBalance    ] = useState({})
+  const [corrections, setCorrections] = useState([])
+  const [checking,    setChecking   ] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!user) return
     const now = new Date()
-    const [t, s, h, hols, leavs, sett] = await Promise.all([
+    const [t, s, h, hols, leavs, sett, bal, corrs] = await Promise.all([
       getTodayAttendance(user.id),
       getMonthSummary(user.id, now.getFullYear(), now.getMonth() + 1),
       getMonthHistory(user.id, now.getFullYear(), now.getMonth() + 1),
       getHolidays(),
       getMyLeaves(user.id, now.getFullYear()),
       getSettings(),
+      getLeaveBalance(user.id, now.getFullYear()),
+      getMyCorrections(user.id),
     ])
     setToday(t); setSummary(s); setHistory(h); setHolidays(hols); setLeaves(leavs)
     if (sett) setSettings(sett)
+    setBalance(bal || {}); setCorrections(corrs || [])
   }, [user])
 
   useEffect(() => { loadData() }, [loadData])
@@ -532,6 +538,33 @@ function DashboardInner() {
           <Card className="p-4">
             <CalendarWidget attendance={history} holidays={holidays} leaves={leaves} />
           </Card>
+
+          {/* Leave Balance */}
+          {LEAVE_TYPES.some(t => t.quotaKey && settings?.[t.quotaKey]) && (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Leave Balance</p>
+              <div className="grid grid-cols-2 gap-2">
+                {LEAVE_TYPES.filter(t => t.quotaKey).map(t => {
+                  const quota = settings?.[t.quotaKey] ? parseInt(settings[t.quotaKey], 10) : null
+                  const used  = balance[t.value] || 0
+                  const rem   = quota !== null ? Math.max(0, quota - used) : null
+                  const lc    = LEAVE_COLORS[t.value]
+                  return (
+                    <div key={t.value} className={`flex items-center gap-2 px-3 py-2 rounded-xl ${lc.bg} border ${lc.border}`}>
+                      <span className="text-base leading-none">{t.icon}</span>
+                      <div className="min-w-0">
+                        <p className={`text-[10px] font-bold ${lc.text} leading-tight truncate`}>{t.label.replace(' Leave', '')}</p>
+                        <p className="text-xs font-mono font-bold text-gray-100 leading-tight">
+                          {rem !== null ? rem : '—'}
+                          {quota !== null && <span className="text-gray-500 font-normal text-[10px]">/{quota}</span>}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Gradient separator */}
@@ -634,6 +667,66 @@ function DashboardInner() {
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Today's Status</p>
             <TodayStatus record={today} />
           </Card>
+
+          {/* Pending Requests */}
+          {(() => {
+            const CORR_LABELS = {
+              forgot_checkin:  { icon: '🔑', label: 'Missed Check-in'  },
+              forgot_checkout: { icon: '🚪', label: 'Missed Check-out' },
+              wrong_status:    { icon: '📍', label: 'Wrong Status'     },
+              other:           { icon: '✏️', label: 'Other Correction' },
+            }
+            const pendingLeaves = leaves.filter(r => r.status === 'pending')
+            const pendingCorrs  = corrections.filter(r => r.status === 'pending')
+            const items = [
+              ...pendingLeaves.map(r => ({ ...r, _kind: 'leave' })),
+              ...pendingCorrs.map(r => ({ ...r, _kind: 'correction' })),
+            ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+            if (!items.length) return null
+            const shown = items.slice(0, 3)
+            const extra = items.length - shown.length
+            return (
+              <Card className="p-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Pending Requests</p>
+                <div className="flex flex-col gap-2">
+                  {shown.map((r, i) => {
+                    if (r._kind === 'leave') {
+                      const lt = LEAVE_TYPES.find(t => t.value === r.type)
+                      const lc = LEAVE_COLORS[r.type] || LEAVE_COLORS.casual
+                      const dateStr = r.start_date === r.end_date
+                        ? r.start_date
+                        : `${r.start_date} → ${r.end_date}`
+                      return (
+                        <div key={r.id || i} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${lc.bg} border ${lc.border}`}>
+                          <span className="text-base leading-none shrink-0">{lt?.icon ?? '🗓️'}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs font-semibold ${lc.text} leading-tight`}>{lt?.label ?? 'Leave Request'}</p>
+                            <p className="text-[10px] text-gray-500 font-mono mt-0.5">{dateStr}</p>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0 whitespace-nowrap">⏳ Pending</span>
+                        </div>
+                      )
+                    } else {
+                      const cl = CORR_LABELS[r.type] || CORR_LABELS.other
+                      return (
+                        <div key={r.id || i} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+                          <span className="text-base leading-none shrink-0">{cl.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-gray-300 leading-tight">{cl.label}</p>
+                            <p className="text-[10px] text-gray-500 font-mono mt-0.5">{r.date}</p>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0 whitespace-nowrap">⏳ Pending</span>
+                        </div>
+                      )
+                    }
+                  })}
+                  {extra > 0 && (
+                    <p className="text-[10px] text-gray-600 text-center pt-1">+{extra} more pending</p>
+                  )}
+                </div>
+              </Card>
+            )
+          })()}
 
           {/* Attendance score */}
           {passedWD > 0 && (

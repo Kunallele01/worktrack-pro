@@ -14,6 +14,11 @@ function getISTMinutes() {
 
 function SmartAlerts({ data, stats }) {
   const istMins = getISTMinutes()
+
+  // Never surface alerts on weekends or company holidays
+  const ist = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+  if (ist.getDay() === 0 || ist.getDay() === 6 || data?.isHoliday) return null
+
   const absent   = data?.by_category?.absent || []
   const late     = data?.by_category?.late   || []
   const total    = stats?.total_employees || 0
