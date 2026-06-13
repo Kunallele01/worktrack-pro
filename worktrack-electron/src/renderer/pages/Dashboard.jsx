@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import gsap from 'gsap'
 import { CheckCircle, ArrowRightFromLine, Users, Home, Clock, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
-import { getTodayAttendance, getMonthSummary, getMonthHistory, checkIn, checkOut, getSettings, getHolidays, getMyLeaves, getLeaveBalance, getMyCorrections } from '../lib/supabase'
+import { getTodayAttendance, getMonthSummary, getMonthHistory, getYearHistory, checkIn, checkOut, getSettings, getHolidays, getMyLeaves, getLeaveBalance, getMyCorrections } from '../lib/supabase'
 import { LEAVE_TYPES, LEAVE_COLORS } from '../lib/leaveConstants'
 import { useStore } from '../lib/store'
 import { GpsWidget, StatCard, CalendarWidget, Button, Badge, Card } from '../components/ui'
@@ -228,6 +228,7 @@ function DashboardInner() {
   const [today,       setToday      ] = useState(null)
   const [summary,     setSummary    ] = useState({})
   const [history,     setHistory    ] = useState([])
+  const [calHistory,  setCalHistory ] = useState([])
   const [holidays,    setHolidays   ] = useState([])
   const [leaves,      setLeaves     ] = useState([])
   const [balance,     setBalance    ] = useState({})
@@ -237,17 +238,18 @@ function DashboardInner() {
   const loadData = useCallback(async () => {
     if (!user) return
     const now = new Date()
-    const [t, s, h, hols, leavs, sett, bal, corrs] = await Promise.all([
+    const [t, s, h, yh, hols, leavs, sett, bal, corrs] = await Promise.all([
       getTodayAttendance(user.id),
       getMonthSummary(user.id, now.getFullYear(), now.getMonth() + 1),
       getMonthHistory(user.id, now.getFullYear(), now.getMonth() + 1),
+      getYearHistory(user.id, now.getFullYear()),
       getHolidays(),
       getMyLeaves(user.id, now.getFullYear()),
       getSettings(),
       getLeaveBalance(user.id, now.getFullYear()),
       getMyCorrections(user.id),
     ])
-    setToday(t); setSummary(s); setHistory(h); setHolidays(hols); setLeaves(leavs)
+    setToday(t); setSummary(s); setHistory(h); setCalHistory(yh); setHolidays(hols); setLeaves(leavs)
     if (sett) setSettings(sett)
     setBalance(bal || {}); setCorrections(corrs || [])
   }, [user])
@@ -536,7 +538,7 @@ function DashboardInner() {
           </div>
 
           <Card className="p-4">
-            <CalendarWidget attendance={history} holidays={holidays} leaves={leaves} />
+            <CalendarWidget attendance={calHistory} holidays={holidays} leaves={leaves} />
           </Card>
 
           {/* Leave Balance */}
@@ -590,6 +592,7 @@ function DashboardInner() {
           <GpsWidget
             onAcquiring={setGpsAcquiring}
             onReady={(lat, lon, acc) => setGps({ lat, lon, accuracy: acc })}
+            officeWifiSSIDs={(settings?.office_wifi_ssid || '').split('\n').map(s => s.trim()).filter(Boolean)}
           />
 
           {/* Check-in / Check-out */}

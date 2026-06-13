@@ -583,6 +583,15 @@ export async function getMonthHistory(userId, year, month) {
   return data || []
 }
 
+// Two-year window (covers prev + current year) for calendar back-navigation
+export async function getYearHistory(userId, year) {
+  const start = `${year - 1}-01-01`
+  const end   = `${year}-12-31`
+  const { data } = await supabase.from('attendance')
+    .select('*').eq('user_id', userId).gte('date', start).lte('date', end).order('date')
+  return data || []
+}
+
 export async function getMonthSummary(userId, year, month) {
   const records = await getMonthHistory(userId, year, month)
   const now = new Date()

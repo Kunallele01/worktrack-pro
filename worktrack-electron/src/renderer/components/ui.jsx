@@ -214,7 +214,7 @@ function Toast({ id, message, type, onDismiss }) {
 
 // ── GPS Widget ───────────────────────────────────────────────────────────── //
 
-export function GpsWidget({ onReady, onAcquiring }) {
+export function GpsWidget({ onReady, onAcquiring, officeWifiSSIDs = [] }) {
   const [status, setStatus] = useState('idle')
   const [coords, setCoords] = useState(null)
   const [error,  setError ] = useState(null)
@@ -323,8 +323,12 @@ export function GpsWidget({ onReady, onAcquiring }) {
     : coords.accuracy <= 5000  ? 'fair'
     : 'poor'
 
+  const isOfficeWifi = tier === 'wifi' && wifi && officeWifiSSIDs.includes(wifi)
+
   const tierConfig = {
-    wifi: { dot: 'bg-blue-400',    text: 'WiFi Detection Active',        sub: `Network: ${wifi || 'detected'} — SSID verified against office list at check-in` },
+    wifi: isOfficeWifi
+      ? { dot: 'bg-emerald-400', text: 'Office WiFi Detected',       sub: `Network: ${wifi} — you'll be marked In Office` }
+      : { dot: 'bg-blue-400',    text: 'WiFi Detection Active',      sub: `Network: ${wifi || 'detected'} — not an office network, you'll be marked WFH` },
     good: { dot: 'bg-emerald-400', text: 'GPS / WiFi Active',            sub: `Accuracy: ±${Math.round(coords?.accuracy)}m` },
     fair: { dot: 'bg-amber-400',   text: 'Location Active (Low)',        sub: `Accuracy: ±${Math.round((coords?.accuracy||0)/1000)}km` },
     poor: { dot: 'bg-red-400',     text: 'IP-Based Location (Very Low)', sub: `Accuracy: ±${Math.round((coords?.accuracy||0)/1000)}km — WiFi SSID detection active` },
