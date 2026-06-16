@@ -236,8 +236,10 @@ async function buildExcel(kind, year, month) {
       if (!byUser[r.user_id]) byUser[r.user_id] = []
       byUser[r.user_id].push(r)
     })
-    const daysInMonth = new Date(year, month, 0).getDate()
-    const allDays     = Array.from({ length: daysInMonth }, (_, i) => {
+    const daysInMonth    = new Date(year, month, 0).getDate()
+    const isCurrentMonth = today.startsWith(`${year}-${String(month).padStart(2,'0')}`)
+    const lastDay        = isCurrentMonth ? parseInt(today.split('-')[2], 10) : daysInMonth
+    const allDays        = Array.from({ length: lastDay }, (_, i) => {
       const d = new Date(year, month - 1, i + 1)
       return { date: d.toLocaleDateString('sv-SE'), day: d.toLocaleDateString('en', { weekday: 'short' }) }
     })

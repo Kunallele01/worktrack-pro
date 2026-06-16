@@ -48,9 +48,27 @@ function CorrectionForm({ user, history, onSuccess }) {
   const [reason,  setReason ] = useState('')
   const [busy,    setBusy   ] = useState(false)
 
-  const ct        = CORR_TYPES.find(c => c.value === type) || CORR_TYPES[0]
-  const dateOpts  = history.map(r => ({ value: r.date, label: `${r.date} — ${r.status || '—'}` }))
-  const dateOptsFull = [{ value: '', label: 'Select a date…' }, ...dateOpts]
+  const ct = CORR_TYPES.find(c => c.value === type) || CORR_TYPES[0]
+
+  const dateOptsFull = (() => {
+    const histMap  = Object.fromEntries(history.map(r => [r.date, r.status]))
+    const now2     = new Date()
+    const todayStr = now2.toLocaleDateString('sv-SE')
+    const yr       = now2.getFullYear()
+    const mo       = now2.getMonth() + 1
+    const dim      = new Date(yr, mo, 0).getDate()
+    const STATUS_LABEL = { in_office: 'In Office', wfh: 'WFH', absent: 'Absent', auto_checkout: 'Auto-out' }
+    const opts = [{ value: '', label: 'Select a date…' }]
+    for (let d = 1; d <= dim; d++) {
+      const dateStr = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+      if (dateStr > todayStr) break
+      const dow = new Date(yr, mo - 1, d).getDay()
+      if (dow === 0 || dow === 6) continue
+      const st = histMap[dateStr]
+      opts.push({ value: dateStr, label: `${dateStr} — ${STATUS_LABEL[st] || (st ? st : 'No record')}` })
+    }
+    return opts
+  })()
 
   const submit = async (e) => {
     e.preventDefault()
