@@ -1411,13 +1411,19 @@ export async function sendCheckInReminders() {
   const pass     = settings.smtp_password?.trim()
   if (!host || !user || !pass) return 0
 
-  const { data: allEmps } = await supabase.from('profiles')
-    .select('id,full_name,email').eq('is_active', true).eq('is_admin', false)
-  const { data: checkins } = await supabase.from('attendance')
-    .select('user_id').eq('date', today).not('check_in_time', 'is', null)
+  // Skip on company holidays
+  const { data: todayHoliday } = await supabase.from('holidays').select('date').eq('date', today).limit(1)
+  if ((todayHoliday || []).length > 0) return 0
 
-  const checkedIds = new Set((checkins || []).map(r => r.user_id))
-  const missing    = (allEmps || []).filter(e => !checkedIds.has(e.id) && e.email)
+  const [{ data: allEmps }, { data: checkins }, { data: onLeave }] = await Promise.all([
+    supabase.from('profiles').select('id,full_name,email').eq('is_active', true).eq('is_admin', false),
+    supabase.from('attendance').select('user_id').eq('date', today).not('check_in_time', 'is', null),
+    supabase.from('leave_requests').select('user_id').eq('status', 'approved').lte('start_date', today).gte('end_date', today),
+  ])
+
+  const checkedIds  = new Set((checkins  || []).map(r => r.user_id))
+  const onLeaveIds  = new Set((onLeave   || []).map(r => r.user_id))
+  const missing     = (allEmps || []).filter(e => !checkedIds.has(e.id) && !onLeaveIds.has(e.id) && e.email)
   if (!missing.length) return 0
 
   await Promise.allSettled(missing.map(emp =>
@@ -1433,7 +1439,6 @@ export async function sendCheckInReminders() {
         <div style="background:#f8fafc;padding:20px 24px;border:1px solid #e2e8f0;border-radius:0 0 10px 10px;">
           <p style="color:#334155;">Hi <strong>${emp.full_name}</strong>,</p>
           <p style="color:#475569;">It looks like you haven't checked in yet today. Open WorkTrack Pro and mark your attendance!</p>
-          <p style="color:#94a3b8;font-size:12px;">If you are on leave today, please ignore this message.</p>
         </div>
       </div>`,
     })

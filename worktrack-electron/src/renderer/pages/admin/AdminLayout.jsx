@@ -9,6 +9,8 @@ import { BirthdayManager } from '../../components/BirthdayEffects'
 
 function checkAndSendReminders(settings) {
   if (settings.reminder_enabled !== 'true') return
+  const ist = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+  if (ist.getDay() === 0 || ist.getDay() === 6) return   // never on weekends
   const today  = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Kolkata' })
   const cacheK = `wt_reminder_sent_${today}`
   if (localStorage.getItem(cacheK)) return  // Already sent today
