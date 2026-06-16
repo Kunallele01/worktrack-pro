@@ -134,6 +134,12 @@ function CorrectionForm({ user, history, onSuccess }) {
 }
 
 function MyRequests({ requests }) {
+  const [showOlder, setShowOlder] = useState(false)
+
+  const thisMonth  = new Date().toLocaleDateString('sv-SE').slice(0, 7)
+  const mainItems  = requests.filter(r => r.status === 'pending' || (r.created_at || '').startsWith(thisMonth))
+  const olderItems = requests.filter(r => r.status !== 'pending' && !(r.created_at || '').startsWith(thisMonth))
+
   if (!requests.length) return (
     <Card>
       <EmptyState emoji="✍️" title="No correction requests yet"
@@ -142,7 +148,7 @@ function MyRequests({ requests }) {
   )
   return (
     <div className="flex flex-col gap-3">
-      {requests.map(r => {
+      {mainItems.map(r => {
         const ct  = CORR_TYPES.find(c => c.value === r.type) || CORR_TYPES[3]
         const cm  = CORR_META[r.type] || CORR_META.other
         const sa  = STATUS_ACCENT[r.status] || STATUS_ACCENT.pending
@@ -202,6 +208,48 @@ function MyRequests({ requests }) {
           </motion.div>
         )
       })}
+
+      {olderItems.length > 0 && (
+        <>
+          <button
+            onClick={() => setShowOlder(s => !s)}
+            className="text-xs text-gray-500 hover:text-gray-300 text-center py-2 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] transition-all"
+          >
+            {showOlder
+              ? '↑ Hide older requests'
+              : `↓ Show ${olderItems.length} older request${olderItems.length !== 1 ? 's' : ''}`}
+          </button>
+          {showOlder && olderItems.map(r => {
+            const ct = CORR_TYPES.find(c => c.value === r.type) || CORR_TYPES[3]
+            const cm = CORR_META[r.type] || CORR_META.other
+            const sa = STATUS_ACCENT[r.status] || STATUS_ACCENT.pending
+            return (
+              <motion.div key={r.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+                <Card className={`p-4 border-l-4 ${sa.border} opacity-70`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`w-9 h-9 rounded-xl ${cm.bg} border ${cm.border} flex items-center justify-center text-base shrink-0`}>
+                      {cm.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                        <p className={`text-xs font-bold ${cm.color}`}>{ct.label.replace(/^.+ /, '')}</p>
+                        <span className="text-xs font-mono text-gray-500">{r.date}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ml-auto ${sa.badge}`}>{sa.label}</span>
+                      </div>
+                      <p className="text-xs text-gray-400 leading-relaxed italic line-clamp-2">"{r.reason}"</p>
+                      {r.admin_note && (
+                        <p className="text-xs text-gray-500 mt-1.5 px-2.5 py-1.5 bg-white/[0.03] rounded-lg border border-white/[0.05]">
+                          <span className="text-gray-600">Admin note: </span>{r.admin_note}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              </motion.div>
+            )
+          })}
+        </>
+      )}
     </div>
   )
 }

@@ -277,8 +277,9 @@ function LeaveInner() {
   const [requests, setRequests] = useState([])
   const [holidays, setHolidays] = useState([])
   const [quotas,   setQuotas  ] = useState({})
-  const [applying, setApplying] = useState(false)
-  const [filter,   setFilter  ] = useState('all')
+  const [applying,   setApplying  ] = useState(false)
+  const [filter,     setFilter    ] = useState('all')
+  const [showOlder,  setShowOlder ] = useState(false)
 
   // Mark leaves as seen — clears the sidebar badge
   useEffect(() => {
@@ -311,8 +312,11 @@ function LeaveInner() {
 
   useEffect(() => { load() }, [load])
 
-  const filtered = filter === 'all' ? requests : requests.filter(r => r.status === filter)
-  const pending  = requests.filter(r => r.status === 'pending').length
+  const filtered   = filter === 'all' ? requests : requests.filter(r => r.status === filter)
+  const pending    = requests.filter(r => r.status === 'pending').length
+  const thisMonth  = new Date().toLocaleDateString('sv-SE').slice(0, 7)
+  const mainItems  = filtered.filter(r => r.status === 'pending' || (r.created_at || '').startsWith(thisMonth))
+  const olderItems = filtered.filter(r => r.status !== 'pending' && !(r.created_at || '').startsWith(thisMonth))
 
   return (
     <>
@@ -348,7 +352,7 @@ function LeaveInner() {
               </h2>
               <div className="flex gap-1">
                 {['all','pending','approved','rejected'].map(f => (
-                  <button key={f} onClick={() => setFilter(f)}
+                  <button key={f} onClick={() => { setFilter(f); setShowOlder(false) }}
                     className={`text-xs px-3 py-1.5 rounded-full transition-colors capitalize font-medium
                       ${filter === f ? 'bg-accent-500/20 text-accent-400' : 'text-gray-500 hover:text-gray-300'}`}>
                     {f}
@@ -357,14 +361,27 @@ function LeaveInner() {
               </div>
             </div>
 
-            {filtered.length === 0 ? (
+            {mainItems.length === 0 && olderItems.length === 0 ? (
               <Card>
                 <EmptyState emoji="🏖️" title="No leave requests yet"
                   subtitle={filter === 'all' ? 'Apply for leave using the button above and your requests will appear here.' : `No ${filter} leave requests to show.`} />
               </Card>
             ) : (
               <div className="flex flex-col gap-3">
-                {filtered.map(r => <RequestCard key={r.id} req={r} />)}
+                {mainItems.map(r => <RequestCard key={r.id} req={r} />)}
+                {olderItems.length > 0 && (
+                  <>
+                    <button
+                      onClick={() => setShowOlder(s => !s)}
+                      className="text-xs text-gray-500 hover:text-gray-300 text-center py-2 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] transition-all"
+                    >
+                      {showOlder
+                        ? '↑ Hide older requests'
+                        : `↓ Show ${olderItems.length} older request${olderItems.length !== 1 ? 's' : ''}`}
+                    </button>
+                    {showOlder && olderItems.map(r => <RequestCard key={r.id} req={r} />)}
+                  </>
+                )}
               </div>
             )}
           </div>
