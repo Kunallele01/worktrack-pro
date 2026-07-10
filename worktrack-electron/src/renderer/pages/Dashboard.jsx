@@ -116,6 +116,21 @@ function SkyCanvas({ type, phase }) {
     let W = 0, H = 0, parts = [], stars = []
     const rnd = (a, b) => a + Math.random() * (b - a)
 
+    // Build a fresh, uniquely-shaped cloud (regenerated each time one wraps around).
+    // Bounded lump sizes keep the silhouette varied but never comically abnormal.
+    function makeCloud() {
+      const w = rnd(120, 205), h = rnd(13, 24)
+      const n = 3 + Math.floor(rnd(0, 2.99))
+      const lumps = [{ dx: 0, dy: 0, rx: w, ry: h }]
+      for (let i = 0; i < n; i++) lumps.push({
+        dx: rnd(-w * 0.55, w * 0.55),
+        dy: -rnd(h * 0.15, h * 0.85),
+        rx: rnd(w * 0.30, w * 0.52),
+        ry: rnd(h * 0.70, h * 1.25),
+      })
+      return { w, h, v: rnd(11, 19), a: rnd(0.05, 0.09), lumps }
+    }
+
     function init() {
       parts = []
       // Stars fill the whole pill at night/dawn/dusk — never in daylight, and not during
@@ -129,7 +144,7 @@ function SkyCanvas({ type, phase }) {
       } else if (type === 'snow') {
         for (let i = 0; i < 60; i++) parts.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(1, 2.6), v: rnd(18, 42), drift: rnd(-14, 14), ph: rnd(0, 6.28), a: rnd(0.3, 0.8) })
       } else if (type === 'clouds') {
-        for (let i = 0; i < 3; i++) parts.push({ x: rnd(0, W), y: rnd(H * 0.14, H * 0.48), w: rnd(130, 210), h: rnd(14, 26), v: rnd(11, 19), a: rnd(0.05, 0.09) })
+        for (let i = 0; i < 3; i++) parts.push({ ...makeCloud(), x: rnd(0, W), y: rnd(H * 0.14, H * 0.48) })
       }
     }
     function resize() {
@@ -173,16 +188,22 @@ function SkyCanvas({ type, phase }) {
           if (p.y > H) { p.y = -4; p.x = rnd(0, W) }
         }
       } else if (type === 'clouds') {
-        // Soft wide haze wisps — heavily blurred, dim at night, warm at dawn/dusk
+        // Soft wide haze wisps — heavily blurred, dim at night, warm at dawn/dusk.
+        // Each cloud regenerates a fresh silhouette (in place) when it wraps around.
         const cloudCol = phase === 'night' ? '#5d6b85' : phase === 'day' ? '#cdd8e8' : '#d3c1bf'
         ctx.filter = 'blur(11px)'
         ctx.fillStyle = cloudCol
         for (const p of parts) {
           ctx.globalAlpha = p.a
-          ctx.beginPath(); ctx.ellipse(p.x, p.y, p.w, p.h, 0, 0, 6.283); ctx.fill()
-          ctx.beginPath(); ctx.ellipse(p.x - p.w * 0.25, p.y - p.h * 0.5, p.w * 0.55, p.h * 0.8, 0, 0, 6.283); ctx.fill()
+          for (const l of p.lumps) {
+            ctx.beginPath(); ctx.ellipse(p.x + l.dx, p.y + l.dy, l.rx, l.ry, 0, 0, 6.283); ctx.fill()
+          }
           p.x += p.v * dt
-          if (p.x - p.w > W) { p.x = -p.w; p.y = rnd(H * 0.14, H * 0.48) }
+          if (p.x - p.w > W) {
+            const c = makeCloud()
+            p.w = c.w; p.h = c.h; p.v = c.v; p.a = c.a; p.lumps = c.lumps
+            p.x = -c.w; p.y = rnd(H * 0.14, H * 0.48)
+          }
         }
         ctx.filter = 'none'
       }
