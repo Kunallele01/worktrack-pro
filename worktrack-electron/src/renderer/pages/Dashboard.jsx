@@ -152,17 +152,18 @@ function AttendanceScoreCard({ score, grade, consistency, punctuality, officePre
   const hex = GRADE_HEX[grade.label] || '#4F86F7'
 
   // Main gauge geometry — 270° arc, gap at the bottom
-  const R    = 60
+  const R    = 46
   const CIRC = 2 * Math.PI * R
   const SPAN = CIRC * 0.75
-  const CX   = 76
+  const GBOX = 120
+  const CX   = 60
 
-  // Mini ring geometry — viewBox 52 with the circle centered at 26 leaves ample
-  // margin so the round line-cap + drop-shadow never clip against the SVG edge
-  const mR    = 18
+  // Mini ring geometry — viewBox leaves margin so the round line-cap + drop-shadow
+  // never clip against the SVG edge
+  const mR    = 15
   const mCirc = 2 * Math.PI * mR
-  const mBox  = 52
-  const mCX   = 26
+  const mBox  = 42
+  const mCX   = 21
 
   const scoreRef = useRef(null)
   const arcRef   = useRef(null)
@@ -201,51 +202,49 @@ function AttendanceScoreCard({ score, grade, consistency, punctuality, officePre
   }, [score])
 
   return (
-    <Card className="p-4 relative overflow-hidden">
-      {/* Ambient glow behind the gauge only — colored by grade */}
-      <div
-        className="absolute rounded-full pointer-events-none"
-        style={{ top: 20, left: 12, width: 130, height: 130, background: `radial-gradient(circle, ${hex}22 0%, transparent 60%)`, filter: 'blur(18px)' }}
-      />
+    <Card className="p-4 relative shrink-0">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Attendance Score</p>
 
-      <div className="relative flex items-center gap-4">
+      <div className="flex items-center gap-4">
         {/* ── Main gauge ── */}
-        <div className="relative shrink-0" style={{ width: 152, height: 152 }}>
-          <svg width={152} height={152} viewBox="0 0 152 152">
+        <div className="relative shrink-0" style={{ width: GBOX, height: GBOX }}>
+          {/* Ambient glow behind the gauge — colored by grade */}
+          <div
+            className="absolute inset-0 rounded-full pointer-events-none"
+            style={{ background: `radial-gradient(circle, ${hex}26 0%, transparent 62%)`, filter: 'blur(14px)' }}
+          />
+          <svg width={GBOX} height={GBOX} viewBox={`0 0 ${GBOX} ${GBOX}`} className="relative">
             <defs>
               <linearGradient id="asc-grad" x1="0%" y1="100%" x2="100%" y2="0%">
                 <stop offset="0%"   stopColor={hex} stopOpacity="0.45" />
                 <stop offset="100%" stopColor={hex} />
               </linearGradient>
             </defs>
-            {/* Faint dotted inner ring for depth */}
-            <circle cx={CX} cy={CX} r={R - 11} fill="none" stroke="rgba(255,255,255,0.07)"
-              strokeWidth="1" strokeDasharray="1 6" />
             {/* Track */}
-            <circle cx={CX} cy={CX} r={R} fill="none" stroke="rgba(255,255,255,0.06)"
-              strokeWidth="10" strokeLinecap="round"
+            <circle cx={CX} cy={CX} r={R} fill="none" stroke="rgba(255,255,255,0.07)"
+              strokeWidth="8" strokeLinecap="round"
               strokeDasharray={`${SPAN} ${CIRC}`}
               transform={`rotate(135 ${CX} ${CX})`} />
             {/* Score arc */}
             <circle ref={arcRef} cx={CX} cy={CX} r={R} fill="none" stroke="url(#asc-grad)"
-              strokeWidth="10" strokeLinecap="round"
+              strokeWidth="8" strokeLinecap="round"
               strokeDasharray={`${SPAN} ${CIRC}`}
               strokeDashoffset={SPAN}
               transform={`rotate(135 ${CX} ${CX})`}
-              style={{ filter: `drop-shadow(0 0 5px ${hex}66)` }} />
+              style={{ filter: `drop-shadow(0 0 4px ${hex}66)` }} />
           </svg>
 
           {/* Center content */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span ref={scoreRef}
               className="text-3xl font-black font-mono tabular-nums leading-none text-gray-50"
-              style={{ textShadow: `0 0 18px ${hex}55` }}>0</span>
+              style={{ textShadow: `0 0 16px ${hex}55` }}>0</span>
             <span className="text-[9px] text-gray-500 font-medium mt-0.5">of 100</span>
             <motion.span
               initial={{ opacity: 0, scale: 0.8, y: 4 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{ delay: 1.4, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className={`mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full ${grade.bg} ${grade.color} border border-white/10`}
+              className={`mt-1 inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full ${grade.bg} ${grade.color} border border-white/10`}
             >
               <span className="w-1 h-1 rounded-full animate-pulse" style={{ background: hex }} />
               {grade.label}
@@ -254,10 +253,9 @@ function AttendanceScoreCard({ score, grade, consistency, punctuality, officePre
         </div>
 
         {/* ── Sub-score rings ── */}
-        <div className="relative flex-1 grid grid-cols-3 gap-1.5">
-          <p className="col-span-3 text-xs font-semibold text-gray-500 uppercase tracking-widest -mt-1 mb-0.5">Attendance Score</p>
+        <div className="flex-1 grid grid-cols-3 gap-1.5">
           {rings.map(({ label, value, max, color, glow }, i) => (
-            <div key={label} className="flex flex-col items-center gap-1 py-1.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+            <div key={label} className="flex flex-col items-center gap-0.5 py-2 rounded-xl bg-white/[0.02] border border-white/[0.05]">
               <div className="relative" style={{ width: mBox, height: mBox }}>
                 <svg width={mBox} height={mBox} viewBox={`0 0 ${mBox} ${mBox}`}>
                   <circle cx={mCX} cy={mCX} r={mR} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
@@ -275,16 +273,14 @@ function AttendanceScoreCard({ score, grade, consistency, punctuality, officePre
                   </span>
                 </div>
               </div>
-              <div className="text-center leading-tight">
-                <p className="text-[9px] font-semibold text-gray-400 truncate w-full">{label}</p>
-                <p className="text-[8px] text-gray-600 font-mono">/ {max}</p>
-              </div>
+              <p className="text-[9px] font-semibold text-gray-400 leading-tight mt-0.5">{label}</p>
+              <p className="text-[8px] text-gray-600 font-mono leading-none">/ {max}</p>
             </div>
           ))}
         </div>
       </div>
 
-      <p className="relative text-[10px] text-gray-600 mt-2 text-center">
+      <p className="text-[10px] text-gray-600 mt-2 text-center">
         Based on {passedWD} of {totalWD} working days in {monthName}
       </p>
     </Card>
