@@ -157,10 +157,12 @@ function AttendanceScoreCard({ score, grade, consistency, punctuality, officePre
   const SPAN = CIRC * 0.75
   const CX   = 76
 
-  // Mini ring geometry
+  // Mini ring geometry — viewBox 52 with the circle centered at 26 leaves ample
+  // margin so the round line-cap + drop-shadow never clip against the SVG edge
   const mR    = 18
   const mCirc = 2 * Math.PI * mR
-  const mCX   = 22
+  const mBox  = 52
+  const mCX   = 26
 
   const scoreRef = useRef(null)
   const arcRef   = useRef(null)
@@ -256,8 +258,8 @@ function AttendanceScoreCard({ score, grade, consistency, punctuality, officePre
           <p className="col-span-3 text-xs font-semibold text-gray-500 uppercase tracking-widest -mt-1 mb-0.5">Attendance Score</p>
           {rings.map(({ label, value, max, color, glow }, i) => (
             <div key={label} className="flex flex-col items-center gap-1 py-1.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-              <div className="relative" style={{ width: 44, height: 44 }}>
-                <svg width={44} height={44} viewBox="0 0 44 44">
+              <div className="relative" style={{ width: mBox, height: mBox }}>
+                <svg width={mBox} height={mBox} viewBox={`0 0 ${mBox} ${mBox}`}>
                   <circle cx={mCX} cy={mCX} r={mR} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
                   <circle ref={el => ringRefs.current[i] = el}
                     cx={mCX} cy={mCX} r={mR} fill="none" stroke={color}
