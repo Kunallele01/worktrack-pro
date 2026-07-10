@@ -143,72 +143,149 @@ function TodayStatus({ record }) {
 }
 
 function AttendanceScoreCard({ score, grade, consistency, punctuality, officePresence, passedWD, totalWD, monthName }) {
-  const bars = [
-    { label: 'Consistency',     value: consistency,    max: 40, color: '#4F86F7' },
-    { label: 'Punctuality',     value: punctuality,    max: 35, color: '#10B981' },
-    { label: 'Office Presence', value: officePresence, max: 25, color: '#8B5CF6' },
+  const rings = [
+    { label: 'Consistency', value: consistency,    max: 40, color: '#4F86F7', glow: 'rgba(79,134,247,0.45)'  },
+    { label: 'Punctuality', value: punctuality,    max: 35, color: '#10B981', glow: 'rgba(16,185,129,0.45)'  },
+    { label: 'Presence',    value: officePresence, max: 25, color: '#8B5CF6', glow: 'rgba(139,92,246,0.45)'  },
   ]
-  const barRefs  = useRef([])
+  const GRADE_HEX = { 'Excellent': '#10B981', 'Good': '#4F86F7', 'Fair': '#F59E0B', 'At Risk': '#EF4444' }
+  const hex = GRADE_HEX[grade.label] || '#4F86F7'
+
+  // Main gauge geometry — 270° arc, gap at the bottom
+  const R    = 86
+  const CIRC = 2 * Math.PI * R
+  const SPAN = CIRC * 0.75
+
+  // Mini ring geometry
+  const mR    = 26
+  const mCirc = 2 * Math.PI * mR
+
   const scoreRef = useRef(null)
+  const arcRef   = useRef(null)
+  const ringRefs = useRef([])
 
   useEffect(() => {
-    // Stagger bars one after another
-    const tl = gsap.timeline({ delay: 0.3 })
-    barRefs.current.forEach((el, i) => {
+    const pct = Math.min(100, Math.max(0, score)) / 100
+    const tl  = gsap.timeline({ delay: 0.25 })
+
+    // Main arc sweeps from empty to score
+    if (arcRef.current) {
+      tl.fromTo(arcRef.current,
+        { strokeDashoffset: SPAN },
+        { strokeDashoffset: SPAN * (1 - pct), duration: 1.7, ease: 'power2.inOut' },
+        0,
+      )
+    }
+    // Mini rings stagger in after the main arc starts moving
+    ringRefs.current.forEach((el, i) => {
       if (!el) return
-      const pct = bars[i].max > 0 ? (bars[i].value / bars[i].max) * 100 : 0
+      const r  = rings[i]
+      const rp = r.max > 0 ? Math.min(1, Math.max(0, r.value / r.max)) : 0
       tl.fromTo(el,
-        { width: '0%' },
-        { width: `${pct}%`, duration: 1.1, ease: 'sine.inOut' },
-        i * 0.28,
+        { strokeDashoffset: mCirc },
+        { strokeDashoffset: mCirc * (1 - rp), duration: 1.05, ease: 'sine.inOut' },
+        0.45 + i * 0.22,
       )
     })
     // Count up the score number
-    if (scoreRef.current) {
-      const obj = { val: 0 }
-      gsap.to(obj, {
-        val: score, duration: 1.8, ease: 'power2.inOut', delay: 0.3,
-        onUpdate: () => { if (scoreRef.current) scoreRef.current.textContent = Math.round(obj.val) },
-      })
-    }
-    return () => { tl.kill(); gsap.killTweensOf({}) }
+    const obj = { val: 0 }
+    const counter = gsap.to(obj, {
+      val: score, duration: 1.8, ease: 'power2.inOut', delay: 0.25,
+      onUpdate: () => { if (scoreRef.current) scoreRef.current.textContent = Math.round(obj.val) },
+    })
+    return () => { tl.kill(); counter.kill() }
   }, [score])
 
   return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Attendance Score</p>
-        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${grade.bg} ${grade.color}`}>
-          {grade.label}
-        </span>
-      </div>
+    <Card className="p-5 relative overflow-hidden">
+      {/* Ambient glow behind the gauge — colored by grade */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 rounded-full pointer-events-none"
+        style={{ top: 16, width: 260, height: 260, background: `radial-gradient(circle, ${hex}30 0%, transparent 65%)`, filter: 'blur(30px)' }}
+      />
 
-      <div className="flex items-end gap-2 mb-5">
-        <span ref={scoreRef} className={`text-4xl font-black font-mono tabular-nums leading-none ${grade.color}`}>0</span>
-        <span className="text-base text-gray-600 mb-1.5">/ 100</span>
-      </div>
+      <p className="relative text-xs font-semibold text-gray-500 uppercase tracking-widest text-center mb-1">
+        Attendance Score
+      </p>
 
-      <div className="flex flex-col gap-3">
-        {bars.map(({ label, value, max, color }, i) => (
-          <div key={label}>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs text-gray-400">{label}</span>
-              <span className="text-xs font-mono text-gray-400">
-                {Math.round(value)}<span className="text-gray-600">/{max}</span>
-              </span>
+      {/* ── Main gauge ── */}
+      <div className="relative flex justify-center">
+        <div className="relative" style={{ width: 216, height: 216 }}>
+          <svg width={216} height={216} viewBox="0 0 216 216">
+            <defs>
+              <linearGradient id="asc-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%"   stopColor={hex} stopOpacity="0.45" />
+                <stop offset="100%" stopColor={hex} />
+              </linearGradient>
+            </defs>
+            {/* Faint dotted inner ring for depth */}
+            <circle cx="108" cy="108" r={R - 15} fill="none" stroke="rgba(255,255,255,0.07)"
+              strokeWidth="1" strokeDasharray="1 7" />
+            {/* Track */}
+            <circle cx="108" cy="108" r={R} fill="none" stroke="rgba(255,255,255,0.06)"
+              strokeWidth="13" strokeLinecap="round"
+              strokeDasharray={`${SPAN} ${CIRC}`}
+              transform="rotate(135 108 108)" />
+            {/* Score arc */}
+            <circle ref={arcRef} cx="108" cy="108" r={R} fill="none" stroke="url(#asc-grad)"
+              strokeWidth="13" strokeLinecap="round"
+              strokeDasharray={`${SPAN} ${CIRC}`}
+              strokeDashoffset={SPAN}
+              transform="rotate(135 108 108)"
+              style={{ filter: `drop-shadow(0 0 6px ${hex}66)` }} />
+          </svg>
+
+          {/* Center content */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div className="flex items-baseline gap-1">
+              <span ref={scoreRef}
+                className="text-5xl font-black font-mono tabular-nums leading-none text-gray-50"
+                style={{ textShadow: `0 0 24px ${hex}55` }}>0</span>
             </div>
-            <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-              <div
-                ref={el => barRefs.current[i] = el}
-                className="h-full rounded-full"
-                style={{ width: 0, background: color }}
-              />
+            <span className="text-[11px] text-gray-500 font-medium mt-1">of 100</span>
+            <motion.span
+              initial={{ opacity: 0, scale: 0.8, y: 4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ delay: 1.4, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className={`mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full ${grade.bg} ${grade.color} border border-white/10`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: hex }} />
+              {grade.label}
+            </motion.span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Sub-score rings ── */}
+      <div className="relative grid grid-cols-3 gap-2 mt-1">
+        {rings.map(({ label, value, max, color, glow }, i) => (
+          <div key={label} className="flex flex-col items-center gap-1.5 py-2 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+            <div className="relative" style={{ width: 64, height: 64 }}>
+              <svg width={64} height={64} viewBox="0 0 64 64">
+                <circle cx="32" cy="32" r={mR} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
+                <circle ref={el => ringRefs.current[i] = el}
+                  cx="32" cy="32" r={mR} fill="none" stroke={color}
+                  strokeWidth="5" strokeLinecap="round"
+                  strokeDasharray={mCirc}
+                  strokeDashoffset={mCirc}
+                  transform="rotate(-90 32 32)"
+                  style={{ filter: `drop-shadow(0 0 4px ${glow})` }} />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-sm font-bold font-mono tabular-nums" style={{ color }}>
+                  {Math.round(value)}
+                </span>
+              </div>
+            </div>
+            <div className="text-center leading-tight">
+              <p className="text-[10px] font-semibold text-gray-400">{label}</p>
+              <p className="text-[9px] text-gray-600 font-mono">/ {max}</p>
             </div>
           </div>
         ))}
       </div>
 
-      <p className="text-[10px] text-gray-600 mt-4">
+      <p className="relative text-[10px] text-gray-600 mt-3 text-center">
         Based on {passedWD} of {totalWD} working days in {monthName}
       </p>
     </Card>
