@@ -118,9 +118,10 @@ function SkyCanvas({ type, phase }) {
 
     function init() {
       parts = []
-      const showStars = phase !== 'day' && type !== 'rain' && type !== 'snow' && type !== 'storm'
+      // Stars fill the whole pill (except during heavy precip, where drops/flakes dominate)
+      const showStars = type !== 'rain' && type !== 'snow' && type !== 'storm'
       stars = showStars
-        ? Array.from({ length: 46 }, () => ({ x: rnd(0, W), y: rnd(0, H * 0.7), r: rnd(0.4, 1.3), p: rnd(0, 6.28), s: rnd(0.8, 2.4) }))
+        ? Array.from({ length: 84 }, () => ({ x: rnd(0, W), y: rnd(0, H), r: rnd(0.4, 1.5), p: rnd(0, 6.28), s: rnd(0.8, 2.4) }))
         : []
       if (type === 'rain' || type === 'storm') {
         for (let i = 0; i < 95; i++) parts.push({ x: rnd(0, W), y: rnd(0, H), len: rnd(8, 18), v: rnd(360, 560), a: rnd(0.08, 0.28) })
@@ -233,12 +234,12 @@ function OdoClock({ now }) {
   const ss = String(now.getSeconds()).padStart(2, '0')
   const big = 46, small = 22
   return (
-    <div className="flex items-end justify-center font-mono font-black text-gray-50" style={{ letterSpacing: '-1px' }}>
+    <div className="flex items-center justify-center font-mono font-black text-gray-50" style={{ letterSpacing: '-1px' }}>
       <OdoDigit d={+hh[0]} size={big} /><OdoDigit d={+hh[1]} size={big} />
       <span className="text-gray-500 animate-pulse font-black" style={{ fontSize: big * 0.72, lineHeight: `${big}px`, margin: '0 2px' }}>:</span>
       <OdoDigit d={+mm[0]} size={big} /><OdoDigit d={+mm[1]} size={big} />
-      <span className="flex items-end text-gray-400 font-light ml-1.5" style={{ height: big }}>
-        <span style={{ fontSize: small * 0.8, lineHeight: `${small}px` }}>:</span>
+      <span className="flex items-center text-gray-400 font-light ml-1.5">
+        <span style={{ fontSize: small * 0.8, lineHeight: `${small}px`, marginRight: 1 }}>:</span>
         <OdoDigit d={+ss[0]} size={small} /><OdoDigit d={+ss[1]} size={small} />
       </span>
     </div>
