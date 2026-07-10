@@ -129,7 +129,7 @@ function SkyCanvas({ type, phase }) {
       } else if (type === 'snow') {
         for (let i = 0; i < 60; i++) parts.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(1, 2.6), v: rnd(18, 42), drift: rnd(-14, 14), ph: rnd(0, 6.28), a: rnd(0.3, 0.8) })
       } else if (type === 'clouds') {
-        for (let i = 0; i < 5; i++) parts.push({ x: rnd(0, W), y: rnd(H * 0.1, H * 0.55), w: rnd(90, 180), h: rnd(24, 44), v: rnd(4, 10), a: rnd(0.05, 0.12) })
+        for (let i = 0; i < 3; i++) parts.push({ x: rnd(0, W), y: rnd(H * 0.14, H * 0.48), w: rnd(130, 210), h: rnd(14, 26), v: rnd(11, 19), a: rnd(0.05, 0.09) })
       }
     }
     function resize() {
@@ -173,15 +173,18 @@ function SkyCanvas({ type, phase }) {
           if (p.y > H) { p.y = -4; p.x = rnd(0, W) }
         }
       } else if (type === 'clouds') {
+        // Soft wide haze wisps — heavily blurred, dim at night, warm at dawn/dusk
+        const cloudCol = phase === 'night' ? '#5d6b85' : phase === 'day' ? '#cdd8e8' : '#d3c1bf'
+        ctx.filter = 'blur(11px)'
+        ctx.fillStyle = cloudCol
         for (const p of parts) {
           ctx.globalAlpha = p.a
-          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.w)
-          g.addColorStop(0, '#cbd6e6'); g.addColorStop(1, 'transparent')
-          ctx.fillStyle = g
           ctx.beginPath(); ctx.ellipse(p.x, p.y, p.w, p.h, 0, 0, 6.283); ctx.fill()
+          ctx.beginPath(); ctx.ellipse(p.x - p.w * 0.25, p.y - p.h * 0.5, p.w * 0.55, p.h * 0.8, 0, 0, 6.283); ctx.fill()
           p.x += p.v * dt
-          if (p.x - p.w > W) { p.x = -p.w; p.y = rnd(H * 0.1, H * 0.55) }
+          if (p.x - p.w > W) { p.x = -p.w; p.y = rnd(H * 0.14, H * 0.48) }
         }
+        ctx.filter = 'none'
       }
       ctx.globalAlpha = 1
 
@@ -315,15 +318,19 @@ function SkyHeader({ lat, lon }) {
     <div className="relative shrink-0 overflow-hidden rounded-2xl border border-white/[0.06]" style={{ height: 216 }}>
       {/* Sky base gradient */}
       <div className="absolute inset-0" style={{ background: `linear-gradient(168deg, ${pal[0]}, ${pal[1]} 52%, ${pal[2]})`, transition: 'background 2s ease' }} />
-      {/* Sun / moon celestial glow — drifts across with the day */}
-      <div className="absolute rounded-full pointer-events-none"
-        style={{
-          top: sky.isNight ? '14%' : `${18 - Math.sin(sky.sunT * Math.PI) * 10}%`,
-          left: `${glowX}%`, transform: 'translate(-50%,-50%)',
-          width: 210, height: 210,
-          background: `radial-gradient(circle, ${SKY_GLOW[sky.phase]} 0%, transparent 65%)`,
-          filter: 'blur(6px)', transition: 'background 2s ease',
-        }} />
+      {/* Sun / moon — a bright disc with a soft halo, drifting across with the day */}
+      {(() => {
+        const isN     = sky.isNight
+        const bodyTop = isN ? '22%' : `${16 - Math.sin(sky.sunT * Math.PI) * 8}%`
+        const disc    = isN ? '#e7edf9' : sky.phase === 'day' ? '#ffe4a0' : '#ffb277'
+        const ds      = isN ? 20 : 30
+        return (
+          <div className="absolute pointer-events-none" style={{ left: `${glowX}%`, top: bodyTop, width: 0, height: 0 }}>
+            <div className="absolute rounded-full" style={{ width: 200, height: 200, transform: 'translate(-50%,-50%)', background: `radial-gradient(circle, ${SKY_GLOW[sky.phase]} 0%, transparent 60%)` }} />
+            <div className="absolute rounded-full" style={{ width: ds, height: ds, transform: 'translate(-50%,-50%)', background: disc, boxShadow: `0 0 22px 5px ${disc}80`, opacity: 0.95 }} />
+          </div>
+        )
+      })()}
       {/* Weather particles */}
       <SkyCanvas type={type} phase={sky.phase} />
 
