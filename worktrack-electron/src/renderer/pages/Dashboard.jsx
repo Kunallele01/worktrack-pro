@@ -231,7 +231,7 @@ function OdoClock({ now }) {
   const hh = String(now.getHours()).padStart(2, '0')
   const mm = String(now.getMinutes()).padStart(2, '0')
   const ss = String(now.getSeconds()).padStart(2, '0')
-  const big = 54, small = 24
+  const big = 46, small = 22
   return (
     <div className="flex items-end justify-center font-mono font-black text-gray-50" style={{ letterSpacing: '-1px' }}>
       <OdoDigit d={+hh[0]} size={big} /><OdoDigit d={+hh[1]} size={big} />
@@ -310,7 +310,7 @@ function SkyHeader({ lat, lon }) {
   const info  = w ? wmoInfo(w.code) : null
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/[0.06]" style={{ height: 210 }}>
+    <div className="relative shrink-0 overflow-hidden rounded-2xl border border-white/[0.06]" style={{ height: 216 }}>
       {/* Sky base gradient */}
       <div className="absolute inset-0" style={{ background: `linear-gradient(168deg, ${pal[0]}, ${pal[1]} 52%, ${pal[2]})`, transition: 'background 2s ease' }} />
       {/* Sun / moon celestial glow — drifts across with the day */}
