@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { Download, RefreshCw, X } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { AnimatePresence, motion } from 'framer-motion'
-import { getAllAttendance, getUsers, getSettings } from '../../lib/supabase'
+import { getAllAttendance, getUsers, getSettings, getAllLeaveRequests } from '../../lib/supabase'
 import { Card, Button, Select, Avatar } from '../../components/ui'
 import { useToast } from '../../components/ui'
 import { format } from 'date-fns'
@@ -37,9 +37,12 @@ function calcHours(ci, co) {
 function attendancePct(present, workdays) { return workdays > 0 ? Math.round(present / workdays * 100) : 0 }
 function pctColor(p) { return p >= 80 ? 'FF059669' : p >= 60 ? 'FFD97706' : 'FFDC2626' }
 
-function calcPunctualityScore(records, lateThreshold) {
+// denom = working days minus approved-leave days; absent days count as 0 punctuality.
+// Falls back to present-day count if no denominator is supplied.
+function calcPunctualityScore(records, lateThreshold, denom) {
   const present = records.filter(r => ['in_office','wfh'].includes(r.status))
-  if (!present.length) return 0
+  const d = denom ?? present.length
+  if (d === 0) return 0
   const sum = present.reduce((acc, r) => {
     if (!r.is_late || !r.check_in_time) return acc + 1
     const parts = new Intl.DateTimeFormat('en-GB', {
@@ -49,7 +52,7 @@ function calcPunctualityScore(records, lateThreshold) {
     const m = parseInt(parts.find(p => p.type === 'minute').value, 10)
     return acc + Math.min(1, Math.max(0, 1 - ((h * 60 + m) - lateThreshold) / 60))
   }, 0)
-  return (sum / present.length) * 35
+  return Math.min(1, sum / d) * 35
 }
 
 function calcScore(present, inOffice, workdays, punctualityScore) {
@@ -599,7 +602,7 @@ function MonthCalendar({ records, year, month }) {
 }
 
 function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
-  const { full_name, employee_id, department, score, present, wfh, inOffice, late, absent, records = [] } = row
+  const { full_name, employee_id, department, score, present, wfh, inOffice, late, absent, punctDenom, records = [] } = row
   const grade = scoreGrade(score)
 
   const officeStartMin = (() => {
@@ -608,9 +611,9 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
   })()
   const graceMin = parseInt(settings?.grace_period_minutes || '10', 10)
 
-  const consistency    = workdays > 0 ? (present / workdays) * 40                : 0
-  const punctuality    = calcPunctualityScore(records, officeStartMin + graceMin)
-  const officePresence = present  > 0 ? (inOffice / present) * 25                : 0
+  const consistency    = workdays > 0 ? (present / workdays) * 40                          : 0
+  const punctuality    = calcPunctualityScore(records, officeStartMin + graceMin, punctDenom ?? workdays)
+  const officePresence = present  > 0 ? (inOffice / present) * 25                          : 0
 
   const avgHours = (() => {
     const withBoth = records.filter(r => r.check_in_time && r.check_out_time)
@@ -723,10 +726,11 @@ export default function Reports() {
     try {
       const start = `${year}-${String(month).padStart(2,'0')}-01`
       const end   = `${year}-${String(month).padStart(2,'0')}-${new Date(year, month, 0).getDate()}`
-      const [{ items: allItems }, users, settings] = await Promise.all([
+      const [{ items: allItems }, users, settings, approvedLeaves] = await Promise.all([
         getAllAttendance({ start, end, limit: 5000 }),
         getUsers(),
         getSettings(),
+        getAllLeaveRequests('approved'),
       ])
       // Only non-admin employees for analytics
       const empUsers = users.filter(u => !u.is_admin)
@@ -750,6 +754,24 @@ export default function Reports() {
       const graceMin = parseInt(settings?.grace_period_minutes || '10', 10)
       const lateThreshold = officeStartMin + graceMin
 
+      // Approved-leave working days in the report window (elapsed only for current month), per user
+      const monthPrefix = `${year}-${String(month).padStart(2,'0')}`
+      const cutoff      = isCurrentMonth
+        ? today.toLocaleDateString('sv-SE')
+        : `${monthPrefix}-${String(dim).padStart(2,'0')}`
+      const leaveWDByUser = {}
+      ;(approvedLeaves || []).forEach(l => {
+        const cur = new Date(l.start_date + 'T12:00:00')
+        const end = new Date(l.end_date   + 'T12:00:00')
+        const set = leaveWDByUser[l.user_id] || (leaveWDByUser[l.user_id] = new Set())
+        while (cur <= end) {
+          const ds  = cur.toLocaleDateString('sv-SE')
+          const dow = cur.getDay()
+          if (dow !== 0 && dow !== 6 && ds.startsWith(monthPrefix) && ds <= cutoff) set.add(ds)
+          cur.setDate(cur.getDate() + 1)
+        }
+      })
+
       const byUser = {}
       items.forEach(r => {
         if (!byUser[r.user_id]) byUser[r.user_id] = []
@@ -757,16 +779,17 @@ export default function Reports() {
       })
 
       const rows = empUsers.map(u => {
-        const recs     = byUser[u.id] || []
-        const present  = recs.filter(r => ['in_office','wfh'].includes(r.status)).length
-        const wfh      = recs.filter(r => r.status === 'wfh').length
-        const inOffice = recs.filter(r => r.status === 'in_office').length
-        const late     = recs.filter(r => r.is_late).length
-        const absent   = Math.max(0, workdays - present)
-        const pct      = workdays > 0 ? Math.round(present / workdays * 100) : 0
-        const punct    = calcPunctualityScore(recs, lateThreshold)
-        const score    = calcScore(present, inOffice, workdays, punct)
-        return { ...u, present, wfh, inOffice, late, absent, pct, score, records: recs }
+        const recs      = byUser[u.id] || []
+        const present   = recs.filter(r => ['in_office','wfh'].includes(r.status)).length
+        const wfh       = recs.filter(r => r.status === 'wfh').length
+        const inOffice  = recs.filter(r => r.status === 'in_office').length
+        const late      = recs.filter(r => r.is_late).length
+        const absent    = Math.max(0, workdays - present)
+        const pct       = workdays > 0 ? Math.round(present / workdays * 100) : 0
+        const punctDenom = Math.max(0, workdays - (leaveWDByUser[u.id]?.size || 0))
+        const punct     = calcPunctualityScore(recs, lateThreshold, punctDenom)
+        const score     = calcScore(present, inOffice, workdays, punct)
+        return { ...u, present, wfh, inOffice, late, absent, pct, score, punctDenom, records: recs }
       }).sort((a, b) => b.score - a.score)
 
       // Summary totals

@@ -158,9 +158,9 @@ function AttendanceScoreCard({ score, grade, consistency, punctuality, officePre
   const CX   = 76
 
   // Mini ring geometry
-  const mR    = 20
+  const mR    = 18
   const mCirc = 2 * Math.PI * mR
-  const mCX   = 25
+  const mCX   = 22
 
   const scoreRef = useRef(null)
   const arcRef   = useRef(null)
@@ -200,10 +200,10 @@ function AttendanceScoreCard({ score, grade, consistency, punctuality, officePre
 
   return (
     <Card className="p-4 relative overflow-hidden">
-      {/* Ambient glow behind the gauge — colored by grade */}
+      {/* Ambient glow behind the gauge only — colored by grade */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 rounded-full pointer-events-none"
-        style={{ top: 8, width: 180, height: 180, background: `radial-gradient(circle, ${hex}30 0%, transparent 65%)`, filter: 'blur(24px)' }}
+        className="absolute rounded-full pointer-events-none"
+        style={{ top: 20, left: 12, width: 130, height: 130, background: `radial-gradient(circle, ${hex}22 0%, transparent 60%)`, filter: 'blur(18px)' }}
       />
 
       <div className="relative flex items-center gap-4">
@@ -548,9 +548,28 @@ function DashboardInner() {
   const _graceMin      = parseInt(settings?.grace_period_minutes || '10', 10)
   const _lateThreshold = _offStartMin + _graceMin
 
+  // Approved-leave working days elapsed this month — excluded from the punctuality denominator
+  const _thisMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const _todayStr        = now.toLocaleDateString('sv-SE')
+  const leaveDays = new Set()
+  for (const l of leaves) {
+    if (l.status !== 'approved') continue
+    const cur = new Date(l.start_date + 'T12:00:00')
+    const end = new Date(l.end_date   + 'T12:00:00')
+    while (cur <= end) {
+      const ds  = cur.toLocaleDateString('sv-SE')
+      const dow = cur.getDay()
+      if (dow !== 0 && dow !== 6 && ds.startsWith(_thisMonthPrefix) && ds <= _todayStr) leaveDays.add(ds)
+      cur.setDate(cur.getDate() + 1)
+    }
+  }
+  const leaveWD = leaveDays.size
+
   const presentRecs = history.filter(r => ['in_office','wfh'].includes(r.status))
   const punctScore = (() => {
-    if (!presentRecs.length) return 0
+    // Denominator = elapsed working days minus approved-leave days (absent days count as 0 punctuality)
+    const denom = Math.max(0, passedWD - leaveWD)
+    if (denom === 0) return 0
     const sum = presentRecs.reduce((acc, r) => {
       if (!r.is_late || !r.check_in_time) return acc + 1
       const parts = new Intl.DateTimeFormat('en-GB', {
@@ -560,7 +579,7 @@ function DashboardInner() {
       const m = parseInt(parts.find(p => p.type === 'minute').value, 10)
       return acc + Math.min(1, Math.max(0, 1 - ((h * 60 + m) - _lateThreshold) / 60))
     }, 0)
-    return (sum / presentRecs.length) * 35
+    return Math.min(1, sum / denom) * 35
   })()
 
   const consistency    = passedWD > 0 ? (present / passedWD) * 40 : 0
