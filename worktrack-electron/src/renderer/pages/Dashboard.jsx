@@ -118,8 +118,9 @@ function SkyCanvas({ type, phase }) {
 
     function init() {
       parts = []
-      // Stars fill the whole pill (except during heavy precip, where drops/flakes dominate)
-      const showStars = type !== 'rain' && type !== 'snow' && type !== 'storm'
+      // Stars fill the whole pill at night/dawn/dusk — never in daylight, and not during
+      // heavy precip where drops/flakes dominate
+      const showStars = phase !== 'day' && type !== 'rain' && type !== 'snow' && type !== 'storm'
       stars = showStars
         ? Array.from({ length: 84 }, () => ({ x: rnd(0, W), y: rnd(0, H), r: rnd(0.4, 1.5), p: rnd(0, 6.28), s: rnd(0.8, 2.4) }))
         : []
