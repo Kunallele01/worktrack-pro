@@ -53,53 +53,302 @@ function weatherAnim(code) {
   return           { animate: { scale: [1, 1.2, 1], opacity: [1, 0.6, 1] },        transition: { duration: 0.8, repeat: Infinity                    } }  // Thunder — flash
 }
 
-function WeatherWidget({ lat, lon }) {
-  const [w, setW] = useState(null)
+// ── Weather code → particle type ────────────────────────────────────────────
+function precipType(code) {
+  if (code == null) return 'none'
+  if (code >= 95) return 'storm'
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snow'
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return 'rain'
+  if (code === 45 || code === 48 || code === 2 || code === 3)   return 'clouds'
+  return 'clear'
+}
+
+// ── Time-of-day sky palettes (kept dark enough for white text) ───────────────
+const SKY_PAL = {
+  night: ['#05070f', '#0a0f1e', '#0e1526'],
+  dawn:  ['#15122a', '#2c2242', '#5a4050'],
+  day:   ['#0b1e34', '#12304a', '#1b3d5c'],
+  dusk:  ['#171029', '#34223f', '#5e3641'],
+}
+const SKY_GLOW = {
+  night: 'rgba(180,200,255,0.13)',
+  dawn:  'rgba(255,178,138,0.22)',
+  day:   'rgba(255,224,178,0.20)',
+  dusk:  'rgba(255,148,108,0.22)',
+}
+function skyState(now, sunrise, sunset) {
+  const mins  = now.getHours() * 60 + now.getMinutes()
+  const srMin = sunrise ? sunrise.getHours() * 60 + sunrise.getMinutes() : 6 * 60
+  const ssMin = sunset  ? sunset.getHours()  * 60 + sunset.getMinutes()  : 18 * 60
+  const W = 55 // dawn/dusk window in minutes
+  let phase
+  if (mins < srMin - W || mins > ssMin + W) phase = 'night'
+  else if (mins < srMin + W) phase = 'dawn'
+  else if (mins > ssMin - W) phase = 'dusk'
+  else phase = 'day'
+  const sunT = Math.max(0, Math.min(1, (mins - srMin) / Math.max(1, ssMin - srMin)))
+  return { phase, sunT, isNight: phase === 'night' }
+}
+
+function weatherQuip(code, phase) {
+  const t = precipType(code)
+  if (t === 'storm')  return 'Storm rolling through — stay dry out there.'
+  if (t === 'rain')   return 'Rain outside — perfect heads-down weather.'
+  if (t === 'snow')   return 'Snow is falling — bundle up.'
+  if (t === 'clouds') return 'Grey skies — good focus energy.'
+  if (phase === 'night') return 'Clear night — burning the midnight oil?'
+  if (phase === 'dawn')  return 'A fresh start to the day.'
+  if (phase === 'dusk')  return 'Golden hour — winding down.'
+  return 'Clear skies — make it a good one.'
+}
+
+// ── Live weather particle canvas (rain / snow / clouds / stars / lightning) ──
+function SkyCanvas({ type, phase }) {
+  const cvs   = useRef(null)
+  const flash = useRef(0)
 
   useEffect(() => {
-    if (!lat || !lon || (lat === 0 && lon === 0)) return
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=temperature_2m,apparent_temperature,weather_code&timezone=auto`)
-      .then(r => r.json())
-      .then(d => {
-        if (!d.current) return
-        setW({ temp: Math.round(d.current.temperature_2m), feels: Math.round(d.current.apparent_temperature), code: d.current.weather_code })
-      })
-      .catch(() => {})
-  }, [lat, lon])
+    const canvas = cvs.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    const dpr = Math.min(2, window.devicePixelRatio || 1)
+    let raf, last = 0, running = true
+    let W = 0, H = 0, parts = [], stars = []
+    const rnd = (a, b) => a + Math.random() * (b - a)
 
-  if (!w) return null
-  const { icon, label } = wmoInfo(w.code)
-  const { animate, transition } = weatherAnim(w.code)
+    function init() {
+      parts = []
+      const showStars = phase !== 'day' && type !== 'rain' && type !== 'snow' && type !== 'storm'
+      stars = showStars
+        ? Array.from({ length: 46 }, () => ({ x: rnd(0, W), y: rnd(0, H * 0.7), r: rnd(0.4, 1.3), p: rnd(0, 6.28), s: rnd(0.8, 2.4) }))
+        : []
+      if (type === 'rain' || type === 'storm') {
+        for (let i = 0; i < 95; i++) parts.push({ x: rnd(0, W), y: rnd(0, H), len: rnd(8, 18), v: rnd(360, 560), a: rnd(0.08, 0.28) })
+      } else if (type === 'snow') {
+        for (let i = 0; i < 60; i++) parts.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(1, 2.6), v: rnd(18, 42), drift: rnd(-14, 14), ph: rnd(0, 6.28), a: rnd(0.3, 0.8) })
+      } else if (type === 'clouds') {
+        for (let i = 0; i < 5; i++) parts.push({ x: rnd(0, W), y: rnd(H * 0.1, H * 0.55), w: rnd(90, 180), h: rnd(24, 44), v: rnd(4, 10), a: rnd(0.05, 0.12) })
+      }
+    }
+    function resize() {
+      const r = canvas.parentElement.getBoundingClientRect()
+      W = r.width; H = r.height
+      canvas.width = W * dpr; canvas.height = H * dpr
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      init()
+    }
+    function draw(t) {
+      if (!running) return
+      raf = requestAnimationFrame(draw)
+      if (t - last < 33) return          // throttle ~30fps
+      const dt = Math.min(0.05, (t - last) / 1000 || 0.016)
+      last = t
+      ctx.clearRect(0, 0, W, H)
 
+      for (const s of stars) {
+        s.p += dt * s.s
+        ctx.globalAlpha = 0.25 + 0.55 * (0.5 + 0.5 * Math.sin(s.p))
+        ctx.fillStyle = '#dbe6ff'
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.283); ctx.fill()
+      }
+      ctx.globalAlpha = 1
+
+      if (type === 'rain' || type === 'storm') {
+        ctx.strokeStyle = '#9fc4ff'; ctx.lineWidth = 1
+        for (const p of parts) {
+          ctx.globalAlpha = p.a
+          ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.len * 0.3, p.y + p.len); ctx.stroke()
+          p.y += p.v * dt; p.x -= p.v * 0.3 * dt
+          if (p.y > H) { p.y = -p.len; p.x = rnd(0, W) }
+        }
+      } else if (type === 'snow') {
+        ctx.fillStyle = '#eaf2ff'
+        for (const p of parts) {
+          p.ph += dt
+          ctx.globalAlpha = p.a
+          ctx.beginPath(); ctx.arc(p.x + Math.sin(p.ph) * 4, p.y, p.r, 0, 6.283); ctx.fill()
+          p.y += p.v * dt; p.x += p.drift * dt * 0.3
+          if (p.y > H) { p.y = -4; p.x = rnd(0, W) }
+        }
+      } else if (type === 'clouds') {
+        for (const p of parts) {
+          ctx.globalAlpha = p.a
+          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.w)
+          g.addColorStop(0, '#cbd6e6'); g.addColorStop(1, 'transparent')
+          ctx.fillStyle = g
+          ctx.beginPath(); ctx.ellipse(p.x, p.y, p.w, p.h, 0, 0, 6.283); ctx.fill()
+          p.x += p.v * dt
+          if (p.x - p.w > W) { p.x = -p.w; p.y = rnd(H * 0.1, H * 0.55) }
+        }
+      }
+      ctx.globalAlpha = 1
+
+      if (type === 'storm') {
+        if (Math.random() < 0.004) flash.current = 1
+        if (flash.current > 0) {
+          ctx.fillStyle = `rgba(200,220,255,${flash.current * 0.5})`
+          ctx.fillRect(0, 0, W, H)
+          flash.current -= dt * 2.5
+        }
+      }
+    }
+
+    resize()
+    raf = requestAnimationFrame(draw)
+    const ro = new ResizeObserver(resize); ro.observe(canvas.parentElement)
+    const onVis = () => {
+      running = !document.hidden
+      if (running) { last = 0; raf = requestAnimationFrame(draw) }
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      running = false; cancelAnimationFrame(raf)
+      ro.disconnect(); document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [type, phase])
+
+  return <canvas ref={cvs} className="absolute inset-0 pointer-events-none" style={{ width: '100%', height: '100%' }} />
+}
+
+// ── Rolling odometer digit ───────────────────────────────────────────────────
+function OdoDigit({ d, size }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    if (ref.current) gsap.to(ref.current, { yPercent: -d * 10, duration: 0.5, ease: 'power3.out' })
+  }, [d])
   return (
-    <div className="flex items-center justify-center gap-3 mt-2">
-      <motion.div animate={animate} transition={transition}
-        style={{ fontSize: 30, lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))' }}>
-        {icon}
-      </motion.div>
-      <div>
-        <p className="text-sm font-bold text-gray-100 leading-tight">
-          {w.temp}°C <span className="font-normal text-gray-400">{label}</span>
-        </p>
-        <p className="text-xs text-gray-500">Feels like {w.feels}°C</p>
-      </div>
+    <span style={{ height: size, width: size * 0.62, overflow: 'hidden', display: 'inline-block' }}>
+      <span ref={ref} style={{ display: 'flex', flexDirection: 'column' }}>
+        {Array.from({ length: 10 }, (_, n) => (
+          <span key={n} style={{ height: size, lineHeight: `${size}px`, textAlign: 'center' }}>{n}</span>
+        ))}
+      </span>
+    </span>
+  )
+}
+
+function OdoClock({ now }) {
+  const hh = String(now.getHours()).padStart(2, '0')
+  const mm = String(now.getMinutes()).padStart(2, '0')
+  const ss = String(now.getSeconds()).padStart(2, '0')
+  const big = 54, small = 24
+  return (
+    <div className="flex items-end justify-center font-mono font-black text-gray-50" style={{ letterSpacing: '-1px' }}>
+      <OdoDigit d={+hh[0]} size={big} /><OdoDigit d={+hh[1]} size={big} />
+      <span className="text-gray-500 animate-pulse font-black" style={{ fontSize: big * 0.72, lineHeight: `${big}px`, margin: '0 2px' }}>:</span>
+      <OdoDigit d={+mm[0]} size={big} /><OdoDigit d={+mm[1]} size={big} />
+      <span className="flex items-end text-gray-400 font-light ml-1.5" style={{ height: big }}>
+        <span style={{ fontSize: small * 0.8, lineHeight: `${small}px` }}>:</span>
+        <OdoDigit d={+ss[0]} size={small} /><OdoDigit d={+ss[1]} size={small} />
+      </span>
     </div>
   )
 }
 
-function LiveClock() {
-  const [now, setNow] = useState(new Date())
-  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
-  const h = String(now.getHours()).padStart(2,'0')
-  const m = String(now.getMinutes()).padStart(2,'0')
-  const s = String(now.getSeconds()).padStart(2,'0')
+// ── Daylight arc — sunrise → now → sunset ────────────────────────────────────
+function DaylightArc({ sunT, isNight, sunrise, sunset }) {
+  const P0 = [16, 36], P1 = [150, 6], P2 = [284, 36]
+  const at = (t) => [
+    (1 - t) ** 2 * P0[0] + 2 * (1 - t) * t * P1[0] + t * t * P2[0],
+    (1 - t) ** 2 * P0[1] + 2 * (1 - t) * t * P1[1] + t * t * P2[1],
+  ]
+  const [tx, ty] = at(sunT)
+  const fmt = (d) => (d ? format(d, 'h:mm a') : '—')
+  const path = `M${P0[0]},${P0[1]} Q${P1[0]},${P1[1]} ${P2[0]},${P2[1]}`
   return (
-    <div className="text-center py-6">
-      <div className="font-mono font-bold text-gray-100 leading-none tabular-nums" style={{ fontSize: 56, letterSpacing: '-3px' }}>
-        {h}<span className="text-gray-400 mx-1 animate-pulse">:</span>{m}
-        <span className="font-mono font-light text-gray-400 ml-2" style={{ fontSize: 28 }}>:{s}</span>
+    <div className="flex items-center gap-2 mt-1.5 w-full">
+      <span className="text-[10px] text-gray-400 font-mono w-14 text-right shrink-0">↑ {fmt(sunrise)}</span>
+      <svg viewBox="0 0 300 42" className="flex-1" style={{ height: 30 }} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="dl-arc" x1="0" x2="1">
+            <stop offset="0" stopColor="#f59e0b" stopOpacity="0.25" />
+            <stop offset="1" stopColor="#fcd34d" />
+          </linearGradient>
+        </defs>
+        <path d={path} fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth="1.5" strokeDasharray="2 4" />
+        {!isNight && (
+          <path d={path} fill="none" stroke="url(#dl-arc)" strokeWidth="2"
+            pathLength="1" strokeDasharray="1" strokeDashoffset={1 - sunT} strokeLinecap="round" />
+        )}
+        <circle cx={tx} cy={ty} r="4.5" fill={isNight ? '#cbd5e1' : '#fcd34d'}
+          style={{ filter: `drop-shadow(0 0 5px ${isNight ? '#94a3b8' : '#fcd34d'})` }} />
+      </svg>
+      <span className="text-[10px] text-gray-400 font-mono w-14 shrink-0">↓ {fmt(sunset)}</span>
+    </div>
+  )
+}
+
+// ── The full atmospheric header ──────────────────────────────────────────────
+function SkyHeader({ lat, lon }) {
+  const [now, setNow] = useState(new Date())
+  const [w,   setW  ] = useState(null)
+
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
+
+  useEffect(() => {
+    if (!lat || !lon || (lat === 0 && lon === 0)) { setW(null); return }
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=temperature_2m,apparent_temperature,weather_code,is_day&daily=sunrise,sunset&timezone=auto`)
+      .then(r => r.json())
+      .then(d => {
+        if (!d.current) return
+        setW({
+          temp:    Math.round(d.current.temperature_2m),
+          feels:   Math.round(d.current.apparent_temperature),
+          code:    d.current.weather_code,
+          isDay:   d.current.is_day === 1,
+          sunrise: d.daily?.sunrise?.[0] ? new Date(d.daily.sunrise[0]) : null,
+          sunset:  d.daily?.sunset?.[0]  ? new Date(d.daily.sunset[0])  : null,
+        })
+      })
+      .catch(() => {})
+  }, [lat, lon])
+
+  const sky   = skyState(now, w?.sunrise, w?.sunset)
+  const pal   = SKY_PAL[sky.phase]
+  const type  = precipType(w?.code)
+  const glowX = 6 + sky.sunT * 88
+  const info  = w ? wmoInfo(w.code) : null
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-white/[0.06]" style={{ height: 210 }}>
+      {/* Sky base gradient */}
+      <div className="absolute inset-0" style={{ background: `linear-gradient(168deg, ${pal[0]}, ${pal[1]} 52%, ${pal[2]})`, transition: 'background 2s ease' }} />
+      {/* Sun / moon celestial glow — drifts across with the day */}
+      <div className="absolute rounded-full pointer-events-none"
+        style={{
+          top: sky.isNight ? '14%' : `${18 - Math.sin(sky.sunT * Math.PI) * 10}%`,
+          left: `${glowX}%`, transform: 'translate(-50%,-50%)',
+          width: 210, height: 210,
+          background: `radial-gradient(circle, ${SKY_GLOW[sky.phase]} 0%, transparent 65%)`,
+          filter: 'blur(6px)', transition: 'background 2s ease',
+        }} />
+      {/* Weather particles */}
+      <SkyCanvas type={type} phase={sky.phase} />
+
+      {/* Foreground content */}
+      <div className="relative z-10 h-full flex flex-col items-center justify-center px-4 py-3">
+        <OdoClock now={now} />
+        <p className="text-gray-300 text-sm mt-1.5">{format(now, 'EEEE, d MMMM yyyy')}</p>
+        {w && (
+          <div className="flex items-center gap-2.5 mt-2">
+            <motion.div animate={weatherAnim(w.code).animate} transition={weatherAnim(w.code).transition}
+              style={{ fontSize: 26, lineHeight: 1, display: 'inline-flex', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))' }}>
+              {info.icon}
+            </motion.div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-gray-100 leading-tight">
+                {w.temp}°C <span className="font-normal text-gray-300">{info.label}</span>
+              </p>
+              <p className="text-[11px] text-gray-400 leading-tight">{weatherQuip(w.code, sky.phase)}</p>
+            </div>
+          </div>
+        )}
+        {w?.sunrise && w?.sunset && (
+          <div className="w-full max-w-sm px-2">
+            <DaylightArc sunT={sky.sunT} isNight={sky.isNight} sunrise={w.sunrise} sunset={w.sunset} />
+          </div>
+        )}
       </div>
-      <p className="text-gray-400 text-sm mt-2">{format(now, 'EEEE, d MMMM yyyy')}</p>
     </div>
   )
 }
@@ -665,19 +914,16 @@ function DashboardInner() {
 
         {/* Right column */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
-          {/* Clock + Weather */}
-          <div>
-            <LiveClock />
-            {(() => {
-              // WiFi mode + office coords configured → show office weather; otherwise use resolved coords
-              const inWifi = gpsLocation?.accuracy < 0
-              const offLat = settings?.office_latitude ? parseFloat(settings.office_latitude) : null
-              const offLon = settings?.office_longitude ? parseFloat(settings.office_longitude) : null
-              const wLat = inWifi && offLat ? offLat : gpsLocation?.lat
-              const wLon = inWifi && offLon ? offLon : gpsLocation?.lon
-              return wLat && wLon ? <WeatherWidget lat={wLat} lon={wLon} /> : null
-            })()}
-          </div>
+          {/* Atmospheric header — live sky, odometer clock, weather, daylight arc */}
+          {(() => {
+            // WiFi mode + office coords configured → use office weather; otherwise resolved coords
+            const inWifi = gpsLocation?.accuracy < 0
+            const offLat = settings?.office_latitude ? parseFloat(settings.office_latitude) : null
+            const offLon = settings?.office_longitude ? parseFloat(settings.office_longitude) : null
+            const wLat = inWifi && offLat ? offLat : gpsLocation?.lat
+            const wLon = inWifi && offLon ? offLon : gpsLocation?.lon
+            return <SkyHeader lat={wLat} lon={wLon} />
+          })()}
 
           {/* GPS Widget */}
           <GpsWidget
