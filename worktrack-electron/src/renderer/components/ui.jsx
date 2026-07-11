@@ -444,18 +444,22 @@ export function Avatar({ name = '', size = 8, textSize = 'text-xs' }) {
 // ── Calendar widget ───────────────────────────────────────────────────────── //
 
 
-// Pill config for each attendance + leave + holiday state
+// Pill config for each state. Attendance outcomes use a SOLID fill; leave/holiday
+// ("away") states use a tinted + inset-ring outline so they never read the same as
+// a similarly-coloured attendance day (e.g. Casual Leave vs Late, Sick vs Absent).
 const CAL_STATES = {
-  in_office:    { bg: 'bg-emerald-500',   text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(16,185,129,0.5)]',  label: 'In Office',     dot: 'bg-emerald-400' },
-  wfh:          { bg: 'bg-blue-500',      text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(59,130,246,0.5)]',  label: 'WFH',           dot: 'bg-blue-400'    },
-  late:         { bg: 'bg-amber-500',     text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(245,158,11,0.4)]',  label: 'Late',          dot: 'bg-amber-400'   },
-  absent:       { bg: 'bg-red-500/80',    text: 'text-white',        glow: '',                                        label: 'Absent',         dot: 'bg-red-400'     },
-  auto_checkout:{ bg: 'bg-gray-500/60',   text: 'text-gray-200',     glow: '',                                        label: 'Auto-out',       dot: 'bg-gray-400'    },
-  sick:         { bg: 'bg-rose-500',      text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(244,63,94,0.4)]',   label: 'Sick Leave',     dot: 'bg-rose-400'    },
-  casual:       { bg: 'bg-amber-500',     text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(245,158,11,0.4)]',  label: 'Casual Leave',   dot: 'bg-amber-400'   },
-  planned:      { bg: 'bg-teal-500',      text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(20,184,166,0.4)]',  label: 'Planned Leave',  dot: 'bg-teal-400'    },
-  emergency:    { bg: 'bg-orange-500',    text: 'text-white',        glow: 'shadow-[0_0_8px_rgba(249,115,22,0.4)]',  label: 'Emergency Leave',dot: 'bg-orange-400'  },
-  holiday:      { bg: 'bg-violet-500/25', text: 'text-violet-300',   glow: '',                                        label: 'Holiday',        dot: 'bg-violet-400'  },
+  // ── Attendance outcomes — solid fill ──
+  in_office:    { bg: 'bg-emerald-500',   text: 'text-white',     glow: 'shadow-[0_0_8px_rgba(16,185,129,0.5)]', label: 'In Office',  dot: 'bg-emerald-400' },
+  wfh:          { bg: 'bg-blue-500',      text: 'text-white',     glow: 'shadow-[0_0_8px_rgba(59,130,246,0.5)]', label: 'WFH',        dot: 'bg-blue-400'    },
+  late:         { bg: 'bg-amber-500',     text: 'text-white',     glow: 'shadow-[0_0_8px_rgba(245,158,11,0.4)]', label: 'Late',       dot: 'bg-amber-400'   },
+  absent:       { bg: 'bg-red-500/85',    text: 'text-white',     glow: '',                                       label: 'Absent',     dot: 'bg-red-500'     },
+  auto_checkout:{ bg: 'bg-gray-500/60',   text: 'text-gray-100',  glow: '',                                       label: 'Auto-out',   dot: 'bg-gray-400'    },
+  // ── Away (leave / holiday) — tinted + inset ring ──
+  sick:         { away: true, bg: 'bg-rose-500/20 ring-1 ring-inset ring-rose-400/60',     text: 'text-rose-200',    glow: '', label: 'Sick Leave',      dot: 'bg-rose-400'   },
+  casual:       { away: true, bg: 'bg-amber-500/20 ring-1 ring-inset ring-amber-400/60',   text: 'text-amber-200',   glow: '', label: 'Casual Leave',    dot: 'bg-amber-400'  },
+  planned:      { away: true, bg: 'bg-teal-500/20 ring-1 ring-inset ring-teal-400/60',     text: 'text-teal-200',    glow: '', label: 'Planned Leave',   dot: 'bg-teal-400'   },
+  emergency:    { away: true, bg: 'bg-orange-500/20 ring-1 ring-inset ring-orange-400/60', text: 'text-orange-200',  glow: '', label: 'Emergency Leave', dot: 'bg-orange-400' },
+  holiday:      { away: true, bg: 'bg-violet-500/20 ring-1 ring-inset ring-violet-400/50', text: 'text-violet-200',  glow: '', label: 'Holiday',         dot: 'bg-violet-400' },
 }
 
 export function CalendarWidget({ attendance = [], holidays = [], leaves = [] }) {
@@ -485,11 +489,24 @@ export function CalendarWidget({ attendance = [], holidays = [], leaves = [] }) 
   const prev = () => month === 0  ? (setYear(y=>y-1), setMonth(11)) : setMonth(m=>m-1)
   const next = () => month === 11 ? (setYear(y=>y+1), setMonth(0))  : setMonth(m=>m+1)
 
+  const todayStr = today.toLocaleDateString('sv-SE')
+
   // Present/working stats for header strip
   const monthStr   = `${year}-${String(month+1).padStart(2,'0')}`
   const presentDays = attendance.filter(r => r.date.startsWith(monthStr) && ['in_office','wfh'].includes(r.status)).length
   const lateDays    = attendance.filter(r => r.date.startsWith(monthStr) && r.is_late).length
-  const absentDays  = attendance.filter(r => r.date.startsWith(monthStr) && r.status === 'absent').length
+  // Absent = elapsed working days with no present record, excluding holidays & approved leave
+  let absentDays = 0
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds  = `${monthStr}-${String(d).padStart(2,'0')}`
+    const dow = new Date(year, month, d).getDay()
+    if (dow === 0 || dow === 6) continue          // weekend
+    if (ds >= todayStr) continue                  // today & future aren't absences (yet)
+    if (holidayMap[ds] || leaveMap[ds]) continue  // holiday or approved leave
+    const r = byDate[ds]
+    if (r && ['in_office','wfh'].includes(r.status)) continue
+    absentDays++
+  }
 
   const DAYS_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 
@@ -550,12 +567,15 @@ export function CalendarWidget({ attendance = [], holidays = [], leaves = [] }) 
           const isLate   = rec?.is_late
           const isHoliday = !!holidayMap[dateStr]
           const leaveType = leaveMap[dateStr]
-          const isToday   = day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
+          const isToday   = dateStr === todayStr
+          const isFuture  = dateStr > todayStr
+          const isPast    = dateStr < todayStr
           const isWeekend = (i % 7) >= 5
-          const isFuture  = new Date(year, month, day) > today
+          // A past working day with no record (and not a holiday / approved leave) is an absence
+          const isAbsent  = isPast && !isWeekend && !isHoliday && !leaveType && !status
 
-          // Priority: holiday > approved leave > late > status (in_office / wfh / absent)
-          const stateKey = isHoliday ? 'holiday' : leaveType ? leaveType : isLate ? 'late' : (status || null)
+          // Priority: holiday > approved leave > late > recorded status > derived absent
+          const stateKey = isHoliday ? 'holiday' : leaveType ? leaveType : isLate ? 'late' : status ? status : (isAbsent ? 'absent' : null)
           const st       = stateKey ? CAL_STATES[stateKey] : null
           const tooltipLabel = isHoliday ? `🏖 ${holidayMap[dateStr]}` : st?.label
 
@@ -610,8 +630,8 @@ export function CalendarWidget({ attendance = [], holidays = [], leaves = [] }) 
         <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
           {Object.entries(CAL_STATES).map(([key, s]) => (
             <div key={key} className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${s.dot}`} />
-              <span className="text-[10px] text-gray-600">{s.label}</span>
+              <span className={`w-2 h-2 shrink-0 ${s.dot} ${s.away ? 'rounded-[3px] opacity-90' : 'rounded-full'}`} />
+              <span className="text-[10px] text-gray-500">{s.label}</span>
             </div>
           ))}
         </div>
