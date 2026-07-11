@@ -205,7 +205,7 @@ export default function Login() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!id.trim() || !pw) return
+    if (!id.trim() || !pw) { setErr('Enter your email or Employee ID and password.'); return }
     setErr(''); setLoading(true)
     try {
       const profile = await signIn(id, pw)
@@ -301,7 +301,7 @@ export default function Login() {
           <h1 className="text-2xl font-bold text-gray-50 mb-1">Welcome back</h1>
           <p className="text-sm text-gray-400 mb-8">Sign in to your account</p>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
             <Input
               label="Email or Employee ID"
               placeholder="you@company.com or EMP001"

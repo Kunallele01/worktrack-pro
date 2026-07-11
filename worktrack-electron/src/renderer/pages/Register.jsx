@@ -205,11 +205,13 @@ export default function Register() {
   const [form,       setForm      ] = useState({ name: '', email: '', dept: '', pw: '', pw2: '' })
   const [bday,       setBday      ] = useState({ year: '', month: '', day: '' })
   const [days,       setDays      ] = useState(buildDays('', ''))
-  const [err,        setErr       ] = useState('')
+  const [errors,     setErrors    ] = useState({})
+  const [formErr,    setFormErr   ] = useState('')
   const [loading,    setLoading   ] = useState(false)
   const [scrambling, setScrambling] = useState(false)
 
-  const set = k => e => { setForm(f => ({ ...f, [k]: e.target.value })); setErr('') }
+  const set = k => e => { setForm(f => ({ ...f, [k]: e.target.value })); setErrors(er => ({ ...er, [k]: undefined })); setFormErr('') }
+  const clearErr = k => setErrors(er => ({ ...er, [k]: undefined }))
 
   useEffect(() => {
     const nd = buildDays(bday.year, bday.month)
@@ -224,19 +226,28 @@ export default function Register() {
   const scrambled  = useScramble(scrambling, 'Create Account')
   const displayBtn = scrambling ? scrambled : btnLabel
 
+  function validate() {
+    const e = {}
+    if (!form.name.trim())  e.name  = 'Full name is required.'
+    if (!form.email.trim()) e.email = 'Email is required.'
+    else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email)) e.email = 'Enter a valid email address.'
+    if (!form.dept)         e.dept  = 'Select a department.'
+    if (!bday.year || !bday.month || !bday.day) e.bday = 'Select your full date of birth.'
+    if (!form.pw)                    e.pw = 'Set a password.'
+    else if (form.pw.length < 8)     e.pw = 'At least 8 characters.'
+    else if (!/[A-Z]/.test(form.pw)) e.pw = 'Add an uppercase letter.'
+    else if (!/\d/.test(form.pw))    e.pw = 'Add a number.'
+    if (!form.pw2)                 e.pw2 = 'Re-enter your password.'
+    else if (form.pw2 !== form.pw) e.pw2 = 'Passwords don’t match.'
+    return e
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.name.trim())       { setErr('Full name is required.'); return }
-    if (!form.email.trim())      { setErr('Email address is required.'); return }
-    if (!form.dept)              { setErr('Please select your department.'); return }
-    if (!bday.year)              { setErr('Please select your birth year.'); return }
-    if (!bday.month)             { setErr('Please select your birth month.'); return }
-    if (!bday.day)               { setErr('Please select your birth day.'); return }
-    if (!form.pw)                { setErr('Please set a password.'); return }
-    if (form.pw.length < 8)      { setErr('Password must be at least 8 characters.'); return }
-    if (!/[A-Z]/.test(form.pw)) { setErr('Must contain at least one uppercase letter.'); return }
-    if (!/\d/.test(form.pw))    { setErr('Must contain at least one number.'); return }
-    if (form.pw !== form.pw2)   { setErr('Passwords do not match.'); return }
+    setFormErr('')
+    const v = validate()
+    setErrors(v)
+    if (Object.keys(v).length) return
 
     setScrambling(true)
     await new Promise(r => setTimeout(r, 820))
@@ -246,7 +257,7 @@ export default function Register() {
     try {
       await signUp(form.email, form.pw, form.name.trim(), form.dept, birthday)
       navigate('/', { replace: true })
-    } catch (e) { setErr(e.message) }
+    } catch (e) { setFormErr(e.message) }
     finally { setLoading(false) }
   }
 
@@ -329,25 +340,27 @@ export default function Register() {
             </p>
           </motion.div>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3">
 
             {/* Name */}
             <motion.div {...fadeUp(0.12)}>
               <Input label="Full Name" placeholder="Your full name"
-                value={form.name} onChange={set('name')} required />
+                value={form.name} onChange={set('name')} error={errors.name} />
             </motion.div>
 
             {/* Email + Department */}
             <motion.div {...fadeUp(0.19)} className="grid grid-cols-2 gap-3">
               <Input label="Email" type="email" placeholder="you@company.com"
-                value={form.email} onChange={set('email')} required />
+                value={form.email} onChange={set('email')} error={errors.email} />
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
                   Department <span className="text-red-400">*</span>
                 </label>
                 <Select value={form.dept}
-                  onChange={v => { setForm(f => ({...f, dept: v})); setErr('') }}
-                  options={DEPT_OPTIONS} placeholder="Select…" />
+                  onChange={v => { setForm(f => ({...f, dept: v})); clearErr('dept'); setFormErr('') }}
+                  options={DEPT_OPTIONS} placeholder="Select…"
+                  className={errors.dept ? 'ring-1 ring-red-500/50 rounded-xl' : ''} />
+                {errors.dept && <p className="text-xs text-red-400">{errors.dept}</p>}
               </div>
             </motion.div>
 
@@ -357,17 +370,18 @@ export default function Register() {
                 Date of Birth <span className="text-red-400">*</span>
                 <span className="text-gray-600 font-normal normal-case ml-1.5">— year → month → day</span>
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className={`grid grid-cols-3 gap-2 ${errors.bday ? 'rounded-xl ring-1 ring-red-500/50 p-0.5' : ''}`}>
                 <Select value={bday.year}
-                  onChange={v => setBday(b => ({ ...b, year: v, day: '' }))}
+                  onChange={v => { setBday(b => ({ ...b, year: v, day: '' })); clearErr('bday') }}
                   options={YEARS} placeholder="Year" />
                 <Select value={bday.month}
-                  onChange={v => setBday(b => ({ ...b, month: v, day: '' }))}
+                  onChange={v => { setBday(b => ({ ...b, month: v, day: '' })); clearErr('bday') }}
                   options={MONTHS} placeholder="Month" />
                 <Select value={bday.day}
-                  onChange={v => setBday(b => ({ ...b, day: v }))}
+                  onChange={v => { setBday(b => ({ ...b, day: v })); clearErr('bday') }}
                   options={days} placeholder="Day" />
               </div>
+              {errors.bday && <p className="text-xs text-red-400">{errors.bday}</p>}
               <AnimatePresence>
                 {birthday && (
                   <motion.span key={birthday}
@@ -382,27 +396,27 @@ export default function Register() {
             </motion.div>
 
             {/* Password + Confirm */}
-            <motion.div {...fadeUp(0.33)} className="grid grid-cols-2 gap-3">
+            <motion.div {...fadeUp(0.33)} className="grid grid-cols-2 gap-3 items-start">
               <div>
                 <PasswordInput label="Password" placeholder="Min 8 chars"
-                  value={form.pw} onChange={set('pw')} required />
-                <StrengthBar password={form.pw} />
+                  value={form.pw} onChange={set('pw')} error={errors.pw} />
+                {!errors.pw && <StrengthBar password={form.pw} />}
               </div>
               <PasswordInput label="Confirm Password" placeholder="Repeat"
-                value={form.pw2} onChange={set('pw2')} required />
+                value={form.pw2} onChange={set('pw2')} error={errors.pw2} />
             </motion.div>
 
-            {/* Error */}
+            {/* General / server error */}
             <AnimatePresence>
-              {err && (
+              {formErr && (
                 <motion.p
-                  key={err}
+                  key={formErr}
                   initial={{ opacity: 0, y: -4, height: 0 }}
                   animate={{ opacity: 1, y: 0, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.2 }}
                   className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2"
-                >{err}</motion.p>
+                >{formErr}</motion.p>
               )}
             </AnimatePresence>
 
