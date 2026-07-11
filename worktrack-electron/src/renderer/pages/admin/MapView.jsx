@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet'
+import React, { useState, useEffect, useRef } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { getTodayMapData, getSettings } from '../../lib/supabase'
 import { Button, Avatar } from '../../components/ui'
@@ -73,11 +73,25 @@ function createOfficeIcon(inOfficeCount) {
   })
 }
 
+// ── Flies the map to a focused employee and opens their popup ───────────────── //
+function MapController({ focus, markerRefs }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!focus) return
+    map.flyTo([focus.lat, focus.lon], focus.zoom ?? 16, { duration: 0.8 })
+    const t = setTimeout(() => markerRefs.current[focus.markerKey]?.openPopup(), 850)
+    return () => clearTimeout(t)
+  }, [focus])
+  return null
+}
+
 // ── Employee row in sidebar ────────────────────────────────────────────────── //
-function EmployeeRow({ r }) {
+function EmployeeRow({ r, onClick, active }) {
   const fmt = iso => { try { return format(new Date(iso), 'hh:mm a') } catch { return '—' } }
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
+    <div onClick={onClick}
+      className={`flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.04] cursor-pointer transition-colors
+        ${active ? 'bg-accent-500/10' : 'hover:bg-white/[0.03]'}`}>
       <Avatar name={r.profiles?.full_name || ''} size={8} textSize="text-xs" />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-gray-200 truncate">{r.profiles?.full_name}</p>
@@ -106,6 +120,8 @@ export default function MapView() {
   const [settings, setSettings] = useState(null)
   const [loading,  setLoading ] = useState(true)
   const [tab,      setTab     ] = useState('all')
+  const [focused,  setFocused ] = useState(null)
+  const markerRefs = useRef({})
 
   const load = async () => {
     setLoading(true)
@@ -140,6 +156,19 @@ export default function MapView() {
   const wfhOnMap  = wfh.filter(r => r.latitude && r.longitude)
 
   const tabList = tab === 'office' ? inOffice : tab === 'wfh' ? wfh : checkins
+
+  // Sidebar row → locate on map. In-office employees fly to the office marker;
+  // WFH employees fly to their own pin (if we have coordinates for them).
+  const focusEmployee = (r) => {
+    if (r.status === 'in_office') {
+      if (!olat || !olon) { toast('Office location is not set in Settings.', 'warning'); return }
+      setFocused({ lat: olat, lon: olon, zoom: 15, key: r.user_id, markerKey: 'office' })
+    } else if (r.latitude && r.longitude) {
+      setFocused({ lat: r.latitude, lon: r.longitude, zoom: 16, key: r.user_id, markerKey: r.user_id })
+    } else {
+      toast('No map location recorded for this employee.', 'warning')
+    }
+  }
 
   const STATS = [
     { label: 'In Office', value: inOffice.length, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
@@ -182,12 +211,15 @@ export default function MapView() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
             />
 
+            <MapController focus={focused} markerRefs={markerRefs} />
+
             {/* Office geofence circle + pulsing marker with live count */}
             {olat && olon && (
               <>
                 <Circle center={[olat, olon]} radius={radius}
                   pathOptions={{ color: '#4F86F7', fillColor: '#4F86F7', fillOpacity: 0.08, weight: 2, dashArray: '6 4' }} />
-                <Marker position={[olat, olon]} icon={createOfficeIcon(inOffice.length)}>
+                <Marker position={[olat, olon]} icon={createOfficeIcon(inOffice.length)}
+                  ref={el => { markerRefs.current['office'] = el }}>
                   <Popup className="map-popup">
                     <div style={{ fontFamily: 'Inter, Arial, sans-serif', padding: '2px 4px' }}>
                       <p style={{ fontWeight: 700, fontSize: 13, margin: '0 0 2px' }}>🏢 {company}</p>
@@ -209,6 +241,7 @@ export default function MapView() {
                 key={i}
                 position={[r.latitude, r.longitude]}
                 icon={createAvatarIcon(r.profiles?.full_name || '', r.is_late)}
+                ref={el => { markerRefs.current[r.user_id] = el }}
               >
                 <Popup>
                   <div style={{ fontFamily: 'Inter, Arial, sans-serif', padding: '4px 6px', minWidth: 150 }}>
@@ -281,7 +314,11 @@ export default function MapView() {
             ) : (
               tabList
                 .sort((a, b) => new Date(a.check_in_time) - new Date(b.check_in_time))
-                .map(r => <EmployeeRow key={r.user_id} r={r} />)
+                .map(r => (
+                  <EmployeeRow key={r.user_id} r={r}
+                    active={focused?.key === r.user_id}
+                    onClick={() => focusEmployee(r)} />
+                ))
             )}
           </div>
 
