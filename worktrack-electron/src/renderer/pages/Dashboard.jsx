@@ -53,14 +53,35 @@ function weatherAnim(code) {
   return           { animate: { scale: [1, 1.2, 1], opacity: [1, 0.6, 1] },        transition: { duration: 0.8, repeat: Infinity                    } }  // Thunder — flash
 }
 
-// ── Weather code → particle type ────────────────────────────────────────────
+// ── Weather code → precipitation type (clouds are handled by count, below) ───
 function precipType(code) {
-  if (code == null) return 'none'
+  if (code == null) return 'clear'
   if (code >= 95) return 'storm'
   if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snow'
   if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return 'rain'
-  if (code === 45 || code === 48 || code === 2 || code === 3)   return 'clouds'
-  return 'clear'
+  return 'clear' // 0,1,2,3,45,48 → clear base; cloudCount decides the coverage
+}
+
+// How many drifting clouds to render, scaled to the actual condition
+function cloudCount(code) {
+  if (code == null) return 0
+  if (code === 1) return 1                       // mainly clear
+  if (code === 2) return 3                        // partly cloudy
+  if (code === 45 || code === 48) return 4        // fog
+  if (code === 3) return 5                         // overcast
+  return 0                                          // clear (0) or precip (own particles)
+}
+
+// 0 (clear) → 1 (fully overcast); dims the sun/moon behind the cover
+function cloudCover(code) {
+  if (code == null) return 0
+  if (code === 0) return 0
+  if (code === 1) return 0.20
+  if (code === 2) return 0.50
+  if (code === 45 || code === 48) return 0.85
+  if (code === 3) return 0.90
+  if (code >= 51) return 1                          // any precip fully hides the sun
+  return 0.3
 }
 
 // ── Time-of-day sky palettes (kept dark enough for white text) ───────────────
@@ -103,7 +124,7 @@ function weatherQuip(code, phase) {
 }
 
 // ── Live weather particle canvas (rain / snow / clouds / stars / lightning) ──
-function SkyCanvas({ type, phase }) {
+function SkyCanvas({ type, phase, clouds = 0 }) {
   const cvs   = useRef(null)
   const flash = useRef(0)
 
@@ -143,8 +164,8 @@ function SkyCanvas({ type, phase }) {
         for (let i = 0; i < 95; i++) parts.push({ x: rnd(0, W), y: rnd(0, H), len: rnd(8, 18), v: rnd(360, 560), a: rnd(0.08, 0.28) })
       } else if (type === 'snow') {
         for (let i = 0; i < 60; i++) parts.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(1, 2.6), v: rnd(18, 42), drift: rnd(-14, 14), ph: rnd(0, 6.28), a: rnd(0.3, 0.8) })
-      } else if (type === 'clouds') {
-        for (let i = 0; i < 3; i++) parts.push({ ...makeCloud(), x: rnd(0, W), y: rnd(H * 0.14, H * 0.48) })
+      } else {
+        for (let i = 0; i < clouds; i++) parts.push({ ...makeCloud(), x: rnd(0, W), y: rnd(H * 0.14, H * 0.48) })
       }
     }
     function resize() {
@@ -187,7 +208,7 @@ function SkyCanvas({ type, phase }) {
           p.y += p.v * dt; p.x += p.drift * dt * 0.3
           if (p.y > H) { p.y = -4; p.x = rnd(0, W) }
         }
-      } else if (type === 'clouds') {
+      } else if (parts.length) {
         // Soft wide haze wisps — heavily blurred, dim at night, warm at dawn/dusk.
         // Each cloud regenerates a fresh silhouette (in place) when it wraps around.
         const cloudCol = phase === 'night' ? '#5d6b85' : phase === 'day' ? '#cdd8e8' : '#d3c1bf'
@@ -231,7 +252,7 @@ function SkyCanvas({ type, phase }) {
       running = false; cancelAnimationFrame(raf)
       ro.disconnect(); document.removeEventListener('visibilitychange', onVis)
     }
-  }, [type, phase])
+  }, [type, phase, clouds])
 
   return <canvas ref={cvs} className="absolute inset-0 pointer-events-none" style={{ width: '100%', height: '100%' }} />
 }
@@ -329,11 +350,15 @@ function SkyHeader({ lat, lon }) {
       .catch(() => {})
   }, [lat, lon])
 
-  const sky   = skyState(now, w?.sunrise, w?.sunset)
-  const pal   = SKY_PAL[sky.phase]
-  const type  = precipType(w?.code)
-  const glowX = 6 + sky.sunT * 88
-  const info  = w ? wmoInfo(w.code) : null
+  const sky    = skyState(now, w?.sunrise, w?.sunset)
+  const pal    = SKY_PAL[sky.phase]
+  const type   = precipType(w?.code)
+  const clouds = cloudCount(w?.code)
+  const cover  = cloudCover(w?.code)
+  const glowX  = 6 + sky.sunT * 88
+  const info   = w ? wmoInfo(w.code) : null
+  // Sun/moon dims as cloud cover increases (bright on a clear day, faint under overcast)
+  const bodyVis = Math.max(0.18, 1 - cover * 0.62)
 
   return (
     <div className="relative shrink-0 overflow-hidden rounded-2xl border border-white/[0.06]" style={{ height: 216 }}>
@@ -346,14 +371,14 @@ function SkyHeader({ lat, lon }) {
         const disc    = isN ? '#e7edf9' : sky.phase === 'day' ? '#ffe4a0' : '#ffb277'
         const ds      = isN ? 20 : 30
         return (
-          <div className="absolute pointer-events-none" style={{ left: `${glowX}%`, top: bodyTop, width: 0, height: 0 }}>
+          <div className="absolute pointer-events-none" style={{ left: `${glowX}%`, top: bodyTop, width: 0, height: 0, opacity: bodyVis, transition: 'opacity 1.5s ease' }}>
             <div className="absolute rounded-full" style={{ width: 200, height: 200, transform: 'translate(-50%,-50%)', background: `radial-gradient(circle, ${SKY_GLOW[sky.phase]} 0%, transparent 60%)` }} />
             <div className="absolute rounded-full" style={{ width: ds, height: ds, transform: 'translate(-50%,-50%)', background: disc, boxShadow: `0 0 22px 5px ${disc}80`, opacity: 0.95 }} />
           </div>
         )
       })()}
       {/* Weather particles */}
-      <SkyCanvas type={type} phase={sky.phase} />
+      <SkyCanvas type={type} phase={sky.phase} clouds={clouds} />
 
       {/* Foreground content */}
       <div className="relative z-10 h-full flex flex-col items-center justify-center px-4 py-3">
