@@ -124,7 +124,17 @@ function AmbientSky() {
       if (phase !== 'day') {
         shootTimer -= dt
         if (!shoot && shootTimer <= 0) {
-          shoot = { x: rand(W * 0.1, W * 0.7), y: rand(H * 0.05, H * 0.4), vx: rand(280, 420), vy: rand(120, 200), life: 1 }
+          // Random direction (left/right), angle and speed each time
+          const dir = Math.random() < 0.5 ? 1 : -1
+          const ang = rand(0.35, 1.2)          // ~20°–69° below horizontal
+          const spd = rand(320, 480)
+          shoot = {
+            x: dir === 1 ? rand(0, W * 0.55) : rand(W * 0.45, W),
+            y: rand(0, H * 0.5),
+            vx: Math.cos(ang) * spd * dir,
+            vy: Math.sin(ang) * spd,
+            life: 1,
+          }
           shootTimer = rand(6, 14)
         }
         if (shoot) {
@@ -134,7 +144,7 @@ function AmbientSky() {
           ctx.strokeStyle = g; ctx.lineWidth = 2
           ctx.beginPath(); ctx.moveTo(shoot.x, shoot.y); ctx.lineTo(tx, ty); ctx.stroke()
           shoot.x += shoot.vx * dt; shoot.y += shoot.vy * dt; shoot.life -= dt * 0.7
-          if (shoot.life <= 0 || shoot.x > W || shoot.y > H) shoot = null
+          if (shoot.life <= 0 || shoot.x < -60 || shoot.x > W + 60 || shoot.y > H + 60) shoot = null
         }
       }
 
