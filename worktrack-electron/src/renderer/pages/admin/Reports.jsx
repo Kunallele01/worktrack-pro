@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { Download, RefreshCw, X } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { AnimatePresence, motion } from 'framer-motion'
-import { getAllAttendance, getUsers, getSettings, getAllLeaveRequests } from '../../lib/supabase'
+import { getAllAttendance, getUsers, getSettings, getAllLeaveRequests, getMonthHistory, getMyLeaves } from '../../lib/supabase'
 import { Card, Button, Select, Avatar } from '../../components/ui'
 import { useToast } from '../../components/ui'
 import { format } from 'date-fns'
@@ -66,6 +66,137 @@ function scoreGrade(s) {
   if (s >= 75) return { label: 'Good',      color: 'text-accent-400',  bg: 'bg-accent-500/15',  hex: '#4F86F7' }
   if (s >= 60) return { label: 'Fair',       color: 'text-amber-400',   bg: 'bg-amber-500/15',   hex: '#F59E0B' }
   return              { label: 'At Risk',    color: 'text-red-400',     bg: 'bg-red-500/15',     hex: '#EF4444' }
+}
+
+// ── Deep-dive analytics helpers ─────────────────────────────────────────────
+function _istHM(iso) {
+  const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(iso))
+  return parseInt(p.find(x => x.type === 'hour').value, 10) * 60 + parseInt(p.find(x => x.type === 'minute').value, 10)
+}
+function _median(arr) {
+  if (!arr.length) return null
+  const s = [...arr].sort((a, b) => a - b), mid = Math.floor(s.length / 2)
+  return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2)
+}
+function _hm(mins) {
+  if (mins == null) return '—'
+  const h = Math.floor(mins / 60), m = mins % 60, ap = h >= 12 ? 'PM' : 'AM'
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${ap}`
+}
+function _longestStreak(records) {
+  const present = [...new Set(records.filter(r => ['in_office','wfh'].includes(r.status)).map(r => r.date))].sort()
+  if (!present.length) return 0
+  let best = 1, cur = 1
+  for (let i = 1; i < present.length; i++) {
+    const d = new Date(present[i - 1] + 'T12:00:00'); d.setDate(d.getDate() + 1)
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1)
+    if (d.toLocaleDateString('sv-SE') === present[i]) { cur++; best = Math.max(best, cur) } else cur = 1
+  }
+  return best
+}
+const _DOWLONG = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+const CHIP_TONE = {
+  good:    'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
+  warn:    'bg-amber-500/10 text-amber-300 border-amber-500/20',
+  bad:     'bg-red-500/10 text-red-300 border-red-500/20',
+  neutral: 'bg-white/[0.04] text-gray-300 border-white/10',
+}
+// Behavioural flags derived purely from this employee's month of records
+function buildInsights(records, lateThreshold) {
+  const chips = []
+  const present = records.filter(r => ['in_office','wfh'].includes(r.status) && r.check_in_time)
+  if (present.length) {
+    const onTime = present.filter(r => !r.is_late).length
+    const rate = Math.round(onTime / present.length * 100)
+    chips.push({ icon: rate >= 90 ? '✅' : rate >= 70 ? '🟡' : '🔴', text: `${rate}% on-time arrivals`, tone: rate >= 90 ? 'good' : rate >= 70 ? 'warn' : 'bad' })
+  }
+  const lateRecs = records.filter(r => r.is_late)
+  if (lateRecs.length) {
+    const counts = {}
+    lateRecs.forEach(r => { const d = new Date(r.date + 'T12:00:00').getDay(); counts[d] = (counts[d] || 0) + 1 })
+    const [topDow, topN] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]
+    chips.push({
+      icon: '⏰',
+      text: lateRecs.length === 1 ? `Late once — ${_DOWLONG[topDow]}` : (topN >= 2 ? `Late ${lateRecs.length}× — often ${_DOWLONG[topDow]}s` : `Late ${lateRecs.length}× this month`),
+      tone: lateRecs.length >= 3 ? 'bad' : 'warn',
+    })
+  }
+  const streak = _longestStreak(records)
+  if (streak >= 3) chips.push({ icon: '🔥', text: `${streak}-day present streak`, tone: 'good' })
+  return chips
+}
+
+// Single-employee Excel — a compact one-sheet version of the per-person report
+async function buildEmployeeExcel(row, workdays, month, year, settings) {
+  const ExcelJS   = (await import('exceljs')).default
+  const company   = settings?.company_name || 'WorkTrack Pro'
+  const wb = new ExcelJS.Workbook()
+  wb.creator = company; wb.created = new Date()
+  const monthLabel  = MONTHS.find(m => m.value === month)?.label || ''
+  const genStamp    = `Generated: ${format(new Date(), 'dd MMM yyyy · hh:mm a')}`
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const allDays     = Array.from({ length: daysInMonth }, (_, i) => {
+    const d = new Date(year, month - 1, i + 1)
+    return { date: d.toLocaleDateString('sv-SE'), day: d.toLocaleDateString('en', { weekday: 'short' }) }
+  })
+  const byDate = {}
+  ;(row.records || []).forEach(r => { byDate[r.date] = r })
+  const uPresent = Object.values(byDate).filter(x => ['in_office','wfh'].includes(x.status)).length
+  const uWfh     = Object.values(byDate).filter(x => x.status === 'wfh').length
+  const uLate    = Object.values(byDate).filter(x => x.is_late).length
+  const uAtt     = attendancePct(uPresent, workdays)
+
+  const ws = wb.addWorksheet(row.full_name.replace(/[*?:\\/[\]]/g, '').substring(0, 31))
+  writeHeader(ws, company, row.full_name,
+    `${row.department || ''}  ·  ID: ${row.employee_id}  ·  ${monthLabel} ${year}`,
+    `${genStamp}  ·  Attendance: ${uAtt}%  ·  Working Days: ${workdays}`, 7)
+  writeColHeaders(ws, [
+    { label: 'Date', align: 'center' }, { label: 'Day', align: 'center' },
+    { label: 'Check-in', align: 'center' }, { label: 'Check-out', align: 'center' },
+    { label: 'Status', align: 'center' }, { label: 'Hours', align: 'center' },
+    { label: 'Late?', align: 'center' },
+  ], 6)
+  let r = 7
+  allDays.forEach(({ date, day }) => {
+    const isWknd = ['Sat','Sun'].includes(day)
+    const rec    = byDate[date]
+    const stKey  = rec?.status
+    const bg     = isWknd ? 'FFF1F5F9' : (STATUS_FILL[stKey] || (r % 2 === 0 ? 'FFF8FAFC' : 'FFFFFFFF'))
+    const gFont  = { color: { argb: 'FFBFC8D3' } }
+    sc(ws.getCell(r,1), date,                      { fill: bg, font: isWknd ? gFont : {},                 align: { horizontal: 'center' } })
+    sc(ws.getCell(r,2), day,                       { fill: bg, font: isWknd ? gFont : { bold: true },     align: { horizontal: 'center' } })
+    sc(ws.getCell(r,3), fmtT(rec?.check_in_time),  { fill: bg, font: isWknd ? gFont : {},                 align: { horizontal: 'center' } })
+    sc(ws.getCell(r,4), fmtT(rec?.check_out_time), { fill: bg, font: isWknd ? gFont : {},                 align: { horizontal: 'center' } })
+    sc(ws.getCell(r,5), isWknd ? 'Weekend' : (stKey ? STATUS_LABEL[stKey] || stKey : 'Absent'),
+                                                   { fill: isWknd ? 'FFF1F5F9' : (STATUS_FILL[stKey] || bg), font: isWknd ? gFont : { bold: !!stKey }, align: { horizontal: 'center' } })
+    sc(ws.getCell(r,6), calcHours(rec?.check_in_time, rec?.check_out_time),
+                                                   { fill: bg, font: isWknd ? gFont : {},                 align: { horizontal: 'center' } })
+    sc(ws.getCell(r,7), rec?.is_late ? '▲ Late' : (isWknd ? '' : '—'),
+                                                   { fill: rec?.is_late ? 'FFFEF3C7' : bg, font: rec?.is_late ? { bold: true, color: { argb: 'FFD97706' } } : gFont, align: { horizontal: 'center' } })
+    ws.getRow(r).height = 18; r++
+  })
+  r++
+  ws.mergeCells(r, 1, r, 7)
+  sc(ws.getCell(r,1), 'MONTHLY SUMMARY', { fill: 'FF0F172A', font: { bold: true, size: 10, color: { argb: 'FFFFFFFF' } }, align: { horizontal: 'center' }, border: null })
+  ws.getRow(r).height = 20; r++
+  const footRows = [
+    ['Working Days',  workdays,                          'FFEFF6FF', 'FF1D4ED8'],
+    ['Days Present',  uPresent,                          'FFD1FAE5', 'FF059669'],
+    ['WFH Days',      uWfh,                              'FFDBEAFE', 'FF3B82F6'],
+    ['Late Arrivals', uLate, uLate > 0 ?                 'FFFEF3C7' : 'FFEFF6FF', uLate > 0 ? 'FFD97706' : 'FF6B7280'],
+    ['Days Absent',   Math.max(0, workdays - uPresent),  'FFFEE2E2', 'FFDC2626'],
+    ['Attendance %',  `${uAtt}%`,                        'FFEFF6FF', pctColor(uAtt)],
+  ]
+  footRows.forEach(([label, val, bg, color]) => {
+    ws.mergeCells(r, 1, r, 4)
+    sc(ws.getCell(r,1), label, { fill: bg, font: { bold: true, color: { argb: 'FF374151' } }, align: { horizontal: 'right' } })
+    ws.mergeCells(r, 5, r, 7)
+    sc(ws.getCell(r,5), val,   { fill: bg, font: { bold: true, size: 12, color: { argb: color } }, align: { horizontal: 'center' } })
+    ws.getRow(r).height = 22; r++
+  })
+  ws.columns = [{ width: 14 }, { width: 8 }, { width: 12 }, { width: 12 }, { width: 18 }, { width: 10 }, { width: 10 }]
+  ws.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+  return wb
 }
 
 const CHART_TOOLTIP = {
@@ -602,6 +733,7 @@ function MonthCalendar({ records, year, month }) {
 }
 
 function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
+  const toast = useToast()
   const { full_name, employee_id, department, score, present, wfh, inOffice, late, absent, punctDenom, records = [] } = row
   const grade = scoreGrade(score)
 
@@ -621,6 +753,57 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
     const avg = withBoth.reduce((acc, r) => acc + (new Date(r.check_out_time) - new Date(r.check_in_time)), 0) / withBoth.length / 3600000
     return `${Math.floor(avg)}h ${Math.round((avg % 1) * 60)}m`
   })()
+
+  // ── Typical day + behavioural insights (from this month's records) ──────────
+  const medIn  = _median(records.filter(r => ['in_office','wfh'].includes(r.status) && r.check_in_time).map(r => _istHM(r.check_in_time)))
+  const medOut = _median(records.filter(r => r.check_out_time).map(r => _istHM(r.check_out_time)))
+  const insights = buildInsights(records, officeStartMin + graceMin)
+
+  // ── Month-over-month trend — fetch last month and score it the same way ─────
+  const [prevScore, setPrevScore] = useState(undefined) // undefined = loading, null = no data
+  const [busyExport, setBusyExport] = useState(false)
+  const pm = month === 1 ? 12 : month - 1
+  const py = month === 1 ? year - 1 : year
+  const prevLabel = MONTHS.find(x => x.value === pm)?.label?.slice(0, 3) || ''
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const [recs, leaves] = await Promise.all([getMonthHistory(row.id, py, pm), getMyLeaves(row.id, py)])
+        const dim = new Date(py, pm, 0).getDate()
+        let wd = 0
+        for (let d = 1; d <= dim; d++) { const dow = new Date(py, pm - 1, d).getDay(); if (dow !== 0 && dow !== 6) wd++ }
+        const prefix = `${py}-${String(pm).padStart(2, '0')}`
+        const leaveSet = new Set()
+        ;(leaves || []).filter(l => l.status === 'approved').forEach(l => {
+          const cur = new Date(l.start_date + 'T12:00:00'), end = new Date(l.end_date + 'T12:00:00')
+          while (cur <= end) { const ds = cur.toLocaleDateString('sv-SE'), dow = cur.getDay(); if (dow !== 0 && dow !== 6 && ds.startsWith(prefix)) leaveSet.add(ds); cur.setDate(cur.getDate() + 1) }
+        })
+        const p  = (recs || []).filter(r => ['in_office','wfh'].includes(r.status)).length
+        const io = (recs || []).filter(r => r.status === 'in_office').length
+        const punct = calcPunctualityScore(recs || [], officeStartMin + graceMin, Math.max(0, wd - leaveSet.size))
+        const s = calcScore(p, io, wd, punct)
+        if (alive) setPrevScore(p > 0 ? s : null)
+      } catch { if (alive) setPrevScore(null) }
+    })()
+    return () => { alive = false }
+  }, [row.id, month, year])
+
+  const delta = typeof prevScore === 'number' ? score - prevScore : null
+
+  const exportEmployee = async () => {
+    setBusyExport(true)
+    try {
+      const wb  = await buildEmployeeExcel(row, workdays, month, year, settings)
+      const buf = await wb.xlsx.writeBuffer()
+      const safe = (full_name || 'employee').replace(/[^a-z0-9]+/gi, '_').toLowerCase()
+      const ml   = MONTHS.find(x => x.value === month)?.label?.toLowerCase() || month
+      await window.api?.saveExcel(buf, `${safe}_${ml}_${year}.xlsx`)
+      toast('Employee report saved to Downloads!', 'success')
+    } catch (e) { toast(e.message, 'error') }
+    finally { setBusyExport(false) }
+  }
 
   return (
     <>
@@ -644,6 +827,10 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
             <p className="text-base font-bold text-gray-100 leading-tight">{full_name}</p>
             <p className="text-xs text-gray-500 mt-0.5">{department || '—'} · <span className="font-mono">{employee_id}</span></p>
           </div>
+          <button onClick={exportEmployee} disabled={busyExport} title="Export this employee to Excel"
+            className="p-1.5 rounded-lg hover:bg-white/[0.07] text-gray-500 hover:text-gray-300 transition-colors shrink-0 disabled:opacity-50">
+            {busyExport ? <RefreshCw size={15} className="animate-spin" /> : <Download size={15} />}
+          </button>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.07] text-gray-500 hover:text-gray-300 transition-colors shrink-0">
             <X size={15} />
           </button>
@@ -659,6 +846,19 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
                 <div className="flex items-center gap-2">
                   <span className={`text-3xl font-black font-mono tabular-nums ${grade.color}`}>{score}</span>
                   <span className={`text-xs font-bold px-2 py-1 rounded-full ${grade.bg} ${grade.color}`}>{grade.label}</span>
+                </div>
+                {/* Rank + month-over-month trend */}
+                <div className="flex items-center gap-1.5 mt-2">
+                  {row._rank && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/[0.06] text-gray-300 border border-white/10">
+                      #{row._rank} of {row._total}
+                    </span>
+                  )}
+                  {delta !== null && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${delta > 0 ? 'bg-emerald-500/15 text-emerald-400' : delta < 0 ? 'bg-red-500/15 text-red-400' : 'bg-white/[0.06] text-gray-400'}`}>
+                      {delta > 0 ? `▲ +${delta}` : delta < 0 ? `▼ ${delta}` : '± 0'} vs {prevLabel}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="text-right">
@@ -687,6 +887,27 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
               </div>
             ))}
           </div>
+
+          {/* Typical day + behavioural insights */}
+          {(medIn != null || insights.length > 0) && (
+            <div className="flex flex-col gap-2.5">
+              {medIn != null && (
+                <div className="flex items-center gap-2 bg-white/[0.02] border border-white/[0.05] rounded-xl px-3 py-2">
+                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Typical day</span>
+                  <span className="ml-auto text-xs font-mono text-gray-300">🕘 {_hm(medIn)} → 🚪 {_hm(medOut)}</span>
+                </div>
+              )}
+              {insights.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {insights.map((c, i) => (
+                    <span key={i} className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-lg border ${CHIP_TONE[c.tone]}`}>
+                      <span>{c.icon}</span>{c.text}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Calendar */}
           <div>
@@ -997,7 +1218,7 @@ export default function Reports() {
                   const grade = scoreGrade(r.score)
                   return (
                     <tr key={r.id}
-                      onClick={() => setDeepDive(r)}
+                      onClick={() => setDeepDive({ ...r, _rank: i + 1, _total: preview.rows.length })}
                       className={`border-b border-white/[0.04] hover:bg-white/[0.05] transition-colors cursor-pointer ${i % 2 === 1 ? 'bg-white/[0.015]' : ''}`}>
                       <td className="px-3 py-2.5 text-xs text-gray-600 font-mono w-8">{i + 1}</td>
                       <td className="px-3 py-2.5">
