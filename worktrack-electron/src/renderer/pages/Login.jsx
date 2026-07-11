@@ -17,7 +17,7 @@ function OdoDigit({ d, size }) {
     <span style={{ height: size, width: size * 0.6, overflow: 'hidden', display: 'inline-block' }}>
       <span ref={ref} style={{ display: 'flex', flexDirection: 'column' }}>
         {Array.from({ length: 10 }, (_, n) => (
-          <span key={n} style={{ height: size, lineHeight: `${size}px`, textAlign: 'center' }}>{n}</span>
+          <span key={n} style={{ height: size, lineHeight: `${size}px`, fontSize: size, textAlign: 'center' }}>{n}</span>
         ))}
       </span>
     </span>
@@ -37,7 +37,7 @@ function LiveClock() {
       <div className="flex items-center justify-center font-mono font-bold text-white leading-none" style={{ letterSpacing: '-3px' }}>
         <OdoDigit d={+hh[0]} size={big} /><OdoDigit d={+hh[1]} size={big} />
         <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ fontSize: big * 0.78, margin: '0 6px' }}>:</motion.span>
+          className="text-white/70" style={{ fontSize: big * 0.5, margin: '0 4px' }}>:</motion.span>
         <OdoDigit d={+mm[0]} size={big} /><OdoDigit d={+mm[1]} size={big} />
       </div>
       <div className="flex items-center justify-center font-mono font-light text-white/40 tabular-nums mt-3" style={{ letterSpacing: '-1px' }}>

@@ -334,15 +334,26 @@ function SkyHeader({ lat, lon }) {
 
   useEffect(() => {
     if (!lat || !lon || (lat === 0 && lon === 0)) { setW(null); return }
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=temperature_2m,apparent_temperature,weather_code,is_day&daily=sunrise,sunset&timezone=auto`)
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=temperature_2m,apparent_temperature,weather_code,is_day&hourly=precipitation_probability&daily=sunrise,sunset&timezone=auto`)
       .then(r => r.json())
       .then(d => {
         if (!d.current) return
+        // Chance of rain — max probability over the current + next 3 hours
+        let rainChance = null
+        const hp = d.hourly?.precipitation_probability, ht = d.hourly?.time
+        if (hp && ht && d.current.time) {
+          let idx = ht.indexOf(d.current.time)
+          if (idx < 0) idx = ht.findIndex(t => t.slice(0, 13) === d.current.time.slice(0, 13))
+          if (idx < 0) idx = 0
+          const win = hp.slice(idx, idx + 4).filter(x => x != null)
+          rainChance = win.length ? Math.max(...win) : (hp[idx] ?? null)
+        }
         setW({
           temp:    Math.round(d.current.temperature_2m),
           feels:   Math.round(d.current.apparent_temperature),
           code:    d.current.weather_code,
           isDay:   d.current.is_day === 1,
+          rainChance,
           sunrise: d.daily?.sunrise?.[0] ? new Date(d.daily.sunrise[0]) : null,
           sunset:  d.daily?.sunset?.[0]  ? new Date(d.daily.sunset[0])  : null,
         })
@@ -393,6 +404,9 @@ function SkyHeader({ lat, lon }) {
             <div className="text-left">
               <p className="text-sm font-bold text-gray-100 leading-tight">
                 {w.temp}°C <span className="font-normal text-gray-300">{info.label}</span>
+                {w.rainChance != null && w.rainChance >= 10 && (
+                  <span className="font-semibold text-sky-300/90 text-xs"> · 💧 {w.rainChance}%</span>
+                )}
               </p>
               <p className="text-[11px] text-gray-400 leading-tight">{weatherQuip(w.code, sky.phase)}</p>
             </div>
