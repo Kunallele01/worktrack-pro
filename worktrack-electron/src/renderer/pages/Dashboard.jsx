@@ -333,13 +333,26 @@ function SkyHeader({ lat, lon }) {
 
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
 
-  // Reverse-geocode the coordinates → city name (keyless client endpoint)
+  // Reverse-geocode the coordinates → city name. Primary is coordinate-accurate;
+  // if it fails or returns nothing, fall back to IP-based city (same host the app
+  // already uses reliably for geolocation).
   useEffect(() => {
     if (!lat || !lon || (lat === 0 && lon === 0)) { setCity(null); return }
+    let alive = true
+    const apply = (name) => { if (alive && name) setCity(name) }
+    const ipFallback = () =>
+      fetch('https://ip-api.com/json/?fields=city,regionName,status')
+        .then(r => r.json())
+        .then(d => { if (d.status === 'success') apply(d.city || d.regionName) })
+        .catch(() => {})
     fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&localityLanguage=en`)
       .then(r => r.json())
-      .then(d => setCity(d.city || d.locality || d.principalSubdivision || null))
-      .catch(() => {})
+      .then(d => {
+        const name = d.city || d.locality || d.principalSubdivision
+        if (name) apply(name); else ipFallback()
+      })
+      .catch(ipFallback)
+    return () => { alive = false }
   }, [lat, lon])
 
   useEffect(() => {
