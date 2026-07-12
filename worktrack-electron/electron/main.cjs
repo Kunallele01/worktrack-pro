@@ -168,6 +168,26 @@ ipcMain.handle('create-tray',  () => { if (!tray) createTray() })
 ipcMain.handle('destroy-tray', () => { if (tray) { tray.destroy(); tray = null } })
 ipcMain.handle('get-version',  () => app.getVersion())
 
+// Fetch a URL from the main process (bypasses renderer CSP + sets a proper UA that
+// OSM tile servers accept) and return it as a base64 data-URL. Used to embed the
+// WFH-location map tiles directly into notification emails.
+ipcMain.handle('fetch-url-b64', async (_event, url) => {
+  const mod = require(url.startsWith('https') ? 'https' : 'http')
+  return new Promise((resolve) => {
+    const req = mod.get(url, {
+      headers: { 'User-Agent': 'WorkTrack Pro/2.0 (Electron; Windows NT 10.0) Mozilla/5.0' },
+      timeout: 8000,
+    }, (res) => {
+      if (res.statusCode !== 200) { res.resume(); resolve(null); return }
+      const chunks = []
+      res.on('data', chunk => chunks.push(chunk))
+      res.on('end', () => resolve(`data:image/png;base64,${Buffer.concat(chunks).toString('base64')}`))
+    })
+    req.on('error', () => resolve(null))
+    req.on('timeout', () => { req.destroy(); resolve(null) })
+  })
+})
+
 // WiFi SSID — used for office detection on desktops without GPS
 ipcMain.handle('get-wifi-ssid', () => {
   try {
