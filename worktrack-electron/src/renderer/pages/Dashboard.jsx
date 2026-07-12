@@ -327,10 +327,20 @@ function DaylightArc({ sunT, isNight, sunrise, sunset }) {
 
 // ── The full atmospheric header ──────────────────────────────────────────────
 function SkyHeader({ lat, lon }) {
-  const [now, setNow] = useState(new Date())
-  const [w,   setW  ] = useState(null)
+  const [now,  setNow ] = useState(new Date())
+  const [w,    setW   ] = useState(null)
+  const [city, setCity] = useState(null)
 
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
+
+  // Reverse-geocode the coordinates → city name (keyless client endpoint)
+  useEffect(() => {
+    if (!lat || !lon || (lat === 0 && lon === 0)) { setCity(null); return }
+    fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&localityLanguage=en`)
+      .then(r => r.json())
+      .then(d => setCity(d.city || d.locality || d.principalSubdivision || null))
+      .catch(() => {})
+  }, [lat, lon])
 
   useEffect(() => {
     if (!lat || !lon || (lat === 0 && lon === 0)) { setW(null); return }
@@ -394,7 +404,10 @@ function SkyHeader({ lat, lon }) {
       {/* Foreground content */}
       <div className="relative z-10 h-full flex flex-col items-center justify-center px-4 py-3">
         <OdoClock now={now} />
-        <p className="text-gray-300 text-sm mt-1.5">{format(now, 'EEEE, d MMMM yyyy')}</p>
+        <p className="text-gray-300 text-sm mt-1.5">
+          {format(now, 'EEEE, d MMMM yyyy')}
+          {city && <span className="text-gray-400"> · 📍 {city}</span>}
+        </p>
         {w && (
           <div className="flex items-center gap-2.5 mt-2">
             <motion.div animate={weatherAnim(w.code).animate} transition={weatherAnim(w.code).transition}
