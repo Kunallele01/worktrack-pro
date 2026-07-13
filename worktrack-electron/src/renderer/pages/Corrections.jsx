@@ -38,8 +38,23 @@ const STATUS_OPTIONS = [
   { value: 'wfh',       label: 'WFH' },
 ]
 
-function CorrectionForm({ user, history, onSuccess }) {
+const MONTHS = [
+  { value: 1,  label: 'January'   }, { value: 2,  label: 'February' }, { value: 3,  label: 'March'     },
+  { value: 4,  label: 'April'     }, { value: 5,  label: 'May'      }, { value: 6,  label: 'June'      },
+  { value: 7,  label: 'July'      }, { value: 8,  label: 'August'   }, { value: 9,  label: 'September' },
+  { value: 10, label: 'October'   }, { value: 11, label: 'November' }, { value: 12, label: 'December'  },
+]
+
+function CorrectionForm({ user, onSuccess }) {
   const toast = useToast()
+  const now0     = new Date()
+  const curYear  = now0.getFullYear()
+  const curMonth = now0.getMonth() + 1
+  const todayStr = now0.toLocaleDateString('sv-SE')
+
+  const [selYear,   setSelYear  ] = useState(curYear)
+  const [selMonth,  setSelMonth ] = useState(curMonth)
+  const [monthHist, setMonthHist] = useState([])
   const [date,    setDate   ] = useState('')
   const [type,    setType   ] = useState('forgot_checkin')
   const [checkin, setCheckin] = useState('')
@@ -50,25 +65,43 @@ function CorrectionForm({ user, history, onSuccess }) {
 
   const ct = CORR_TYPES.find(c => c.value === type) || CORR_TYPES[0]
 
-  const dateOptsFull = (() => {
-    const histMap  = Object.fromEntries(history.map(r => [r.date, r.status]))
-    const now2     = new Date()
-    const todayStr = now2.toLocaleDateString('sv-SE')
-    const yr       = now2.getFullYear()
-    const mo       = now2.getMonth() + 1
-    const dim      = new Date(yr, mo, 0).getDate()
+  // Load the selected month's attendance so each day can show its current status
+  useEffect(() => {
+    let alive = true
+    getMonthHistory(user.id, selYear, selMonth)
+      .then(h => { if (alive) setMonthHist(h || []) })
+      .catch(() => { if (alive) setMonthHist([]) })
+    return () => { alive = false }
+  }, [user.id, selYear, selMonth])
+
+  // Year: current + previous. Month: exclude future months of the current year.
+  const yearOpts  = [curYear, curYear - 1].map(y => ({ value: String(y), label: String(y) }))
+  const monthOpts = MONTHS
+    .filter(m => !(selYear === curYear && m.value > curMonth))
+    .map(m => ({ value: String(m.value), label: m.label }))
+
+  const dayOpts = (() => {
+    const histMap = Object.fromEntries(monthHist.map(r => [r.date, r.status]))
+    const dim     = new Date(selYear, selMonth, 0).getDate()
     const STATUS_LABEL = { in_office: 'In Office', wfh: 'WFH', absent: 'Absent', auto_checkout: 'Auto-out' }
-    const opts = [{ value: '', label: 'Select a date…' }]
+    const opts = [{ value: '', label: 'Day…' }]
     for (let d = 1; d <= dim; d++) {
-      const dateStr = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+      const dateStr = `${selYear}-${String(selMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`
       if (dateStr > todayStr) break
-      const dow = new Date(yr, mo - 1, d).getDay()
+      const dow = new Date(selYear, selMonth - 1, d).getDay()
       if (dow === 0 || dow === 6) continue
       const st = histMap[dateStr]
-      opts.push({ value: dateStr, label: `${dateStr} — ${STATUS_LABEL[st] || (st ? st : 'No record')}` })
+      opts.push({ value: dateStr, label: `${d} · ${STATUS_LABEL[st] || (st ? st : 'No record')}` })
     }
     return opts
   })()
+
+  const pickYear = (v) => {
+    const y = +v
+    setSelYear(y); setDate('')
+    if (y === curYear && selMonth > curMonth) setSelMonth(curMonth)
+  }
+  const pickMonth = (v) => { setSelMonth(+v); setDate('') }
 
   const submit = async (e) => {
     e.preventDefault()
@@ -90,15 +123,20 @@ function CorrectionForm({ user, history, onSuccess }) {
     <Card className="p-5">
       <h2 className="text-sm font-bold text-gray-100 mb-4">Submit a Correction Request</h2>
       <form onSubmit={submit} className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Date</label>
-            <Select value={date} onChange={setDate} options={dateOptsFull} placeholder="Select date…" />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+            Date of missed / incorrect record
+            <span className="text-gray-600 font-normal normal-case ml-1.5">— year → month → day</span>
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            <Select value={String(selYear)}  onChange={pickYear}  options={yearOpts}  placeholder="Year" />
+            <Select value={String(selMonth)} onChange={pickMonth} options={monthOpts} placeholder="Month" />
+            <Select value={date}             onChange={setDate}   options={dayOpts}   placeholder="Day" />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Issue Type</label>
-            <Select value={type} onChange={setType} options={CORR_TYPES.map(c => ({ value: c.value, label: c.label }))} />
-          </div>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Issue Type</label>
+          <Select value={type} onChange={setType} options={CORR_TYPES.map(c => ({ value: c.value, label: c.label }))} />
         </div>
 
         {ct.fields.includes('checkin') && (
@@ -257,7 +295,6 @@ function MyRequests({ requests }) {
 function CorrectionsInner() {
   const user      = useStore(s => s.user)
   const setBadges = useStore(s => s.setBadges)
-  const [history,  setHistory ] = useState([])
   const [requests, setRequests] = useState([])
 
   // Mark corrections as seen — clears the sidebar badge
@@ -270,12 +307,7 @@ function CorrectionsInner() {
 
   const load = useCallback(async () => {
     if (!user) return
-    const now = new Date()
-    const [h, r] = await Promise.all([
-      getMonthHistory(user.id, now.getFullYear(), now.getMonth() + 1),
-      getMyCorrections(user.id),
-    ])
-    setHistory(h); setRequests(r)
+    setRequests(await getMyCorrections(user.id))
   }, [user])
 
   useEffect(() => { load() }, [load])
@@ -287,7 +319,7 @@ function CorrectionsInner() {
           <h1 className="text-xl font-bold text-gray-100">Attendance Corrections</h1>
           <p className="text-sm text-gray-400 mt-0.5">Request a fix for a wrong or missed check-in</p>
         </div>
-        <CorrectionForm user={user} history={history} onSuccess={load} />
+        <CorrectionForm user={user} onSuccess={load} />
         <div>
           <h2 className="text-sm font-semibold text-gray-300 mb-3">My Requests</h2>
           <MyRequests requests={requests} />

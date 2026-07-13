@@ -164,15 +164,20 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
 
   const show = (message, type = 'info') => {
-    const id = Date.now()
-    setToasts(t => [...t, { id, message, type }])
+    const id = Date.now() + Math.random()
+    setToasts(t => {
+      // Skip if an identical toast is already on screen (avoids stacking duplicates)
+      if (t.some(x => x.message === message && x.type === type)) return t
+      return [...t, { id, message, type }]
+    })
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3500)
   }
 
   return (
     <ToastContext.Provider value={show}>
       {children}
-      <div className="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
+      {/* z above Leaflet map panes/controls (which can reach ~1000) so toasts never hide behind the map */}
+      <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none">
         <AnimatePresence>
           {toasts.map(t => <Toast key={t.id} {...t} onDismiss={() => setToasts(ts => ts.filter(x => x.id !== t.id))} />)}
         </AnimatePresence>

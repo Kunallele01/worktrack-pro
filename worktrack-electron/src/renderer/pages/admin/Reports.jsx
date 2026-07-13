@@ -34,7 +34,7 @@ function calcHours(ci, co) {
   const h = (new Date(co) - new Date(ci)) / 3600000
   return h > 0 ? `${Math.floor(h)}h ${Math.round((h % 1) * 60)}m` : ''
 }
-function attendancePct(present, workdays) { return workdays > 0 ? Math.round(present / workdays * 100) : 0 }
+function attendancePct(present, workdays) { return workdays > 0 ? Math.min(100, Math.round(present / workdays * 100)) : 0 }
 function pctColor(p) { return p >= 80 ? 'FF059669' : p >= 60 ? 'FFD97706' : 'FFDC2626' }
 
 // denom = working days minus approved-leave days; absent days count as 0 punctuality.
@@ -521,7 +521,7 @@ async function buildExcel(kind, year, month) {
     wfh:   `Period: ${dateRange}  ·  Showing Work From Home only`,
   }
   const ws  = wb.addWorksheet(TITLES[kind])
-  const COL = 10
+  const COL = 11
   writeHeader(ws, company, TITLES[kind], METAS[kind], `${genStamp}  ·  Records: ${items.length}`, COL)
   writeColHeaders(ws, [
     { label: '#',           align: 'center' }, { label: 'Employee',    align: 'left'   },
@@ -529,6 +529,7 @@ async function buildExcel(kind, year, month) {
     { label: 'Date',        align: 'center' }, { label: 'Day',         align: 'center' },
     { label: 'Check-in',    align: 'center' }, { label: 'Check-out',   align: 'center' },
     { label: 'Status',      align: 'center' }, { label: 'Hours',       align: 'center' },
+    { label: 'Location',    align: 'center' },
   ], 6)
 
   if (!items.length) {
@@ -556,13 +557,23 @@ async function buildExcel(kind, year, month) {
     sc(ws.getCell(r,8),  fmtT(rec.check_out_time),                           { fill: bg,                                         align: { horizontal: 'center' } })
     sc(ws.getCell(r,9),  STATUS_LABEL[rec.status] || rec.status || '',       { fill: stF, font: { bold: true },                  align: { horizontal: 'center' } })
     sc(ws.getCell(r,10), calcHours(rec.check_in_time, rec.check_out_time),   { fill: bg,                                         align: { horizontal: 'center' } })
+
+    // Location — clickable Google Maps link where coordinates were captured (WFH pins, GPS check-ins)
+    const lat = rec.latitude, lon = rec.longitude
+    const hasLoc = lat != null && lon != null && !(lat === 0 && lon === 0)
+    if (hasLoc) {
+      sc(ws.getCell(r,11), { text: '📍 View map', hyperlink: `https://www.google.com/maps?q=${lat},${lon}` },
+        { fill: bg, font: { color: { argb: 'FF2563EB' }, underline: true }, align: { horizontal: 'center' } })
+    } else {
+      sc(ws.getCell(r,11), '—', { fill: bg, font: { color: { argb: 'FF9CA3AF' } }, align: { horizontal: 'center' } })
+    }
     ws.getRow(r).height = 19
   })
 
   ws.columns = [
     { width: 5  }, { width: 26 }, { width: 13 }, { width: 18 },
     { width: 13 }, { width: 7  }, { width: 11 }, { width: 11 },
-    { width: 17 }, { width: 10 },
+    { width: 17 }, { width: 10 }, { width: 14 },
   ]
   ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
   return wb

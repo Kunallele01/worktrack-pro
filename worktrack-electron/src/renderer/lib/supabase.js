@@ -1022,6 +1022,11 @@ export async function reviewCorrection(corrId, reviewerId, approved, adminNote =
     if (corr.requested_checkout) updates.check_out_time = corr.requested_checkout
     if (corr.requested_status)   updates.status         = corr.requested_status
 
+    // A "forgot to check in" correction asserts the person WAS present that day, so
+    // approval must record a present status. Default to In Office if they didn't pick WFH,
+    // otherwise the created record has no status and never counts as present.
+    if (corr.type === 'forgot_checkin' && !updates.status) updates.status = 'in_office'
+
     // Recalculate is_late whenever check_in_time is being corrected
     if (updates.check_in_time) {
       const parts = new Intl.DateTimeFormat('en-GB', {

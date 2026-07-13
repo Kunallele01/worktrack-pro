@@ -70,8 +70,10 @@ function Confetti({ run }) {
       }
     }
 
-    const DURATION  = 7500
-    const particles = Array.from({ length: 280 }, (_, i) => new Particle(true))
+    // Respect the OS "reduce motion" setting — gentler, shorter burst
+    const reduce    = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const DURATION  = reduce ? 4000 : 7500
+    const particles = Array.from({ length: reduce ? 70 : 280 }, (_, i) => new Particle(true))
     const start     = Date.now()
 
     const loop = () => {
@@ -123,38 +125,84 @@ function FloatingParticles() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Personalized birthday messages — one per person (deterministic by name hash)
+// Personalized birthday messages — warm, human, like a colleague actually wrote
+// them. One per person, picked deterministically by name so it stays "theirs".
 // ─────────────────────────────────────────────────────────────────────────────
 const BIRTHDAY_MESSAGES = [
   {
-    body: (name) => `Today the universe made a brilliant decision — it gave us ${name}. You show up, you deliver, you make this place worth coming to every single day. That's not ordinary — that's extraordinary. Today is entirely yours. 🚀`,
-    quote: `"May this year bring you everything you deserve — which is absolutely everything."`,
-    cta: `🎉  Let's Make It Legendary!`,
+    body: (name) => `Happy birthday, ${name}! Hope today's the kind of day where the coffee's hot, the inbox stays quiet, and someone remembers to bring cake. You've earned a good one.`,
+    quote: `"Another year, another excuse to eat cake before noon. Take it."`,
+    cta: `🎂  Thanks!`,
   },
   {
-    body: (name) => `${name}, some people light up a room when they walk in. You somehow manage to do that every single day. On your birthday, we just want to say: you are genuinely one of a kind. Have the most epic day. 🌟`,
-    quote: `"The secret to a great life? Be exactly who you are. You've clearly figured it out."`,
-    cta: `🎂  Thanks, I'll Accept This Greatness`,
+    body: (name) => `Quick reminder, ${name} — it's your birthday, which means "it's my birthday" is a complete sentence today if anyone asks you to do anything. Enjoy every bit of it. Glad you're here.`,
+    quote: `"Do less today. You've got a note from us."`,
+    cta: `🎉  On it`,
   },
   {
-    body: (name) => `Here's to ${name} — the person who somehow makes deadlines look easy, meetings bearable, and Monday mornings slightly less terrible. The team wouldn't be the same without you. Happy birthday! 🎊`,
-    quote: `"Every year you get wiser, sharper, and more dangerously good at what you do."`,
-    cta: `🚀  Onward to an Amazing Year!`,
+    body: (name) => `Happy birthday! Honestly, working with you makes the days easier, ${name} — and that's not a small thing. Hope you get spoiled a little today. You deserve it.`,
+    quote: `"Good people make ordinary days better. You're one of them."`,
+    cta: `🥳  Appreciate it`,
   },
   {
-    body: (name) => `${name}, you don't just do the work — you raise the bar for everyone around you. Today's your day to forget all that and just celebrate yourself. You've earned every single second of it. 🏆`,
-    quote: `"Success is getting what you want; happiness is wanting what you get. You've got both."`,
-    cta: `🎈  Let the Celebration Begin!`,
+    body: (name) => `${name}, hope your birthday is exactly your kind of day — whether that's a big fuss or just some peace and quiet. Whatever it looks like, we hope it's a good one. Cheers to you.`,
+    quote: `"Here's to a year that's kind to you."`,
+    cta: `🎈  Cheers`,
   },
   {
-    body: (name) => `A year older, a year more legendary. ${name}, your energy, your work ethic, and your ability to somehow stay calm under pressure never stop impressing us. Here's to you — today and every day. 🥂`,
-    quote: `"The best investment you'll ever make is in yourself. Happy returns on that today."`,
-    cta: `✨  Cheers to Me!`,
+    body: (name) => `It's your day, ${name}! Thanks for being someone this team can actually count on — the kind of person who just makes things work. Go enjoy yourself, you've earned the break.`,
+    quote: `"Reliable people are rare. Lucky us."`,
+    cta: `🎊  Thank you`,
   },
   {
-    body: (name) => `${name} — on the day you were born, the world got measurably better. That hasn't changed. We're lucky to work alongside someone who brings this much dedication, warmth, and talent every single day. 💫`,
-    quote: `"Another trip around the sun, and you only keep getting better."`,
-    cta: `🎉  Here We Go!`,
+    body: (name) => `Happy birthday, ${name}. No big speech — just a genuine thanks for everything you bring here, and a hope that today treats you really well. Eat the cake. All of it.`,
+    quote: `"Cake first. Everything else can wait."`,
+    cta: `🍰  Deal`,
+  },
+  {
+    body: (name) => `Another trip around the sun done, and nicely handled, ${name}. Hope today comes with good company, zero stress, and a bit of celebrating. You make this team better just by being on it.`,
+    quote: `"Same team, one very good reason to celebrate today."`,
+    cta: `🎉  Let's go`,
+  },
+  {
+    body: (name) => `Happy birthday! Hope you feel appreciated today, ${name} — because you should be, the whole year and not just today. Go do something that makes you happy. We'll hold the fort.`,
+    quote: `"Take the day. We mean it."`,
+    cta: `😄  Will do`,
+  },
+  {
+    body: (name) => `${name}, wishing you the good stuff today — the laughs, the favourite food, the people you actually like being around. Thanks for being genuinely great to work with. Happy birthday!`,
+    quote: `"The good stuff, all day. That's the whole wish."`,
+    cta: `💛  Thanks`,
+  },
+  {
+    body: (name) => `It's official, ${name} — a year wiser, and we're a year luckier to have you around. Hope today's relaxed, fun, and everything you want it to be. Happy birthday from all of us.`,
+    quote: `"Wiser every year, somehow still fun. Rare combo."`,
+    cta: `🎂  Cheers to that`,
+  },
+  {
+    body: (name) => `Happy birthday, ${name}! However you're spending it, we hope it's low on stress and high on the things you love. Thanks for showing up as you — it genuinely makes a difference here.`,
+    quote: `"Be exactly who you are today. It's working."`,
+    cta: `🌟  Thank you`,
+  },
+  {
+    body: (name) => `${name}, hope this one's a good birthday — the kind you actually remember for the right reasons. Thanks for everything you do around here. Now go enjoy your day properly.`,
+    quote: `"To a birthday worth remembering."`,
+    cta: `🎈  Absolutely`,
+  },
+  {
+    body: (name) => `${name}, they don't make many like you. Hope your birthday is easy, happy, and full of the people and things you love most. Thanks for being part of this — genuinely.`,
+    quote: `"One of the good ones. Happy birthday."`,
+    cta: `🎉  Thank you`,
+  },
+  {
+    body: (name) => `Happy birthday, ${name}! Take the win today — good food, good people, and absolutely no guilt about the second slice. Thanks for making this a better place to work.`,
+    quote: `"Second slice? Obviously. It's your day."`,
+    cta: `🍰  Say less`,
+  },
+  {
+    body: (name) => `${name}, just wanted to say happy birthday and thanks — for the work, sure, but mostly for being someone people are glad to have around. Hope today's a really good one.`,
+    quote: `"Glad you're on this team. Enjoy your day."`,
+    cta: `💛  Means a lot`,
   },
 ]
 
@@ -172,8 +220,16 @@ function BirthdaySelfModal({ user, onClose }) {
   const firstName = user.full_name?.split(' ')[0] || user.full_name
   const msg = pickBirthdayMsg(user.full_name)
 
+  // Esc to close
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
     <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       style={{ position:'fixed', inset:0, zIndex:9998, display:'flex', alignItems:'center', justifyContent:'center',
         background:'rgba(2,1,10,0.88)', backdropFilter:'blur(20px)', padding:16 }}
     >
@@ -247,7 +303,7 @@ function BirthdaySelfModal({ user, onClose }) {
           </motion.div>
 
           {/* Quote */}
-          <motion.p {...stagger(5)} style={{ color:'#6d28d9', fontSize:12, fontStyle:'italic', marginBottom:24, lineHeight:1.65 }}>
+          <motion.p {...stagger(5)} style={{ color:'#c4b5fd', fontSize:12, fontStyle:'italic', marginBottom:24, lineHeight:1.65 }}>
             {msg.quote}
           </motion.p>
 
@@ -268,7 +324,7 @@ function BirthdaySelfModal({ user, onClose }) {
             </motion.button>
             <button
               onClick={onClose}
-              style={{ background:'none', border:'none', color:'#4b2d7a', fontSize:11, cursor:'pointer', letterSpacing:0.3, padding:'2px 8px' }}
+              style={{ background:'none', border:'none', color:'#a394cf', fontSize:11, cursor:'pointer', letterSpacing:0.3, padding:'2px 8px' }}
             >
               Don't show again today
             </button>
@@ -278,7 +334,7 @@ function BirthdaySelfModal({ user, onClose }) {
         {/* Bottom glow line */}
         <div style={{ height:1, background:'linear-gradient(90deg,transparent,rgba(167,139,250,0.4),transparent)' }} />
         <div style={{ padding:'10px 24px', textAlign:'center' }}>
-          <p style={{ color:'#3b1e6e', fontSize:11, margin:0 }}>From everyone at WorkTrack Pro 💜</p>
+          <p style={{ color:'#b6a7e0', fontSize:11, margin:0 }}>From everyone at WorkTrack Pro 💜</p>
         </div>
       </motion.div>
     </motion.div>
@@ -343,7 +399,13 @@ export function BirthdayManager({ user }) {
 
     getTodaysBirthdays().then(async people => {
       const isMyBday = people.some(p => p.id === user.id)
-      setOtherBirthdays(people.filter(p => p.id !== user.id))
+      const others   = people.filter(p => p.id !== user.id)
+      setOtherBirthdays(others)
+
+      // Auto-dismiss teammate banners after 9s (manual ✕ still works before that)
+      if (others.length) {
+        setTimeout(() => setDismissed(prev => new Set([...prev, ...others.map(p => p.id)])), 9000)
+      }
 
       if (isMyBday) {
         // Only show modal + confetti if not already dismissed today
