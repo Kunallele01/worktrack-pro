@@ -84,6 +84,17 @@ function cloudCover(code) {
   return 0.3
 }
 
+// Rain intensity 0 (none) → 1 (thunderstorm) — drives lightning frequency & brightness
+function rainIntensity(code) {
+  if (code == null) return 0
+  if (code >= 95) return 1                              // thunderstorm
+  if (code === 65 || code === 67 || code === 82) return 0.8   // heavy rain / showers
+  if (code === 63 || code === 81) return 0.55                 // moderate rain
+  if (code === 61 || code === 80 || code === 66) return 0.4   // light rain
+  if (code === 51 || code === 53 || code === 55 || code === 56 || code === 57) return 0.25 // drizzle
+  return 0
+}
+
 // ── Time-of-day sky palettes (kept dark enough for white text) ───────────────
 const SKY_PAL = {
   night: ['#05070f', '#0a0f1e', '#0e1526'],
@@ -124,7 +135,7 @@ function weatherQuip(code, phase) {
 }
 
 // ── Live weather particle canvas (rain / snow / clouds / stars / lightning) ──
-function SkyCanvas({ type, phase, clouds = 0 }) {
+function SkyCanvas({ type, phase, clouds = 0, rainLevel = 0 }) {
   const cvs   = useRef(null)
   const flash = useRef(0)
 
@@ -230,12 +241,15 @@ function SkyCanvas({ type, phase, clouds = 0 }) {
       }
       ctx.globalAlpha = 1
 
-      if (type === 'storm') {
-        if (Math.random() < 0.004) flash.current = 1
+      // Lightning — how often it strikes and how bright it flashes both scale with
+      // rain intensity: a faint occasional glow in drizzle → frequent bright flashes in a storm.
+      if (rainLevel > 0) {
+        const chance = 0.0007 + rainLevel * rainLevel * 0.006
+        if (flash.current <= 0 && Math.random() < chance) flash.current = 0.35 + rainLevel * 0.65
         if (flash.current > 0) {
-          ctx.fillStyle = `rgba(200,220,255,${flash.current * 0.5})`
+          ctx.fillStyle = `rgba(205,222,255,${flash.current * (0.14 + rainLevel * 0.4)})`
           ctx.fillRect(0, 0, W, H)
-          flash.current -= dt * 2.5
+          flash.current -= dt * (2.4 + rainLevel)
         }
       }
     }
@@ -252,7 +266,7 @@ function SkyCanvas({ type, phase, clouds = 0 }) {
       running = false; cancelAnimationFrame(raf)
       ro.disconnect(); document.removeEventListener('visibilitychange', onVis)
     }
-  }, [type, phase, clouds])
+  }, [type, phase, clouds, rainLevel])
 
   return <canvas ref={cvs} className="absolute inset-0 pointer-events-none" style={{ width: '100%', height: '100%' }} />
 }
@@ -326,7 +340,7 @@ function DaylightArc({ sunT, isNight, sunrise, sunset }) {
 }
 
 // ── The full atmospheric header ──────────────────────────────────────────────
-function SkyHeader({ lat, lon }) {
+function SkyHeader({ lat, lon, children }) {
   const [now,  setNow ] = useState(new Date())
   const [w,    setW   ] = useState(null)
   const [city, setCity] = useState(null)
@@ -384,18 +398,19 @@ function SkyHeader({ lat, lon }) {
       .catch(() => {})
   }, [lat, lon])
 
-  const sky    = skyState(now, w?.sunrise, w?.sunset)
-  const pal    = SKY_PAL[sky.phase]
-  const type   = precipType(w?.code)
-  const clouds = cloudCount(w?.code)
-  const cover  = cloudCover(w?.code)
-  const glowX  = 6 + sky.sunT * 88
-  const info   = w ? wmoInfo(w.code) : null
+  const sky      = skyState(now, w?.sunrise, w?.sunset)
+  const pal      = SKY_PAL[sky.phase]
+  const type     = precipType(w?.code)
+  const clouds   = cloudCount(w?.code)
+  const cover    = cloudCover(w?.code)
+  const rainLevel = rainIntensity(w?.code)
+  const glowX    = 6 + sky.sunT * 88
+  const info     = w ? wmoInfo(w.code) : null
   // Sun/moon dims as cloud cover increases (bright on a clear day, faint under overcast)
   const bodyVis = Math.max(0.18, 1 - cover * 0.62)
 
   return (
-    <div className="relative shrink-0 overflow-hidden rounded-2xl border border-white/[0.06]" style={{ height: 216 }}>
+    <div className="relative shrink-0 overflow-hidden rounded-2xl border border-white/[0.06]" style={{ minHeight: 216 }}>
       {/* Sky base gradient */}
       <div className="absolute inset-0" style={{ background: `linear-gradient(168deg, ${pal[0]}, ${pal[1]} 52%, ${pal[2]})`, transition: 'background 2s ease' }} />
       {/* Sun / moon — a bright disc with a soft halo, drifting across with the day */}
@@ -412,35 +427,45 @@ function SkyHeader({ lat, lon }) {
         )
       })()}
       {/* Weather particles */}
-      <SkyCanvas type={type} phase={sky.phase} clouds={clouds} />
+      <SkyCanvas type={type} phase={sky.phase} clouds={clouds} rainLevel={rainLevel} />
 
       {/* Foreground content */}
-      <div className="relative z-10 h-full flex flex-col items-center justify-center px-4 py-3">
-        <OdoClock now={now} />
-        <p className="text-gray-300 text-sm mt-1.5">
-          {format(now, 'EEEE, d MMMM yyyy')}
-          {city && <span className="text-gray-400"> · 📍 {city}</span>}
-        </p>
-        {w && (
-          <div className="flex items-center gap-2.5 mt-2">
-            <motion.div animate={weatherAnim(w.code).animate} transition={weatherAnim(w.code).transition}
-              style={{ fontSize: 26, lineHeight: 1, display: 'inline-flex', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))' }}>
-              {info.icon}
-            </motion.div>
-            <div className="text-left">
-              <p className="text-sm font-bold text-gray-100 leading-tight">
-                {w.temp}°C <span className="font-normal text-gray-300">{info.label}</span>
-                {w.rainChance != null && w.rainChance >= 10 && (
-                  <span className="font-semibold text-sky-300/90 text-xs"> · 💧 {w.rainChance}%</span>
-                )}
-              </p>
-              <p className="text-[11px] text-gray-400 leading-tight">{weatherQuip(w.code, sky.phase)}</p>
+      <div className="relative z-10 flex flex-col h-full">
+        {/* Sky section — clock, date, weather, daylight arc */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4 pt-4 pb-3">
+          <OdoClock now={now} />
+          <p className="text-gray-300 text-sm mt-1.5">
+            {format(now, 'EEEE, d MMMM yyyy')}
+            {city && <span className="text-gray-400"> · 📍 {city}</span>}
+          </p>
+          {w && (
+            <div className="flex items-center gap-2.5 mt-2">
+              <motion.div animate={weatherAnim(w.code).animate} transition={weatherAnim(w.code).transition}
+                style={{ fontSize: 26, lineHeight: 1, display: 'inline-flex', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))' }}>
+                {info.icon}
+              </motion.div>
+              <div className="text-left">
+                <p className="text-sm font-bold text-gray-100 leading-tight">
+                  {w.temp}°C <span className="font-normal text-gray-300">{info.label}</span>
+                  {w.rainChance != null && w.rainChance >= 10 && (
+                    <span className="font-semibold text-sky-300/90 text-xs"> · 💧 {w.rainChance}%</span>
+                  )}
+                </p>
+                <p className="text-[11px] text-gray-400 leading-tight">{weatherQuip(w.code, sky.phase)}</p>
+              </div>
             </div>
-          </div>
-        )}
-        {w?.sunrise && w?.sunset && (
-          <div className="w-full max-w-sm px-2">
-            <DaylightArc sunT={sky.sunT} isNight={sky.isNight} sunrise={w.sunrise} sunset={w.sunset} />
+          )}
+          {w?.sunrise && w?.sunset && (
+            <div className="w-full max-w-sm px-2">
+              <DaylightArc sunT={sky.sunT} isNight={sky.isNight} sunrise={w.sunrise} sunset={w.sunset} />
+            </div>
+          )}
+        </div>
+
+        {/* Frosted GPS/status strip — sits over the sky but keeps its text readable */}
+        {children && (
+          <div className="border-t border-white/10 bg-black/40 backdrop-blur-md px-4 py-2.5">
+            {children}
           </div>
         )}
       </div>
@@ -1009,7 +1034,8 @@ function DashboardInner() {
 
         {/* Right column */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
-          {/* Atmospheric header — live sky, odometer clock, weather, daylight arc */}
+          {/* Atmospheric header — live sky, odometer clock, weather, daylight arc, and
+              the GPS/WiFi status merged into a frosted strip at the bottom */}
           {(() => {
             // WiFi mode + office coords configured → use office weather; otherwise resolved coords
             const inWifi = gpsLocation?.accuracy < 0
@@ -1017,15 +1043,17 @@ function DashboardInner() {
             const offLon = settings?.office_longitude ? parseFloat(settings.office_longitude) : null
             const wLat = inWifi && offLat ? offLat : gpsLocation?.lat
             const wLon = inWifi && offLon ? offLon : gpsLocation?.lon
-            return <SkyHeader lat={wLat} lon={wLon} />
+            return (
+              <SkyHeader lat={wLat} lon={wLon}>
+                <GpsWidget
+                  embedded
+                  onAcquiring={setGpsAcquiring}
+                  onReady={(lat, lon, acc) => setGps({ lat, lon, accuracy: acc })}
+                  officeWifiSSIDs={(settings?.office_wifi_ssid || '').split('\n').map(s => s.trim()).filter(Boolean)}
+                />
+              </SkyHeader>
+            )
           })()}
-
-          {/* GPS Widget */}
-          <GpsWidget
-            onAcquiring={setGpsAcquiring}
-            onReady={(lat, lon, acc) => setGps({ lat, lon, accuracy: acc })}
-            officeWifiSSIDs={(settings?.office_wifi_ssid || '').split('\n').map(s => s.trim()).filter(Boolean)}
-          />
 
           {/* Check-in / Check-out */}
           <div className="grid grid-cols-2 gap-4">

@@ -219,7 +219,7 @@ function Toast({ id, message, type, onDismiss }) {
 
 // ── GPS Widget ───────────────────────────────────────────────────────────── //
 
-export function GpsWidget({ onReady, onAcquiring, officeWifiSSIDs = [] }) {
+export function GpsWidget({ onReady, onAcquiring, officeWifiSSIDs = [], embedded = false }) {
   const [status, setStatus] = useState('idle')
   const [coords, setCoords] = useState(null)
   const [error,  setError ] = useState(null)
@@ -339,45 +339,45 @@ export function GpsWidget({ onReady, onAcquiring, officeWifiSSIDs = [] }) {
     poor: { dot: 'bg-red-400',     text: 'IP-Based Location (Very Low)', sub: `Accuracy: ±${Math.round((coords?.accuracy||0)/1000)}km — WiFi SSID detection active` },
   }
 
-  return (
-    <Card className="p-4">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5">
-          {status === 'acquiring' && (
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-amber-400 opacity-75"/>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"/>
-            </span>
-          )}
-          {status === 'active'    && <span className={`block h-3 w-3 rounded-full ${tierConfig[tier]?.dot}`} />}
-          {status === 'error'     && <span className="block h-3 w-3 rounded-full bg-red-500"/>}
-          {status === 'idle'      && <span className="block h-3 w-3 rounded-full bg-gray-600"/>}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-200">
-              {status === 'acquiring' && 'Acquiring location…'}
-              {status === 'active'    && tierConfig[tier]?.text}
-              {status === 'error'     && 'Location Unavailable'}
-              {status === 'idle'      && 'Location idle'}
-            </p>
-            <Button variant="ghost" onClick={acquire} className="text-xs py-1 px-2 h-auto">
-              Refresh
-            </Button>
-          </div>
-          {status === 'active' && (
-            <>
-              <p className="text-xs text-gray-400 mt-0.5">{tierConfig[tier]?.sub}</p>
-              {coords.lat === 0 && coords.lon === 0 && (
-                <p className="text-xs text-amber-400/70 mt-1">Approximate location unavailable</p>
-              )}
-            </>
-          )}
-          {status === 'error' && <p className="text-xs text-red-400 mt-1">{error}</p>}
-        </div>
+  const body = (
+    <div className="flex items-start gap-3">
+      <div className="mt-0.5">
+        {status === 'acquiring' && (
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-amber-400 opacity-75"/>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"/>
+          </span>
+        )}
+        {status === 'active'    && <span className={`block h-3 w-3 rounded-full ${tierConfig[tier]?.dot}`} />}
+        {status === 'error'     && <span className="block h-3 w-3 rounded-full bg-red-500"/>}
+        {status === 'idle'      && <span className="block h-3 w-3 rounded-full bg-gray-600"/>}
       </div>
-    </Card>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between">
+          <p className={`text-sm font-semibold ${embedded ? 'text-gray-100' : 'text-gray-200'}`}>
+            {status === 'acquiring' && 'Acquiring location…'}
+            {status === 'active'    && tierConfig[tier]?.text}
+            {status === 'error'     && 'Location Unavailable'}
+            {status === 'idle'      && 'Location idle'}
+          </p>
+          <Button variant="ghost" onClick={acquire} className={`text-xs py-1 px-2 h-auto ${embedded ? 'text-gray-200 hover:text-white' : ''}`}>
+            Refresh
+          </Button>
+        </div>
+        {status === 'active' && (
+          <>
+            <p className={`text-xs mt-0.5 ${embedded ? 'text-gray-300' : 'text-gray-400'}`}>{tierConfig[tier]?.sub}</p>
+            {coords.lat === 0 && coords.lon === 0 && (
+              <p className="text-xs text-amber-300 mt-1">Approximate location unavailable</p>
+            )}
+          </>
+        )}
+        {status === 'error' && <p className="text-xs text-red-300 mt-1">{error}</p>}
+      </div>
+    </div>
   )
+
+  return embedded ? body : <Card className="p-4">{body}</Card>
 }
 
 // ── Confirm dialog ────────────────────────────────────────────────────────── //
