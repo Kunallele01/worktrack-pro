@@ -262,11 +262,12 @@ export default function Register() {
   }
 
   return (
-    <Page className="flex h-screen">
+    <Page className="relative flex h-screen overflow-hidden">
+      {/* Network runs full-bleed behind both halves — one continuous space */}
+      <NetworkBackground />
 
       {/* ── Left branding panel ── */}
-      <div className="relative hidden lg:flex flex-col items-center justify-center w-[42%] overflow-hidden">
-        <NetworkBackground />
+      <div className="relative hidden lg:flex flex-col items-center justify-center w-[42%]">
         <div className="relative z-10 flex flex-col items-center gap-10 px-10 w-full">
           {/* Logo */}
           <div className="flex items-center gap-3 self-start">
@@ -317,17 +318,20 @@ export default function Register() {
         </div>
       </div>
 
-      {/* Divider */}
-      <div className="auth-divider hidden lg:block w-px bg-gradient-to-b from-transparent via-white/[0.08] to-transparent" />
-
       {/* ── Right form panel ── */}
       <div className="login-panel flex-1 flex items-center justify-center relative overflow-hidden">
-        {/* Background — hardcoded dark so light-mode theme doesn't bleed through */}
-        <div className="absolute inset-0" style={{ background: '#0a0e1a' }} />
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom right, #0a0e1a, #0a0e1a, rgba(109,40,217,0.12))' }} />
+        {/* Dimming veil — fades the network to ~25-30% behind the form so it stays calm */}
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ background: 'linear-gradient(to right, rgba(10,14,26,0.45), rgba(10,14,26,0.78) 40%, rgba(10,14,26,0.82))' }} />
 
         <div className="w-full max-w-sm relative z-10 rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-2xl
-                        shadow-[0_24px_70px_-20px_rgba(0,0,0,0.7)] px-8 py-8 overflow-y-auto max-h-[calc(100vh-2.5rem)]">
+                        shadow-[0_24px_70px_-20px_rgba(0,0,0,0.7)] overflow-hidden flex flex-col max-h-[calc(100vh-2.5rem)]">
+
+          {/* Hairline top edge — lit in register's violet identity */}
+          <div className="absolute top-0 inset-x-6 h-px pointer-events-none z-10"
+            style={{ background: 'linear-gradient(90deg, transparent, rgba(196,181,253,0.45), transparent)' }} />
+
+          <div className="overflow-y-auto px-8 py-8">
 
           {/* Header */}
           <motion.div {...fadeUp(0.05)} className="mb-5">
@@ -439,6 +443,7 @@ export default function Register() {
             Already have an account?{' '}
             <Link to="/" className="text-accent-400 hover:text-accent-300 font-medium transition-colors">Sign In</Link>
           </motion.p>
+          </div>
         </div>
       </div>
     </Page>
