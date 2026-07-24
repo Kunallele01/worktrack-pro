@@ -195,6 +195,28 @@ const FEATURES = [
   { Icon: CalendarDays,    title: 'Leave Management',     desc: 'Apply, track, and approve time-off in one place' },
 ]
 
+// Right panel echoes the sky's current phase so both halves share one light source
+const PHASE_TINT = {
+  night: 'rgba(96,150,255,0.10)',
+  dawn:  'rgba(255,170,130,0.11)',
+  day:   'rgba(120,170,235,0.10)',
+  dusk:  'rgba(255,140,100,0.11)',
+}
+// Hairline top edge on the glass card, "lit" by the sky beside it
+const PHASE_EDGE = {
+  night: 'rgba(150,190,255,0.35)',
+  dawn:  'rgba(255,185,150,0.40)',
+  day:   'rgba(170,205,250,0.35)',
+  dusk:  'rgba(255,160,120,0.40)',
+}
+
+// Staggered entrance for the form contents (matches Register's cascade)
+const fadeUp = (delay = 0) => ({
+  initial:    { opacity: 0, y: 10 },
+  animate:    { opacity: 1, y: 0  },
+  transition: { delay, type: 'spring', damping: 22, stiffness: 240 },
+})
+
 export default function Login() {
   const navigate  = useNavigate()
   const setUser   = useStore(s => s.setUser)
@@ -202,6 +224,16 @@ export default function Login() {
   const [pw,  setPw ] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
+  const [phase, setPhase] = useState(() => loginSky(new Date()).phase)
+
+  // Track the sky phase so the right panel's tint follows it
+  useEffect(() => {
+    const t = setInterval(() => setPhase(loginSky(new Date()).phase), 60000)
+    return () => clearInterval(t)
+  }, [])
+
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -271,9 +303,10 @@ export default function Login() {
 
       {/* Right panel */}
       <div className="login-panel flex-1 flex items-center justify-center relative overflow-hidden px-8">
-        {/* Subtle background that echoes the left panel */}
+        {/* Subtle background that echoes the sky's current phase */}
         <div className="absolute inset-0" style={{ background: '#0a0e1a' }} />
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom right, #0a0e1a, #0a0e1a, rgba(67,56,202,0.14))' }} />
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ background: `linear-gradient(to bottom right, transparent 30%, ${PHASE_TINT[phase]})`, transition: 'background 3s ease' }} />
         <svg className="absolute inset-0 w-full h-full opacity-[0.025] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <pattern id="rdots" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
@@ -288,8 +321,12 @@ export default function Login() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
           className="w-full max-w-sm relative z-10 rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-2xl px-8 py-9
-                     shadow-[0_24px_70px_-20px_rgba(0,0,0,0.7)]"
+                     shadow-[0_24px_70px_-20px_rgba(0,0,0,0.7)] overflow-hidden"
         >
+          {/* Hairline top edge lit by the sky's phase colour */}
+          <div className="absolute top-0 inset-x-6 h-px pointer-events-none"
+            style={{ background: `linear-gradient(90deg, transparent, ${PHASE_EDGE[phase]}, transparent)`, transition: 'background 3s ease' }} />
+
           {/* Logo (mobile only) */}
           <div className="flex items-center gap-2 mb-10 lg:hidden">
             <div className="w-8 h-8 rounded-xl bg-accent-500 flex items-center justify-center">
@@ -298,29 +335,35 @@ export default function Login() {
             <p className="font-bold text-gray-100">WorkTrack Pro</p>
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-50 mb-1">Welcome back</h1>
-          <p className="text-sm text-gray-400 mb-8">Sign in to your account</p>
+          <motion.div {...fadeUp(0.10)}>
+            <h1 className="text-2xl font-bold text-gray-50 mb-1">{greeting}</h1>
+            <p className="text-sm text-gray-400 mb-8">Sign in to your account</p>
+          </motion.div>
 
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-            <Input
-              label="Email or Employee ID"
-              placeholder="you@company.com or EMP001"
-              value={id}
-              onChange={e => { setId(e.target.value); setErr('') }}
-              autoFocus
-            />
-            <PasswordInput
-              label="Password"
-              placeholder="Your password"
-              value={pw}
-              onChange={e => { setPw(e.target.value); setErr('') }}
-            />
+            <motion.div {...fadeUp(0.18)}>
+              <Input
+                label="Email or Employee ID"
+                placeholder="you@company.com or EMP001"
+                value={id}
+                onChange={e => { setId(e.target.value); setErr('') }}
+                autoFocus
+              />
+            </motion.div>
+            <motion.div {...fadeUp(0.26)}>
+              <PasswordInput
+                label="Password"
+                placeholder="Your password"
+                value={pw}
+                onChange={e => { setPw(e.target.value); setErr('') }}
+              />
+            </motion.div>
 
-            <div className="flex justify-end -mt-1">
+            <motion.div {...fadeUp(0.32)} className="flex justify-end -mt-1">
               <Link to="/forgot" className="text-xs text-accent-400 hover:text-accent-300 transition-colors">
                 Forgot password?
               </Link>
-            </div>
+            </motion.div>
 
             {err && (
               <motion.div
@@ -333,17 +376,19 @@ export default function Login() {
               </motion.div>
             )}
 
-            <Button type="submit" loading={loading} className="w-full h-11 mt-1">
-              {loading ? 'Signing in…' : 'Sign In'}
-            </Button>
+            <motion.div {...fadeUp(0.38)}>
+              <Button type="submit" loading={loading} className="w-full h-11 mt-1">
+                {loading ? 'Signing in…' : 'Sign In'}
+              </Button>
+            </motion.div>
           </form>
 
-          <p className="text-center text-sm text-gray-500 mt-8">
+          <motion.p {...fadeUp(0.46)} className="text-center text-sm text-gray-500 mt-8">
             Don't have an account?{' '}
             <Link to="/register" className="text-accent-400 hover:text-accent-300 font-medium transition-colors">
               Register
             </Link>
-          </p>
+          </motion.p>
         </motion.div>
       </div>
     </Page>
