@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react'
+import { AnimatePresence } from 'framer-motion'
 import { getSettings, updateSettings, getHolidays, saveHolidays, flushTestData, flushAttendanceByDate } from '../../lib/supabase'
 import { Card, Button, Input, PasswordInput } from '../../components/ui'
 import { useToast } from '../../components/ui'
-import { Trash2, Plus, MapPin, CalendarDays, Bell, Mail, Palmtree, AlertTriangle } from 'lucide-react'
+import { Trash2, Plus, MapPin, CalendarDays, Bell, Mail, Palmtree, AlertTriangle, Route, Gauge } from 'lucide-react'
+import LeaveRoutingOverlay from './LeaveRouting'
 
 function Section({ icon, title, accent = 'bg-accent-500/15 border-accent-500/30 text-accent-400', children }) {
   return (
@@ -24,6 +26,7 @@ export default function AdminSettings() {
   const toast = useToast()
   const [s, setS] = useState({})
   const [saving, setSaving] = useState({})
+  const [routingOpen, setRoutingOpen] = useState(false)
 
   useEffect(() => { getSettings(true).then(setS) }, [])
   const set = (k) => (e) => setS(prev => ({ ...prev, [k]: e.target.value }))
@@ -57,6 +60,10 @@ export default function AdminSettings() {
 
   return (
     <div className="h-full overflow-y-auto p-6 flex flex-col gap-5">
+      <AnimatePresence>
+        {routingOpen && <LeaveRoutingOverlay onClose={() => setRoutingOpen(false)} />}
+      </AnimatePresence>
+
       <h1 className="text-xl font-bold text-gray-100">Admin Settings</h1>
 
       <Section icon={<MapPin size={13} />} title="Office Location & Hours"
@@ -116,6 +123,31 @@ export default function AdminSettings() {
         </Button>
       </Section>
 
+      <Section icon={<Gauge size={13} />} title="Attendance Scoring"
+        accent="bg-violet-500/15 border-violet-500/30 text-violet-400">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-gray-200">WFH days don't count against Attendance Score</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              When enabled, working from home gets the same Office Presence credit as being in office —
+              useful if WFH is company-sanctioned (e.g. alternate days). When disabled, WFH days reduce
+              the Office Presence portion of the score, same as before.
+            </p>
+          </div>
+          <button
+            onClick={() => setS(p => ({ ...p, wfh_neutral_scoring: p.wfh_neutral_scoring === 'true' ? 'false' : 'true' }))}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-4
+              ${s.wfh_neutral_scoring === 'true' ? 'bg-accent-500' : 'bg-gray-600'}`}>
+            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200
+              ${s.wfh_neutral_scoring === 'true' ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+        <Button onClick={save(['wfh_neutral_scoring'])}
+          loading={saving.wfh_neutral_scoring} className="w-fit text-sm">
+          Save Scoring Settings
+        </Button>
+      </Section>
+
       <Section icon={<CalendarDays size={13} />} title="Leave Quotas (Days per Year)"
         accent="bg-blue-500/15 border-blue-500/30 text-blue-400">
         <div className="grid grid-cols-3 gap-4">
@@ -131,6 +163,22 @@ export default function AdminSettings() {
           loading={saving.leave_sick_quota} className="w-fit text-sm">
           Save Leave Quotas
         </Button>
+      </Section>
+
+      <Section icon={<Route size={13} />} title="Leave Request Routing"
+        accent="bg-cyan-500/15 border-cyan-500/30 text-cyan-400">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm text-gray-200">Route each employee's leave requests to a specific admin</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Only the assigned admin sees and reviews that employee's leave requests, and is the one notified by email and in-app.
+              Employees with no assigned admin stay visible to every admin, as before.
+            </p>
+          </div>
+          <Button variant="secondary" onClick={() => setRoutingOpen(true)} className="text-sm shrink-0">
+            Manage Routing…
+          </Button>
+        </div>
       </Section>
 
       <Section icon={<Bell size={13} />} title="Check-in Reminders"

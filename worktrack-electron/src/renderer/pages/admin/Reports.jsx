@@ -752,7 +752,8 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
     const [h, m] = (settings?.office_start_time || '09:30').split(':').map(Number)
     return h * 60 + m
   })()
-  const graceMin = parseInt(settings?.grace_period_minutes || '10', 10)
+  const graceMin   = parseInt(settings?.grace_period_minutes || '10', 10)
+  const wfhNeutral = settings?.wfh_neutral_scoring === 'true'
 
   const consistency    = workdays > 0 ? (present / workdays) * 40                          : 0
   const punctuality    = calcPunctualityScore(records, officeStartMin + graceMin, punctDenom ?? workdays)
@@ -792,7 +793,7 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
           while (cur <= end) { const ds = cur.toLocaleDateString('sv-SE'), dow = cur.getDay(); if (dow !== 0 && dow !== 6 && ds.startsWith(prefix)) leaveSet.add(ds); cur.setDate(cur.getDate() + 1) }
         })
         const p  = (recs || []).filter(r => ['in_office','wfh'].includes(r.status)).length
-        const io = (recs || []).filter(r => r.status === 'in_office').length
+        const io = wfhNeutral ? p : (recs || []).filter(r => r.status === 'in_office').length
         const punct = calcPunctualityScore(recs || [], officeStartMin + graceMin, Math.max(0, wd - leaveSet.size))
         const s = calcScore(p, io, wd, punct)
         if (alive) setPrevScore(p > 0 ? s : null)
@@ -985,6 +986,7 @@ export default function Reports() {
       })()
       const graceMin = parseInt(settings?.grace_period_minutes || '10', 10)
       const lateThreshold = officeStartMin + graceMin
+      const wfhNeutral = settings?.wfh_neutral_scoring === 'true'
 
       // Approved-leave working days in the report window (elapsed only for current month), per user
       const monthPrefix = `${year}-${String(month).padStart(2,'0')}`
@@ -1014,7 +1016,7 @@ export default function Reports() {
         const recs      = byUser[u.id] || []
         const present   = recs.filter(r => ['in_office','wfh'].includes(r.status)).length
         const wfh       = recs.filter(r => r.status === 'wfh').length
-        const inOffice  = recs.filter(r => r.status === 'in_office').length
+        const inOffice  = wfhNeutral ? present : recs.filter(r => r.status === 'in_office').length
         const late      = recs.filter(r => r.is_late).length
         const absent    = Math.max(0, workdays - present)
         const pct       = workdays > 0 ? Math.round(present / workdays * 100) : 0

@@ -304,3 +304,38 @@ INSERT INTO public.app_settings (key, value) VALUES
   ('leave_casual_quota',   '12'),
   ('leave_planned_quota',  '5')
 ON CONFLICT (key) DO NOTHING;
+
+-- ============================================================
+-- MIGRATION: Leave Request Routing
+-- Wires each employee to a single admin. That admin is the only
+-- one who sees/reviews the employee's leave requests and the only
+-- one notified (email + in-app) when one is submitted. Employees
+-- with no assigned admin remain visible to every admin, as before.
+-- Run this in Supabase SQL Editor.
+-- ============================================================
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS assigned_admin_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_profiles_assigned_admin ON public.profiles(assigned_admin_id);
+
+DROP POLICY IF EXISTS "leave_select" ON public.leave_requests;
+CREATE POLICY "leave_select" ON public.leave_requests FOR SELECT USING (
+  auth.uid() = user_id
+  OR (
+    public.is_admin()
+    AND COALESCE(
+      (SELECT assigned_admin_id FROM public.profiles WHERE id = leave_requests.user_id),
+      auth.uid()
+    ) = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS "leave_update" ON public.leave_requests;
+CREATE POLICY "leave_update" ON public.leave_requests FOR UPDATE USING (
+  public.is_admin()
+  AND COALESCE(
+    (SELECT assigned_admin_id FROM public.profiles WHERE id = leave_requests.user_id),
+    auth.uid()
+  ) = auth.uid()
+);

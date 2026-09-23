@@ -278,11 +278,29 @@ export async function getUsers({ search = '', department = '', isActive = null, 
 }
 
 export async function updateUser(userId, fields) {
-  const allowed = ['full_name', 'email', 'department', 'is_admin', 'is_active', 'birthday', 'employee_id']
+  const allowed = ['full_name', 'email', 'department', 'is_admin', 'is_active', 'birthday', 'employee_id', 'assigned_admin_id']
   const payload = Object.fromEntries(Object.entries(fields).filter(([k]) => allowed.includes(k)))
   const { data, error } = await supabase.from('profiles').update(payload).eq('id', userId).select().single()
   if (error) throw new Error(error.message)
   return data
+}
+
+// ── Leave routing (which admin reviews/gets notified for whom) ─────────────── //
+
+export async function getAdmins() {
+  const { data, error } = await supabase.from('profiles')
+    .select('id,full_name,employee_id,email')
+    .eq('is_admin', true).eq('is_active', true)
+    .order('full_name')
+  if (error) throw new Error(error.message)
+  return (data || []).map(normaliseName)
+}
+
+export async function bulkSetAssignedAdmin(userIds, adminId) {
+  const { error } = await supabase.from('profiles')
+    .update({ assigned_admin_id: adminId || null })
+    .in('id', userIds)
+  if (error) throw new Error(error.message)
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────── //
@@ -310,6 +328,7 @@ const DEFAULTS = {
   leave_casual_quota:  '12',
   leave_planned_quota: '5',
   company_holidays:    '[]',
+  wfh_neutral_scoring: 'false',
 }
 
 let settingsCache = null
@@ -850,13 +869,19 @@ export async function applyLeave(userId, { type, startDate, endDate, days, reaso
   }).select().single()
   if (error) throw new Error(error.message)
 
-  // Notify admin(s) of new leave request
+  // Notify the employee's assigned admin, or every admin if none is assigned
   const [profile, settings] = await Promise.all([
-    supabase.from('profiles').select('full_name,employee_id,department').eq('id', userId).single().then(r => r.data),
+    supabase.from('profiles').select('full_name,employee_id,department,assigned_admin_id').eq('id', userId).single().then(r => r.data),
     getSettings(),
   ])
   const host = settings.smtp_host?.trim(), user = settings.smtp_username?.trim(), pass = settings.smtp_password?.trim()
-  const notify = (settings.wfh_notify_emails || settings.admin_email || '').split('\n').map(s => s.trim()).filter(Boolean)
+  let notify = []
+  if (profile?.assigned_admin_id) {
+    const { data: assignedAdmin } = await supabase.from('profiles').select('email').eq('id', profile.assigned_admin_id).single()
+    if (assignedAdmin?.email) notify = [assignedAdmin.email]
+  } else {
+    notify = (await getAdmins()).map(a => a.email).filter(Boolean)
+  }
   if (host && user && pass && notify.length && profile) {
     const LABELS = { sick:'Sick Leave', casual:'Casual Leave', planned:'Planned Leave', emergency:'Emergency Leave' }
     window.api?.sendEmail({

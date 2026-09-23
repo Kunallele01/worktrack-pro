@@ -581,7 +581,7 @@ function AttendanceScoreCard({ score, grade, consistency, punctuality, officePre
           {/* Center content */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span ref={scoreRef}
-              className="text-3xl font-black font-mono tabular-nums leading-none text-gray-50"
+              className="text-3xl font-black font-mono tabular-nums leading-none text-gray-100"
               style={{ textShadow: `0 0 16px ${hex}55` }}>0</span>
             <span className="text-[9px] text-gray-500 font-medium mt-0.5">of 100</span>
             <motion.span
@@ -881,7 +881,8 @@ function DashboardInner() {
   const present      = summary.present  || 0
   const late         = summary.late     || 0
   const wfh          = summary.wfh      || 0
-  const inOffice     = Math.max(0, present - wfh)
+  const wfhNeutral   = settings?.wfh_neutral_scoring === 'true'
+  const inOffice     = wfhNeutral ? present : Math.max(0, present - wfh)
 
   const _offStartMin = (() => {
     const [h, m] = (settings?.office_start_time || '09:30').split(':').map(Number)
