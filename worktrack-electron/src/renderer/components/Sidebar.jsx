@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { LayoutDashboard, Settings, BarChart3, Users, Calendar, Map, LogOut, Zap, Sun, Moon, CalendarCheck, ClipboardList, UserCircle, Bell } from 'lucide-react'
+import { LayoutDashboard, Settings, BarChart3, Users, Calendar, Map, LogOut, Zap, Sun, Moon, CalendarCheck, ClipboardList, UserCircle, UserCog, Bell } from 'lucide-react'
 import { signOut, getAdminBadgeCounts, getEmployeeBadgeCounts, getNotifications } from '../lib/supabase'
 import { useStore } from '../lib/store'
 import { Avatar } from './ui'
@@ -21,7 +21,9 @@ const ADMIN_NAV = [
   { to: '/admin/corrections',  label: 'Corrections',  icon: ClipboardList },
   { to: '/admin/reports',      label: 'Reports',      icon: BarChart3 },
   { to: '/admin/map',          label: 'Map',          icon: Map },
-  { to: '/admin/settings',     label: 'Settings',     icon: Settings },
+  { to: '/admin/settings',     label: 'Admin Settings', icon: Settings },
+  { to: '/profile',            label: 'My Profile',   icon: UserCircle },
+  { to: '/settings',           label: 'My Account',   icon: UserCog },
 ]
 
 export default function Sidebar() {

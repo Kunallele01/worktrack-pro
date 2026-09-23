@@ -33,8 +33,9 @@ function ProfileInner() {
   const [saving,   setSaving  ] = useState(false)
   const [stats,    setStats   ] = useState(null)
 
+  // Admins have no Dashboard and never check in, so they carry no attendance.
   useEffect(() => {
-    if (!user?.id) return
+    if (!user?.id || user.is_admin) return
     const now = new Date()
     getMonthSummary(user.id, now.getFullYear(), now.getMonth() + 1).then(setStats)
   }, [user?.id])

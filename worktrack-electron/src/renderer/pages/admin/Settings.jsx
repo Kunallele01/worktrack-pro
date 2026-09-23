@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { getSettings, updateSettings, getHolidays, saveHolidays, flushTestData, flushAttendanceByDate } from '../../lib/supabase'
 import { Card, Button, Input, PasswordInput } from '../../components/ui'
 import { useToast } from '../../components/ui'
@@ -22,11 +22,19 @@ function Section({ icon, title, accent = 'bg-accent-500/15 border-accent-500/30 
   )
 }
 
+const TABS = [
+  { id: 'office',        label: 'Office & Hours',    icon: MapPin        },
+  { id: 'attendance',    label: 'Attendance & Leave', icon: CalendarDays },
+  { id: 'notifications', label: 'Notifications',     icon: Mail          },
+  { id: 'data',          label: 'Data & Danger',     icon: AlertTriangle },
+]
+
 export default function AdminSettings() {
   const toast = useToast()
   const [s, setS] = useState({})
   const [saving, setSaving] = useState({})
   const [routingOpen, setRoutingOpen] = useState(false)
+  const [tab, setTab] = useState('office')
 
   useEffect(() => { getSettings(true).then(setS) }, [])
   const set = (k) => (e) => setS(prev => ({ ...prev, [k]: e.target.value }))
@@ -59,13 +67,32 @@ export default function AdminSettings() {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6 flex flex-col gap-5">
+    <div className="h-full flex flex-col p-6 gap-5">
       <AnimatePresence>
         {routingOpen && <LeaveRoutingOverlay onClose={() => setRoutingOpen(false)} />}
       </AnimatePresence>
 
       <h1 className="text-xl font-bold text-gray-100">Admin Settings</h1>
 
+      <div className="flex-1 flex gap-6 min-h-0">
+        {/* Category rail */}
+        <nav className="w-52 shrink-0 flex flex-col gap-1">
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button key={id} onClick={() => setTab(id)}
+              className={`${tab === id ? 'nav-item-active' : 'nav-item'} w-full text-left`}>
+              <Icon size={16} className="shrink-0" />
+              <span className="truncate">{label}</span>
+            </button>
+          ))}
+        </nav>
+
+        {/* Active panel */}
+        <motion.div key={tab}
+          initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          className="flex-1 min-w-0 overflow-y-auto pr-1 pb-2 flex flex-col gap-5">
+
+      {tab === 'office' && <>
       <Section icon={<MapPin size={13} />} title="Office Location & Hours"
         accent="bg-emerald-500/15 border-emerald-500/30 text-emerald-400">
         <div className="grid grid-cols-2 gap-4">
@@ -122,7 +149,9 @@ export default function AdminSettings() {
           Save Office Settings
         </Button>
       </Section>
+      </>}
 
+      {tab === 'attendance' && <>
       <Section icon={<Gauge size={13} />} title="Attendance Scoring"
         accent="bg-violet-500/15 border-violet-500/30 text-violet-400">
         <div className="flex items-center justify-between">
@@ -181,6 +210,10 @@ export default function AdminSettings() {
         </div>
       </Section>
 
+      <HolidaySection />
+      </>}
+
+      {tab === 'notifications' && <>
       <Section icon={<Bell size={13} />} title="Check-in Reminders"
         accent="bg-amber-500/15 border-amber-500/30 text-amber-400">
         <div className="flex items-center justify-between">
@@ -238,10 +271,15 @@ export default function AdminSettings() {
           <Button variant="secondary" onClick={testEmail} loading={saving.test} className="text-sm">Send Test Email</Button>
         </div>
       </Section>
+      </>}
 
-      <HolidaySection />
+      {tab === 'data' && <>
       <FlushByDate />
       <DangerZone />
+      </>}
+
+        </motion.div>
+      </div>
     </div>
   )
 }
