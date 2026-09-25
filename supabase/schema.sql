@@ -339,3 +339,16 @@ CREATE POLICY "leave_update" ON public.leave_requests FOR UPDATE USING (
     auth.uid()
   ) = auth.uid()
 );
+
+-- ============================================================
+-- MIGRATION: Check-out discipline
+-- Marks rows the system closed (20:00 auto-checkout, or next-day
+-- cleanup) so they can be told apart from a real check-out. A flag
+-- rather than status = 'auto_checkout', because `present` counts only
+-- 'in_office'/'wfh' — changing status would erase the day from
+-- attendance just because someone forgot to click Check Out.
+-- Run this in Supabase SQL Editor.
+-- ============================================================
+
+ALTER TABLE public.attendance
+  ADD COLUMN IF NOT EXISTS auto_checked_out BOOLEAN DEFAULT FALSE;

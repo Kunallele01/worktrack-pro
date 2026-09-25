@@ -59,14 +59,22 @@ function SmartAlerts({ data, stats }) {
   }
 
   // Attendance well below 50% after 11 AM
-  const pctPresent = total > 0 ? checkedIn / total : 1
-  if (istMins >= 11 * 60 && total >= 4 && pctPresent < 0.5) {
-    const missed = total - checkedIn
+  // Expected today = those who showed up + those genuinely missing. People on
+  // approved leave are excluded from both, so this can't contradict the card above.
+  const expected   = checkedIn + absent.length
+  const onLeave    = Math.max(0, total - expected)
+  const pctPresent = expected > 0 ? checkedIn / expected : 1
+  if (istMins >= 11 * 60 && expected >= 4 && pctPresent < 0.5) {
+    const leaveNote = onLeave > 0 ? ` · ${onLeave} on approved leave` : ''
     alerts.push({
       id: 'low',
       Icon: TrendingDown,
-      title: `Low turnout — only ${checkedIn}/${total} employees present`,
-      detail: `${missed} employee${missed !== 1 ? 's' : ''} yet to check in`,
+      title: checkedIn === 0
+        ? 'Nobody has checked in yet'
+        : `Low turnout — only ${checkedIn} of ${expected} checked in`,
+      detail: (checkedIn === 0
+        ? `All ${expected} employee${expected !== 1 ? 's' : ''} still to arrive`
+        : `${absent.length} employee${absent.length !== 1 ? 's' : ''} yet to check in`) + leaveNote,
       color: '#8B5CF6',
       ring: 'border-violet-500/25',
       bg: 'bg-violet-500/[0.08]',
@@ -153,7 +161,7 @@ function LiveFeed({ feed }) {
           <Avatar name={item.full_name} size={8} />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-200 truncate">{item.full_name}</p>
-            <p className="text-xs text-gray-500 font-mono">{format(new Date(item.time), 'hh:mm a')}</p>
+            <p className="text-xs text-gray-500 font-mono">{format(new Date(item.time), 'HH:mm')}</p>
           </div>
           <div className="flex items-center gap-1.5">
             {item.type === 'in' ? (

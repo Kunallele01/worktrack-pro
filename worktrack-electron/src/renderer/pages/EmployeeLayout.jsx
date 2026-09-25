@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useStore } from '../lib/store'
+import { flushPendingAlerts } from '../lib/supabase'
 import Sidebar from '../components/Sidebar'
 import { Page, ToastProvider } from '../components/ui'
 import { BirthdayManager } from '../components/BirthdayEffects'
@@ -9,6 +10,12 @@ import { BirthdayManager } from '../components/BirthdayEffects'
 export default function EmployeeLayout() {
   const user     = useStore(s => s.user)
   const location = useLocation()
+
+  // Alert timers die with the app; resend anything they missed.
+  useEffect(() => {
+    if (!user?.id) return
+    flushPendingAlerts(user.id).catch(() => {})
+  }, [user?.id])
 
   return (
     <Page className="flex h-screen bg-surface-900 overflow-hidden">

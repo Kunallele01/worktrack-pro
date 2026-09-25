@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Shield, ShieldOff, UserX, UserCheck, Trash2, Cake, Hash } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
-import { getUsers, updateUser, deleteUser, getMonthHistory } from '../../lib/supabase'
+import { getUsers, updateUser, deleteUser, getMonthSummary } from '../../lib/supabase'
 import { Card, Badge, Avatar, Button, Input, Select } from '../../components/ui'
 import { useToast, useConfirm } from '../../components/ui'
 
@@ -10,16 +10,9 @@ function AttendancePill({ userId }) {
   const [label, setLabel] = useState('—')
   useEffect(() => {
     const now = new Date()
-    getMonthHistory(userId, now.getFullYear(), now.getMonth() + 1).then(records => {
-      const present = records.filter(r => ['in_office','wfh'].includes(r.status)).length
-      const today = now.getDate()
-      let workdays = 0
-      for (let d = 1; d <= today; d++) {
-        const day = new Date(now.getFullYear(), now.getMonth(), d).getDay()
-        if (day !== 0 && day !== 6) workdays++
-      }
-      setLabel(`${present} / ${workdays} days`)
-    }).catch(() => setLabel('—'))
+    getMonthSummary(userId, now.getFullYear(), now.getMonth() + 1)
+      .then(s => setLabel(`${s.present} / ${s.working_days} days`))
+      .catch(() => setLabel('—'))
   }, [userId])
 
   return (

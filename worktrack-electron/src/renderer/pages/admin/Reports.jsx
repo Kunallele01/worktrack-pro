@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Download, RefreshCw, X } from 'lucide-react'
+import { Download, RefreshCw, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { AnimatePresence, motion } from 'framer-motion'
-import { getAllAttendance, getUsers, getSettings, getAllLeaveRequests, getMonthHistory, getMyLeaves } from '../../lib/supabase'
+import { getAllAttendance, getUsers, getSettings, getAllLeaveRequests, getMonthHistory, getMyLeaves, getHolidays, isNonWorkingDate, calcDayCompletion } from '../../lib/supabase'
 import { Card, Button, Select, Avatar } from '../../components/ui'
 import { useToast } from '../../components/ui'
 import { format } from 'date-fns'
@@ -17,6 +17,12 @@ const MONTHS = [
 ]
 const YEARS = [2024, 2025, 2026, 2027].map(y => ({ value: y, label: String(y) }))
 
+// Download filenames: "Pawan_Jadhav_August_2026.xlsx", not "pawan_jadhav_august_2026.xlsx"
+const REPORT_LABEL = { daily: 'Daily', monthly: 'Monthly', wfh: 'WFH', late: 'Late' }
+const fileName = s => String(s || '')
+  .trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+  .replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '')
+
 // ── Excel style helpers ───────────────────────────────────────────────────── //
 const STATUS_LABEL = { in_office: 'In Office', wfh: 'Work From Home', auto_checkout: 'Auto Checkout' }
 const STATUS_FILL  = { in_office: 'FFD1FAE5',  wfh: 'FFDBEAFE', absent: 'FFFEE2E2', auto_checkout: 'FFE2E8F0' }
@@ -28,7 +34,7 @@ const BORDER_HDR = {
   left: THIN('FF1E293B'), right: THIN('FF1E293B'),
 }
 
-function fmtT(iso) { if (!iso) return ''; try { return format(new Date(iso), 'hh:mm a') } catch { return '' } }
+function fmtT(iso) { if (!iso) return ''; try { return format(new Date(iso), 'HH:mm') } catch { return '' } }
 function calcHours(ci, co) {
   if (!ci || !co) return ''
   const h = (new Date(co) - new Date(ci)) / 3600000
@@ -55,12 +61,72 @@ function calcPunctualityScore(records, lateThreshold, denom) {
   return Math.min(1, sum / d) * 35
 }
 
-function calcScore(present, inOffice, workdays, punctualityScore) {
+// thirdScore (0-25) is Office Presence, or Day Completion when WFH is sanctioned.
+function calcScore(present, workdays, punctualityScore, thirdScore) {
   if (workdays === 0 || present === 0) return 0
-  const consistency    = (present / workdays) * 40
-  const officePresence = (inOffice / present) * 25
-  return Math.round(consistency + punctualityScore + officePresence)
+  return Math.round((present / workdays) * 40 + punctualityScore + thirdScore)
 }
+// Everything the deep-dive shows for one employee in one month. Shared by the
+// month browser and the month-over-month trend so both score identically.
+async function computeMonthStats(userId, y, m, settings, holidays) {
+  const [allRecords, leaves] = await Promise.all([
+    getMonthHistory(userId, y, m),
+    getMyLeaves(userId, y),
+  ])
+  const holidayDates = new Set((holidays || []).map(h => h.date))
+  const now       = new Date()
+  const isCurrent = y === now.getFullYear() && m === now.getMonth() + 1
+  const dim       = new Date(y, m, 0).getDate()
+  const lastDay   = isCurrent ? now.getDate() : dim
+  const prefix    = `${y}-${String(m).padStart(2, '0')}`
+
+  let workdays = 0
+  for (let d = 1; d <= lastDay; d++) {
+    if (!isNonWorkingDate(`${prefix}-${String(d).padStart(2, '0')}`, holidayDates)) workdays++
+  }
+
+  const recs  = (allRecords || []).filter(r => !isNonWorkingDate(r.date, holidayDates))
+  const extra = (allRecords || []).filter(r =>
+    isNonWorkingDate(r.date, holidayDates) && ['in_office','wfh'].includes(r.status))
+
+  const present  = recs.filter(r => ['in_office','wfh'].includes(r.status)).length
+  const wfh      = recs.filter(r => r.status === 'wfh').length
+  const officeIn = recs.filter(r => r.status === 'in_office').length
+  const late     = recs.filter(r => r.is_late).length
+
+  const cutoff   = isCurrent ? now.toLocaleDateString('sv-SE') : `${prefix}-${String(dim).padStart(2,'0')}`
+  const leaveSet = new Set()
+  ;(leaves || []).filter(l => l.status === 'approved').forEach(l => {
+    const cur = new Date(l.start_date + 'T12:00:00'), end = new Date(l.end_date + 'T12:00:00')
+    while (cur <= end) {
+      const ds = cur.toLocaleDateString('sv-SE')
+      if (ds.startsWith(prefix) && ds <= cutoff && !isNonWorkingDate(ds, holidayDates)) leaveSet.add(ds)
+      cur.setDate(cur.getDate() + 1)
+    }
+  })
+
+  const [sh, sm]   = (settings?.office_start_time || '09:30').split(':').map(Number)
+  const graceMin   = parseInt(settings?.grace_period_minutes || '10', 10)
+  const punctDenom = Math.max(0, workdays - leaveSet.size)
+  const punctuality = calcPunctualityScore(recs, sh * 60 + sm + graceMin, punctDenom)
+
+  const wfhNeutral = settings?.wfh_neutral_scoring === 'true'
+  const inOffice   = wfhNeutral ? present : officeIn
+  const third      = wfhNeutral
+    ? calcDayCompletion(recs, parseFloat(settings?.full_day_hours || '8'))
+    : (present > 0 ? (inOffice / present) * 25 : 0)
+
+  return {
+    records: recs, allRecords: allRecords || [],
+    workdays, present, wfh, inOffice, late,
+    absent: Math.max(0, workdays - present),
+    pct: workdays > 0 ? Math.round(present / workdays * 100) : 0,
+    punctDenom, punctuality, third,
+    extraDays: extra.length,
+    score: calcScore(present, workdays, punctuality, third),
+  }
+}
+
 function scoreGrade(s) {
   if (s >= 90) return { label: 'Excellent', color: 'text-emerald-400', bg: 'bg-emerald-500/15', hex: '#10B981' }
   if (s >= 75) return { label: 'Good',      color: 'text-accent-400',  bg: 'bg-accent-500/15',  hex: '#4F86F7' }
@@ -80,8 +146,7 @@ function _median(arr) {
 }
 function _hm(mins) {
   if (mins == null) return '—'
-  const h = Math.floor(mins / 60), m = mins % 60, ap = h >= 12 ? 'PM' : 'AM'
-  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${ap}`
+  return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
 }
 function _longestStreak(records) {
   const present = [...new Set(records.filter(r => ['in_office','wfh'].includes(r.status)).map(r => r.date))].sort()
@@ -133,7 +198,7 @@ async function buildEmployeeExcel(row, workdays, month, year, settings) {
   const wb = new ExcelJS.Workbook()
   wb.creator = company; wb.created = new Date()
   const monthLabel  = MONTHS.find(m => m.value === month)?.label || ''
-  const genStamp    = `Generated: ${format(new Date(), 'dd MMM yyyy · hh:mm a')}`
+  const genStamp    = `Generated: ${format(new Date(), 'dd MMM yyyy · HH:mm')}`
   const daysInMonth = new Date(year, month, 0).getDate()
   const allDays     = Array.from({ length: daysInMonth }, (_, i) => {
     const d = new Date(year, month - 1, i + 1)
@@ -354,7 +419,7 @@ async function buildExcel(kind, year, month) {
 
   const monthLabel = MONTHS.find(m => m.value === month)?.label || ''
   const dateRange  = `${monthLabel} ${year}`
-  const genStamp   = `Generated: ${format(new Date(), 'dd MMM yyyy · hh:mm a')}`
+  const genStamp   = `Generated: ${format(new Date(), 'dd MMM yyyy · HH:mm')}`
   const today      = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Kolkata' })
   const start      = kind === 'daily' ? today : `${year}-${String(month).padStart(2,'0')}-01`
   const end        = kind === 'daily' ? today : `${year}-${String(month).padStart(2,'0')}-${new Date(year, month, 0).getDate()}`
@@ -685,10 +750,11 @@ function ArrivalMiniChart({ records, officeStartMin, graceMin }) {
   )
 }
 
-function MonthCalendar({ records, year, month }) {
+function MonthCalendar({ records, year, month, holidays = [] }) {
   const dim    = new Date(year, month, 0).getDate()
   const byDate = {}
   records.forEach(r => { byDate[r.date] = r })
+  const holidayByDate = Object.fromEntries(holidays.map(h => [h.date, h.name]))
 
   const firstDow    = new Date(year, month - 1, 1).getDay()
   const firstMonDow = firstDow === 0 ? 6 : firstDow - 1
@@ -701,19 +767,33 @@ function MonthCalendar({ records, year, month }) {
     const date    = `${year}-${String(month).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`
     const dow     = new Date(year, month - 1, dayNum).getDay()
     const isWknd  = dow === 0 || dow === 6
+    const holiday = holidayByDate[date]
     const rec     = byDate[date]
+    const worked  = !!rec && ['in_office','wfh'].includes(rec.status)
     const isFuture = date > new Date().toLocaleDateString('sv-SE')
-    cells.push({ dayNum, isWknd, rec, isFuture })
+    cells.push({ dayNum, date, isWknd, holiday, rec, worked, isFuture })
   }
 
   const cellStyle = (cell) => {
     if (!cell) return 'bg-transparent'
-    if (cell.isWknd)   return 'bg-white/[0.03] text-gray-700'
+    // Weekends and holidays are never absences — but work done on them stands out.
+    if (cell.isWknd || cell.holiday) {
+      if (cell.worked)  return 'bg-violet-500/25 text-violet-300 ring-1 ring-violet-400/40'
+      if (cell.holiday) return 'bg-orange-500/15 text-orange-400'
+      return 'bg-white/[0.03] text-gray-700'
+    }
     if (cell.isFuture) return 'bg-white/[0.03] text-gray-700'
     if (!cell.rec)     return 'bg-red-500/20 text-red-400'
     if (cell.rec.is_late) return 'bg-amber-500/20 text-amber-400'
     if (cell.rec.status === 'wfh') return 'bg-blue-500/20 text-blue-400'
     return 'bg-emerald-500/20 text-emerald-400'
+  }
+
+  const cellTitle = (cell) => {
+    if (!cell) return undefined
+    if (cell.worked && (cell.isWknd || cell.holiday))
+      return `Worked on ${cell.holiday || 'a weekend'} — not counted in the score`
+    return cell.holiday || undefined
   }
 
   return (
@@ -725,16 +805,18 @@ function MonthCalendar({ records, year, month }) {
       </div>
       <div className="grid grid-cols-7 gap-0.5">
         {cells.map((cell, i) => (
-          <div key={i} className={`aspect-square rounded flex items-center justify-center text-[10px] font-semibold transition-colors ${cellStyle(cell)}`}>
+          <div key={i} title={cellTitle(cell)}
+            className={`aspect-square rounded flex items-center justify-center text-[10px] font-semibold transition-colors ${cellStyle(cell)}`}>
             {cell?.dayNum || ''}
           </div>
         ))}
       </div>
       <div className="flex items-center gap-3 mt-2 flex-wrap">
-        {[['bg-emerald-500/20 text-emerald-400','On Time'],['bg-blue-500/20 text-blue-400','WFH'],
-          ['bg-amber-500/20 text-amber-400','Late'],['bg-red-500/20 text-red-400','Absent']].map(([cls, lbl]) => (
+        {[['bg-emerald-500/20','On Time'],['bg-blue-500/20','WFH'],
+          ['bg-amber-500/20','Late'],['bg-red-500/20','Absent'],
+          ['bg-orange-500/15','Holiday'],['bg-violet-500/25','Extra day']].map(([cls, lbl]) => (
           <div key={lbl} className="flex items-center gap-1">
-            <span className={`w-3 h-3 rounded-sm ${cls.split(' ')[0]}`} />
+            <span className={`w-3 h-3 rounded-sm ${cls}`} />
             <span className="text-[9px] text-gray-500">{lbl}</span>
           </div>
         ))}
@@ -743,10 +825,9 @@ function MonthCalendar({ records, year, month }) {
   )
 }
 
-function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
+function EmployeeDeepDive({ row, workdays, month, year, settings, holidays = [], onClose }) {
   const toast = useToast()
-  const { full_name, employee_id, department, score, present, wfh, inOffice, late, absent, punctDenom, records = [] } = row
-  const grade = scoreGrade(score)
+  const { full_name, employee_id, department } = row
 
   const officeStartMin = (() => {
     const [h, m] = (settings?.office_start_time || '09:30').split(':').map(Number)
@@ -755,9 +836,48 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
   const graceMin   = parseInt(settings?.grace_period_minutes || '10', 10)
   const wfhNeutral = settings?.wfh_neutral_scoring === 'true'
 
-  const consistency    = workdays > 0 ? (present / workdays) * 40                          : 0
-  const punctuality    = calcPunctualityScore(records, officeStartMin + graceMin, punctDenom ?? workdays)
-  const officePresence = present  > 0 ? (inOffice / present) * 25                          : 0
+  // The whole panel follows the month being browsed — not just the calendar.
+  const [viewY, setViewY] = useState(year)
+  const [viewM, setViewM] = useState(month)
+  const [loading, setLoading] = useState(false)
+  const onReportMonth = viewY === year && viewM === month
+
+  // The report month is already computed by the parent; don't refetch it.
+  const rowStats = {
+    records: row.records || [], allRecords: row.allRecords || [],
+    workdays, present: row.present, wfh: row.wfh, inOffice: row.inOffice,
+    late: row.late, absent: row.absent, pct: row.pct, punctDenom: row.punctDenom,
+    punctuality: calcPunctualityScore(row.records || [], officeStartMin + graceMin, row.punctDenom ?? workdays),
+    third: row.third ?? 0, extraDays: row.extraDays || 0, score: row.score,
+  }
+  const [stats, setStats] = useState(rowStats)
+
+  useEffect(() => {
+    if (onReportMonth) { setStats(rowStats); return }
+    let alive = true
+    setLoading(true)
+    computeMonthStats(row.id, viewY, viewM, settings, holidays)
+      .then(s => { if (alive) setStats(s) })
+      .catch(() => { if (alive) setStats({ ...rowStats, records: [], allRecords: [], present: 0, score: 0 }) })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [row.id, viewY, viewM, year, month])
+
+  const { records = [], allRecords = [], present, wfh, inOffice, late, absent, score } = stats
+
+  const nowD = new Date()
+  const atLatestMonth = viewY > nowD.getFullYear()
+    || (viewY === nowD.getFullYear() && viewM >= nowD.getMonth() + 1)
+  const shiftMonth = (delta) => {
+    const d = new Date(viewY, viewM - 1 + delta, 1)
+    setViewY(d.getFullYear())
+    setViewM(d.getMonth() + 1)
+  }
+
+  const grade          = scoreGrade(score)
+  const consistency    = stats.workdays > 0 ? (present / stats.workdays) * 40 : 0
+  const punctuality    = stats.punctuality
+  const officePresence = stats.third
 
   const avgHours = (() => {
     const withBoth = records.filter(r => r.check_in_time && r.check_out_time)
@@ -774,44 +894,29 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
   // ── Month-over-month trend — fetch last month and score it the same way ─────
   const [prevScore, setPrevScore] = useState(undefined) // undefined = loading, null = no data
   const [busyExport, setBusyExport] = useState(false)
-  const pm = month === 1 ? 12 : month - 1
-  const py = month === 1 ? year - 1 : year
+  const pm = viewM === 1 ? 12 : viewM - 1
+  const py = viewM === 1 ? viewY - 1 : viewY
   const prevLabel = MONTHS.find(x => x.value === pm)?.label?.slice(0, 3) || ''
 
   useEffect(() => {
     let alive = true
-    ;(async () => {
-      try {
-        const [recs, leaves] = await Promise.all([getMonthHistory(row.id, py, pm), getMyLeaves(row.id, py)])
-        const dim = new Date(py, pm, 0).getDate()
-        let wd = 0
-        for (let d = 1; d <= dim; d++) { const dow = new Date(py, pm - 1, d).getDay(); if (dow !== 0 && dow !== 6) wd++ }
-        const prefix = `${py}-${String(pm).padStart(2, '0')}`
-        const leaveSet = new Set()
-        ;(leaves || []).filter(l => l.status === 'approved').forEach(l => {
-          const cur = new Date(l.start_date + 'T12:00:00'), end = new Date(l.end_date + 'T12:00:00')
-          while (cur <= end) { const ds = cur.toLocaleDateString('sv-SE'), dow = cur.getDay(); if (dow !== 0 && dow !== 6 && ds.startsWith(prefix)) leaveSet.add(ds); cur.setDate(cur.getDate() + 1) }
-        })
-        const p  = (recs || []).filter(r => ['in_office','wfh'].includes(r.status)).length
-        const io = wfhNeutral ? p : (recs || []).filter(r => r.status === 'in_office').length
-        const punct = calcPunctualityScore(recs || [], officeStartMin + graceMin, Math.max(0, wd - leaveSet.size))
-        const s = calcScore(p, io, wd, punct)
-        if (alive) setPrevScore(p > 0 ? s : null)
-      } catch { if (alive) setPrevScore(null) }
-    })()
+    setPrevScore(undefined)
+    computeMonthStats(row.id, py, pm, settings, holidays)
+      .then(s => { if (alive) setPrevScore(s.present > 0 ? s.score : null) })
+      .catch(() => { if (alive) setPrevScore(null) })
     return () => { alive = false }
-  }, [row.id, month, year])
+  }, [row.id, py, pm])
 
   const delta = typeof prevScore === 'number' ? score - prevScore : null
 
   const exportEmployee = async () => {
     setBusyExport(true)
     try {
-      const wb  = await buildEmployeeExcel(row, workdays, month, year, settings)
+      const wb  = await buildEmployeeExcel({ ...row, ...stats }, stats.workdays, viewM, viewY, settings)
       const buf = await wb.xlsx.writeBuffer()
-      const safe = (full_name || 'employee').replace(/[^a-z0-9]+/gi, '_').toLowerCase()
-      const ml   = MONTHS.find(x => x.value === month)?.label?.toLowerCase() || month
-      await window.api?.saveExcel(buf, `${safe}_${ml}_${year}.xlsx`)
+      const safe = fileName(full_name || 'Employee')
+      const ml   = MONTHS.find(x => x.value === viewM)?.label || viewM
+      await window.api?.saveExcel(buf, `${safe}_${ml}_${viewY}.xlsx`)
       toast('Employee report saved to Downloads!', 'success')
     } catch (e) { toast(e.message, 'error') }
     finally { setBusyExport(false) }
@@ -848,6 +953,22 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
           </button>
         </div>
 
+        {/* Month navigator — scopes everything below it */}
+        <div className="flex items-center justify-between px-5 py-2.5 border-b border-white/[0.06] bg-white/[0.02] shrink-0">
+          <button onClick={() => shiftMonth(-1)} title="Previous month"
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-200 hover:bg-white/5 transition-colors">
+            <ChevronLeft size={15} />
+          </button>
+          <p className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
+            {new Date(viewY, viewM - 1).toLocaleString('en', { month: 'long' })} {viewY}
+            {loading && <span className="ml-2 text-gray-500 normal-case font-normal">loading…</span>}
+          </p>
+          <button onClick={() => shiftMonth(1)} disabled={atLatestMonth} title="Next month"
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-200 hover:bg-white/5 transition-colors disabled:opacity-25 disabled:hover:bg-transparent disabled:cursor-not-allowed">
+            <ChevronRight size={15} />
+          </button>
+        </div>
+
         <div className="flex-1 px-5 py-4 flex flex-col gap-5">
 
           {/* Score */}
@@ -861,7 +982,7 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
                 </div>
                 {/* Rank + month-over-month trend */}
                 <div className="flex items-center gap-1.5 mt-2">
-                  {row._rank && (
+                  {row._rank && onReportMonth && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/[0.06] text-gray-300 border border-white/10">
                       #{row._rank} of {row._total}
                     </span>
@@ -869,6 +990,12 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
                   {delta !== null && (
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${delta > 0 ? 'bg-emerald-500/15 text-emerald-400' : delta < 0 ? 'bg-red-500/15 text-red-400' : 'bg-white/[0.06] text-gray-400'}`}>
                       {delta > 0 ? `▲ +${delta}` : delta < 0 ? `▼ ${delta}` : '± 0'} vs {prevLabel}
+                    </span>
+                  )}
+                  {stats.extraDays > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20"
+                      title="Worked on weekends or company holidays — not counted in the score">
+                      ⭐ {stats.extraDays} extra {stats.extraDays === 1 ? 'day' : 'days'}
                     </span>
                   )}
                 </div>
@@ -881,7 +1008,7 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
             <div className="flex flex-col gap-2">
               <ScoreBar label="Consistency"   value={consistency}    max={40} color="#4F86F7" />
               <ScoreBar label="Punctuality"   value={punctuality}    max={35} color="#10B981" />
-              <ScoreBar label="Office Presence" value={officePresence} max={25} color="#8B5CF6" />
+              <ScoreBar label={wfhNeutral ? 'Day Completion' : 'Office Presence'} value={officePresence} max={25} color="#8B5CF6" />
             </div>
           </div>
 
@@ -924,9 +1051,9 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, onClose }) {
           {/* Calendar */}
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-              {new Date(year, month - 1).toLocaleString('en', { month: 'long' })} {year}
+              {new Date(viewY, viewM - 1).toLocaleString('en', { month: 'long' })} {viewY}
             </p>
-            <MonthCalendar records={records} year={year} month={month} />
+            <MonthCalendar records={allRecords} year={viewY} month={viewM} holidays={holidays} />
           </div>
 
           {/* Arrival time chart */}
@@ -959,12 +1086,14 @@ export default function Reports() {
     try {
       const start = `${year}-${String(month).padStart(2,'0')}-01`
       const end   = `${year}-${String(month).padStart(2,'0')}-${new Date(year, month, 0).getDate()}`
-      const [{ items: allItems }, users, settings, approvedLeaves] = await Promise.all([
+      const [{ items: allItems }, users, settings, approvedLeaves, holidays] = await Promise.all([
         getAllAttendance({ start, end, limit: 5000 }),
         getUsers(),
         getSettings(),
         getAllLeaveRequests('approved'),
+        getHolidays(),
       ])
+      const holidayDates = new Set(holidays.map(h => h.date))
       // Only non-admin employees for analytics
       const empUsers = users.filter(u => !u.is_admin)
       const items    = allItems // keep all for table; analytics use empUsers cross-ref
@@ -976,8 +1105,9 @@ export default function Reports() {
       const dim     = new Date(year, month, 0).getDate()
       let workdays = 0
       for (let d = 1; d <= lastDay; d++) {
+        const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`
         const wd = new Date(year, month - 1, d).getDay()
-        if (wd !== 0 && wd !== 6) workdays++
+        if (wd !== 0 && wd !== 6 && !holidayDates.has(ds)) workdays++
       }
 
       const officeStartMin = (() => {
@@ -986,7 +1116,8 @@ export default function Reports() {
       })()
       const graceMin = parseInt(settings?.grace_period_minutes || '10', 10)
       const lateThreshold = officeStartMin + graceMin
-      const wfhNeutral = settings?.wfh_neutral_scoring === 'true'
+      const wfhNeutral   = settings?.wfh_neutral_scoring === 'true'
+      const fullDayHours = parseFloat(settings?.full_day_hours || '8')
 
       // Approved-leave working days in the report window (elapsed only for current month), per user
       const monthPrefix = `${year}-${String(month).padStart(2,'0')}`
@@ -1013,7 +1144,11 @@ export default function Reports() {
       })
 
       const rows = empUsers.map(u => {
-        const recs      = byUser[u.id] || []
+        const allRecs   = byUser[u.id] || []
+        // Weekend/holiday work is recognised separately, never scored.
+        const recs      = allRecs.filter(r => !isNonWorkingDate(r.date, holidayDates))
+        const extraDays = allRecs.filter(r =>
+          isNonWorkingDate(r.date, holidayDates) && ['in_office','wfh'].includes(r.status)).length
         const present   = recs.filter(r => ['in_office','wfh'].includes(r.status)).length
         const wfh       = recs.filter(r => r.status === 'wfh').length
         const inOffice  = wfhNeutral ? present : recs.filter(r => r.status === 'in_office').length
@@ -1022,8 +1157,13 @@ export default function Reports() {
         const pct       = workdays > 0 ? Math.round(present / workdays * 100) : 0
         const punctDenom = Math.max(0, workdays - (leaveWDByUser[u.id]?.size || 0))
         const punct     = calcPunctualityScore(recs, lateThreshold, punctDenom)
-        const score     = calcScore(present, inOffice, workdays, punct)
-        return { ...u, present, wfh, inOffice, late, absent, pct, score, punctDenom, records: recs }
+        const third     = wfhNeutral
+          ? calcDayCompletion(recs, fullDayHours)
+          : (present > 0 ? (inOffice / present) * 25 : 0)
+        const score     = calcScore(present, workdays, punct, third)
+        // `records` drives scoring (working days only); `allRecords` drives the
+        // calendar, which must still show weekend/holiday work.
+        return { ...u, present, wfh, inOffice, late, absent, pct, score, punctDenom, extraDays, third, records: recs, allRecords: allRecs }
       }).sort((a, b) => b.score - a.score)
 
       // Summary totals
@@ -1111,7 +1251,7 @@ export default function Reports() {
       }).length
       if (after12 > 0) timeSlots.push({ label: '12:00+', count: after12, isLate: true })
 
-      setPreview({ rows, workdays, totals, totalItems: items.length, isCurrentMonth, weekTrend, dowData, timeSlots, settings })
+      setPreview({ rows, workdays, totals, totalItems: items.length, isCurrentMonth, weekTrend, dowData, timeSlots, settings, holidays })
     } catch (e) {
       toast(e.message, 'error')
     } finally {
@@ -1126,8 +1266,12 @@ export default function Reports() {
     try {
       const wb  = await buildExcel(kind, year, month)
       const buf = await wb.xlsx.writeBuffer()
-      const m   = MONTHS.find(x => x.value === month)?.label?.toLowerCase() || month
-      await window.api?.saveExcel(buf, `${kind}_report_${year}_${m}.xlsx`)
+      // The daily report always exports today, so date-stamp it rather than using the month picker.
+      const label = REPORT_LABEL[kind] || fileName(kind)
+      const stamp = kind === 'daily'
+        ? new Date().toLocaleDateString('sv-SE')
+        : `${MONTHS.find(x => x.value === month)?.label || month}_${year}`
+      await window.api?.saveExcel(buf, `${label}_Report_${stamp}.xlsx`)
       toast('Report saved to Downloads!', 'success')
     } catch (e) {
       console.error(e)
@@ -1314,11 +1458,13 @@ export default function Reports() {
       <AnimatePresence>
         {deepDive && (
           <EmployeeDeepDive
+            key={deepDive.id}
             row={deepDive}
             workdays={preview?.workdays ?? 0}
             month={month}
             year={year}
             settings={preview?.settings}
+            holidays={preview?.holidays || []}
             onClose={() => setDeepDive(null)}
           />
         )}

@@ -134,7 +134,7 @@ function PendingCard({ req, onReview }) {
                 Review Request
               </Button>
               <p className="text-xs text-gray-600">
-                Applied {format(parseISO(req.created_at), 'd MMM · hh:mm a')}
+                Applied {format(parseISO(req.created_at), 'd MMM · HH:mm')}
               </p>
             </div>
           </div>

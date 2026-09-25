@@ -116,9 +116,27 @@ export default function AdminSettings() {
                 className="input-base py-2.5 text-sm" />
             </div>
             <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Office End Time (IST)</label>
+              <input type="time" value={s.office_end_time || '18:30'} onChange={set('office_end_time')}
+                className="input-base py-2.5 text-sm" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Auto Checkout Time (IST)</label>
               <input type="time" value={s.auto_checkout_time || '20:00'} onChange={set('auto_checkout_time')}
                 className="input-base py-2.5 text-sm" />
+              <p className="text-xs text-gray-500">Backstop that closes anyone still checked in.</p>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Early Leave Grace (minutes)</label>
+              <input type="number" min="0" max="120" step="5"
+                value={s.early_grace_minutes || '15'} onChange={set('early_grace_minutes')}
+                className="input-base py-2.5 text-sm" />
+              <p className="text-xs text-gray-500">
+                Leaving within this window of the end time is fine. Earlier than that alerts the team's admins —
+                but only if they also worked less than a full day.
+              </p>
             </div>
           </div>
         </div>
@@ -144,7 +162,7 @@ export default function AdminSettings() {
           <p className="text-xs text-gray-500">0 = strict (9:31 is late) · 10 = relaxed (9:40 is fine) · 30 = very relaxed</p>
         </div>
 
-        <Button onClick={save(['office_latitude','office_longitude','office_radius_m','office_start_time','auto_checkout_time','grace_period_minutes','company_name','office_wifi_ssid'])}
+        <Button onClick={save(['office_latitude','office_longitude','office_radius_m','office_start_time','office_end_time','auto_checkout_time','early_grace_minutes','grace_period_minutes','company_name','office_wifi_ssid'])}
           loading={saving.office_latitude} className="w-fit text-sm">
           Save Office Settings
         </Button>
@@ -171,7 +189,19 @@ export default function AdminSettings() {
               ${s.wfh_neutral_scoring === 'true' ? 'translate-x-5' : 'translate-x-0.5'}`} />
           </button>
         </div>
-        <Button onClick={save(['wfh_neutral_scoring'])}
+        {s.wfh_neutral_scoring === 'true' && (
+          <div className="flex flex-col gap-1.5 pt-1 border-t border-white/[0.06]">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-3">Full Working Day (hours)</label>
+            <input type="number" min="1" max="24" step="0.5"
+              value={s.full_day_hours || '8'} onChange={set('full_day_hours')}
+              className="input-base py-2.5 text-sm w-32" />
+            <p className="text-xs text-gray-500">
+              With WFH neutral, the third score becomes <strong>Day Completion</strong>: 15 points for checking out yourself
+              (rather than being auto-checked-out) and 10 for logging a full day. Shorter days earn partial credit.
+            </p>
+          </div>
+        )}
+        <Button onClick={save(['wfh_neutral_scoring','full_day_hours'])}
           loading={saving.wfh_neutral_scoring} className="w-fit text-sm">
           Save Scoring Settings
         </Button>
@@ -294,7 +324,8 @@ function FlushByDate() {
   const [confirm,  setConfirm ] = useState('')
   const [flushing, setFlushing] = useState(false)
 
-  const ready = confirm.trim().toUpperCase() === 'DELETE'
+  // Case-sensitive on purpose — typing it exactly is the point of the gate.
+  const ready = confirm.trim() === 'DELETE'
 
   async function handleFlush() {
     if (!ready || !date) return
@@ -379,7 +410,8 @@ function DangerZone() {
   const [flushing, setFlushing] = useState(false)
   const [open, setOpen] = useState(false)
 
-  const ready = confirm.trim().toUpperCase() === 'FLUSH'
+  // Case-sensitive on purpose — typing it exactly is the point of the gate.
+  const ready = confirm.trim() === 'FLUSH'
 
   async function handleFlush() {
     if (!ready) return

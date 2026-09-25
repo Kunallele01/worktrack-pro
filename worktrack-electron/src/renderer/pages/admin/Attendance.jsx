@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import { Download, Search } from 'lucide-react'
-import { getAllAttendance } from '../../lib/supabase'
+import { getAllAttendance, getSettings, getHolidayDates, isEarlyCheckout } from '../../lib/supabase'
 import { Badge, Button, DataTable, Avatar, Card, Select } from '../../components/ui'
 import { useToast } from '../../components/ui'
 
@@ -15,7 +15,7 @@ const STATUS_OPTIONS = [
 
 function fmtTime(iso) {
   if (!iso) return '—'
-  try { return format(parseISO(iso), 'hh:mm a') } catch { return '—' }
+  try { return format(parseISO(iso), 'HH:mm') } catch { return '—' }
 }
 function fmtHours(ci, co) {
   if (!ci || !co) return '—'
@@ -40,7 +40,11 @@ export default function Attendance() {
   const load = async () => {
     setLoading(true)
     try {
-      const { items } = await getAllAttendance({ start, end, status: status || undefined, limit: 2000 })
+      const [{ items }, settings, holidayDates] = await Promise.all([
+        getAllAttendance({ start, end, status: status || undefined, limit: 2000 }),
+        getSettings(),
+        getHolidayDates(),
+      ])
       const uniqueDepts = [...new Set(items.map(r => r.profiles?.department).filter(Boolean))].sort()
       setDepts(uniqueDepts)
       let filtered = items
@@ -64,11 +68,12 @@ export default function Attendance() {
         checkin:    fmtTime(r.check_in_time),
         checkout:   fmtTime(r.check_out_time),
         status:     r.status,
-        late:       r.is_late ? 'Yes' : 'No',
+        late:       [r.is_late ? 'Late' : '', isEarlyCheckout(r, settings, holidayDates) ? 'Early' : ''].filter(Boolean).join(' + ') || 'No',
         hours:      fmtHours(r.check_in_time, r.check_out_time),
         // Raw refs for custom renders
         _profiles:  r.profiles,
         _is_late:   r.is_late,
+        _is_early:  isEarlyCheckout(r, settings, holidayDates),
         _status:    r.status,
       })))
     } catch (e) { toast(e.message, 'error') }
@@ -103,7 +108,7 @@ export default function Attendance() {
         })
       })
       const buffer = await wb.xlsx.writeBuffer()
-      await window.api?.saveExcel(buffer, `attendance_${start}_to_${end}.xlsx`)
+      await window.api?.saveExcel(buffer, `Attendance_${start}_to_${end}.xlsx`)
       toast(`Saved to Downloads!`, 'success')
     } catch (e) { toast(e.message, 'error') }
   }
@@ -128,8 +133,13 @@ export default function Attendance() {
       render: (v) => <span className="font-mono text-xs">{v}</span> },
     { key: 'status', label: 'Status', width: 120,
       render: (_, r) => r._status ? <Badge status={r._status} /> : '—' },
-    { key: 'late', label: 'Late', width: 60,
-      render: (_, r) => r._is_late ? <span className="text-amber-400 text-xs font-bold">⚑</span> : <span className="text-gray-600">—</span> },
+    { key: 'late', label: 'Flags', width: 70,
+      render: (_, r) => (r._is_late || r._is_early) ? (
+        <span className="flex items-center gap-1.5">
+          {r._is_late  && <span className="text-amber-400 text-xs font-bold" title="Checked in late">⚑</span>}
+          {r._is_early && <span className="text-orange-400 text-xs font-bold" title="Checked out early">⏱</span>}
+        </span>
+      ) : <span className="text-gray-600">—</span> },
     { key: 'hours', label: 'Hours', width: 80,
       render: (v) => <span className="font-mono text-xs">{v}</span> },
   ]

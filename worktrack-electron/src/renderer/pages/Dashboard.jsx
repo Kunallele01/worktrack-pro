@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import gsap from 'gsap'
 import { CheckCircle, ArrowRightFromLine, Users, Home, Clock, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
-import { getTodayAttendance, getMonthSummary, getMonthHistory, getYearHistory, checkIn, checkOut, getSettings, getHolidays, getMyLeaves, getLeaveBalance, getMyCorrections } from '../lib/supabase'
+import { getTodayAttendance, getMonthSummary, getMonthHistory, getYearHistory, checkIn, checkOut, getSettings, getHolidays, getMyLeaves, getLeaveBalance, getMyCorrections, isNonWorkingDate, calcDayCompletion } from '../lib/supabase'
 import { LEAVE_TYPES, LEAVE_COLORS } from '../lib/leaveConstants'
 import { useStore } from '../lib/store'
 import { GpsWidget, StatCard, CalendarWidget, Button, Badge, Card } from '../components/ui'
@@ -300,7 +300,7 @@ function DaylightArc({ sunT, isNight, sunrise, sunset }) {
     (1 - t) ** 2 * P0[1] + 2 * (1 - t) * t * P1[1] + t * t * P2[1],
   ]
   const [tx, ty] = at(sunT)
-  const fmt = (d) => (d ? format(d, 'h:mm a') : '—')
+  const fmt = (d) => (d ? format(d, 'HH:mm') : '—')
   const path = `M${P0[0]},${P0[1]} Q${P1[0]},${P1[1]} ${P2[0]},${P2[1]}`
   return (
     <div className="flex items-center gap-2 mt-1.5 w-full">
@@ -453,7 +453,7 @@ function TodayStatus({ record }) {
     return <p className="text-gray-500 text-sm">Not checked in yet today.</p>
   }
   const fmt = (iso) => {
-    try { return format(new Date(iso), 'hh:mm a') } catch { return '—' }
+    try { return format(new Date(iso), 'HH:mm') } catch { return '—' }
   }
   const hoursWorked = (() => {
     const end = record.check_out_time ? new Date(record.check_out_time) : new Date()
@@ -486,12 +486,16 @@ function TodayStatus({ record }) {
   )
 }
 
-function AttendanceScoreCard({ score, grade, consistency, punctuality, officePresence, passedWD, totalWD, monthName }) {
+function AttendanceScoreCard({ score, grade, consistency, punctuality, officePresence, presenceLabel, passedWD, totalWD, monthName }) {
+  // The bright ring colours are tuned for a dark card; on the light theme they
+  // wash out, so each gets a deeper shade for both the arc and its number.
+  const light = useStore(s => s.theme) === 'light'
   const rings = [
-    { label: 'Consistency', value: consistency,    max: 40, color: '#4F86F7', glow: 'rgba(79,134,247,0.45)'  },
-    { label: 'Punctuality', value: punctuality,    max: 35, color: '#10B981', glow: 'rgba(16,185,129,0.45)'  },
-    { label: 'Presence',    value: officePresence, max: 25, color: '#8B5CF6', glow: 'rgba(139,92,246,0.45)'  },
+    { label: 'Consistency', value: consistency,    max: 40, color: light ? '#2A5AD0' : '#4F86F7', glow: 'rgba(79,134,247,0.45)'  },
+    { label: 'Punctuality', value: punctuality,    max: 35, color: light ? '#047857' : '#10B981', glow: 'rgba(16,185,129,0.45)'  },
+    { label: presenceLabel, value: officePresence, max: 25, color: light ? '#6D28D9' : '#8B5CF6', glow: 'rgba(139,92,246,0.45)'  },
   ]
+  const trackStroke = light ? 'rgba(15,23,42,0.10)' : 'rgba(255,255,255,0.07)'
   const GRADE_HEX = { 'Excellent': '#10B981', 'Good': '#4F86F7', 'Fair': '#F59E0B', 'At Risk': '#EF4444' }
   const hex = GRADE_HEX[grade.label] || '#4F86F7'
 
@@ -565,7 +569,7 @@ function AttendanceScoreCard({ score, grade, consistency, punctuality, officePre
               </linearGradient>
             </defs>
             {/* Track */}
-            <circle cx={CX} cy={CX} r={R} fill="none" stroke="rgba(255,255,255,0.07)"
+            <circle cx={CX} cy={CX} r={R} fill="none" stroke={trackStroke}
               strokeWidth="8" strokeLinecap="round"
               strokeDasharray={`${SPAN} ${CIRC}`}
               transform={`rotate(135 ${CX} ${CX})`} />
@@ -602,7 +606,7 @@ function AttendanceScoreCard({ score, grade, consistency, punctuality, officePre
             <div key={label} className="flex flex-col items-center gap-0.5 py-2 rounded-xl bg-white/[0.02] border border-white/[0.05]">
               <div className="relative" style={{ width: mBox, height: mBox }}>
                 <svg width={mBox} height={mBox} viewBox={`0 0 ${mBox} ${mBox}`}>
-                  <circle cx={mCX} cy={mCX} r={mR} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
+                  <circle cx={mCX} cy={mCX} r={mR} fill="none" stroke={trackStroke} strokeWidth="4" />
                   <circle ref={el => ringRefs.current[i] = el}
                     cx={mCX} cy={mCX} r={mR} fill="none" stroke={color}
                     strokeWidth="4" strokeLinecap="round"
@@ -858,9 +862,10 @@ function DashboardInner() {
   // include today if already checked in, else start from yesterday
   if (!presentDates.has(cur.toLocaleDateString('sv-SE'))) cur.setDate(cur.getDate() - 1)
   for (let i = 0; i < 60; i++) {
+    const ds  = cur.toLocaleDateString('sv-SE')
     const day = cur.getDay()
-    if (day !== 0 && day !== 6) {
-      if (presentDates.has(cur.toLocaleDateString('sv-SE'))) streak++
+    if (day !== 0 && day !== 6 && !(holidays || []).some(h => h.date === ds)) {
+      if (presentDates.has(ds)) streak++
       else break
     }
     cur.setDate(cur.getDate() - 1)
@@ -868,11 +873,13 @@ function DashboardInner() {
 
   // ── Month progress ─────────────────────────────────────────────────────────
   const now = new Date()
+  const holidayDates = new Set((holidays || []).map(h => h.date))
   let totalWD = 0, passedWD = 0
   const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
   for (let d = 1; d <= dim; d++) {
+    const ds = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
     const wd = new Date(now.getFullYear(), now.getMonth(), d).getDay()
-    if (wd !== 0 && wd !== 6) { totalWD++; if (d <= now.getDate()) passedWD++ }
+    if (wd !== 0 && wd !== 6 && !holidayDates.has(ds)) { totalWD++; if (d <= now.getDate()) passedWD++ }
   }
   const monthPct  = totalWD ? Math.round((passedWD / totalWD) * 100) : 0
   const monthName = format(new Date(), 'MMMM')
@@ -908,7 +915,9 @@ function DashboardInner() {
   }
   const leaveWD = leaveDays.size
 
-  const presentRecs = history.filter(r => ['in_office','wfh'].includes(r.status))
+  // Weekend/holiday work is recognised separately and never scored.
+  const presentRecs = history.filter(r =>
+    ['in_office','wfh'].includes(r.status) && !isNonWorkingDate(r.date, holidayDates))
   const punctScore = (() => {
     // Denominator = elapsed working days minus approved-leave days (absent days count as 0 punctuality)
     const denom = Math.max(0, passedWD - leaveWD)
@@ -927,7 +936,10 @@ function DashboardInner() {
 
   const consistency    = passedWD > 0 ? (present / passedWD) * 40 : 0
   const punctuality    = punctScore
-  const officePresence = present  > 0 ? (inOffice / present) * 25  : 0
+  // With WFH sanctioned, office-vs-home says nothing — score finishing the day instead.
+  const officePresence = wfhNeutral
+    ? calcDayCompletion(presentRecs, parseFloat(settings?.full_day_hours || '8'))
+    : (present > 0 ? (inOffice / present) * 25 : 0)
   const score          = passedWD === 0 || present === 0 ? 0
     : Math.round(consistency + punctuality + officePresence)
   const grade = score >= 90
@@ -1038,7 +1050,7 @@ function DashboardInner() {
                 </div>
                 <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Checked In</p>
                 <p className="text-base font-mono font-bold text-gray-100">
-                  {format(new Date(today.check_in_time), 'hh:mm a')}
+                  {format(new Date(today.check_in_time), 'HH:mm')}
                 </p>
               </div>
             ) : (
@@ -1074,7 +1086,7 @@ function DashboardInner() {
                 </div>
                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Checked Out</p>
                 <p className="text-base font-mono font-bold text-gray-400">
-                  {format(new Date(today.check_out_time), 'hh:mm a')}
+                  {format(new Date(today.check_out_time), 'HH:mm')}
                 </p>
               </div>
             ) : (
@@ -1172,6 +1184,7 @@ function DashboardInner() {
               consistency={consistency}
               punctuality={punctuality}
               officePresence={officePresence}
+              presenceLabel={wfhNeutral ? 'Day Completion' : 'Presence'}
               passedWD={passedWD}
               totalWD={totalWD}
               monthName={monthName}

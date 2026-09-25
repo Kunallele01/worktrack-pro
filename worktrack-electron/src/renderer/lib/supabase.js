@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { LEAVE_TYPES } from './leaveConstants'
 
 const SUPABASE_URL = 'https://lwnuunwxfgvketjtmreo.supabase.co'
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bnV1bnd4Zmd2a2V0anRtcmVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNjg5MjQsImV4cCI6MjA5MjY0NDkyNH0.AklxvNAs0a6KwALEgXV-uPHh5SjfF7VF__ptBu83eWc'
@@ -289,11 +290,24 @@ export async function updateUser(userId, fields) {
 
 export async function getAdmins() {
   const { data, error } = await supabase.from('profiles')
-    .select('id,full_name,employee_id,email')
+    .select('id,full_name,employee_id,email,department')
     .eq('is_admin', true).eq('is_active', true)
     .order('full_name')
   if (error) throw new Error(error.message)
   return (data || []).map(normaliseName)
+}
+
+// Admins of the same team (SAP/RPA). Falls back to every admin when the
+// employee has no department or that team has no admin of its own.
+export function pickAdminsForDepartment(admins, department) {
+  const dept = (department || '').trim().toLowerCase()
+  if (!dept) return admins
+  const sameTeam = admins.filter(a => (a.department || '').trim().toLowerCase() === dept)
+  return sameTeam.length ? sameTeam : admins
+}
+
+export async function getAdminsForDepartment(department) {
+  return pickAdminsForDepartment(await getAdmins(), department)
 }
 
 export async function bulkSetAssignedAdmin(userIds, adminId) {
@@ -301,6 +315,171 @@ export async function bulkSetAssignedAdmin(userIds, adminId) {
     .update({ assigned_admin_id: adminId || null })
     .in('id', userIds)
   if (error) throw new Error(error.message)
+}
+
+// ── Extra-mile recognition (work on weekends / company holidays) ──────────── //
+// Purely a shout-out to the team's admins: it never touches attendance stats.
+// Sent 30 minutes after check-in so a mistaken tap doesn't page anyone.
+
+const EXTRA_DAY_DELAY_MS = 30 * 60 * 1000
+const extraDayKey = (userId, date) => `wt-extraday-sent-${userId}-${date}`
+
+export async function sendExtraDayRecognition(userId, date) {
+  if (localStorage.getItem(extraDayKey(userId, date))) return false
+
+  const [profile, settings, holidays] = await Promise.all([
+    supabase.from('profiles').select('full_name,employee_id,department').eq('id', userId).single().then(r => r.data),
+    getSettings(),
+    getHolidays(),
+  ])
+  if (!profile) return false
+  if (!isNonWorkingDate(date, new Set(holidays.map(h => h.date)))) return false
+
+  const host = settings.smtp_host?.trim()
+  const user = settings.smtp_username?.trim()
+  const pass = settings.smtp_password?.trim()
+  if (!host || !user || !pass) return false
+
+  const to = (await getAdminsForDepartment(profile.department)).map(a => a.email).filter(Boolean)
+  if (!to.length) return false
+
+  const holidayName = holidays.find(h => h.date === date)?.name
+  const dayLabel    = holidayName || new Date(`${date}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'long' })
+  const pretty      = new Date(`${date}T12:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  await window.api?.sendEmail({
+    host, port: settings.smtp_port || '587', user, pass,
+    fromName: settings.smtp_from_name || 'WorkTrack Pro',
+    to,
+    subject: `⭐ Going the extra mile — ${profile.full_name} worked on ${dayLabel}`,
+    html: `<div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;">
+      <div style="background:#1e293b;padding:20px 24px;border-radius:10px 10px 0 0;">
+        <h2 style="color:#fff;margin:0;font-size:16px;">WorkTrack Pro — Extra Mile</h2>
+      </div>
+      <div style="background:#f8fafc;padding:20px 24px;border:1px solid #e2e8f0;border-radius:0 0 10px 10px;">
+        <p style="color:#334155;font-size:15px;margin:0 0 8px;">
+          <strong>${profile.full_name}</strong> (${profile.employee_id}) checked in on <strong>${dayLabel}</strong>, a non-working day.
+        </p>
+        <p style="color:#64748b;font-size:14px;margin:0 0 4px;"><strong>Date:</strong> ${pretty}</p>
+        ${profile.department ? `<p style="color:#64748b;font-size:14px;margin:0 0 12px;"><strong>Team:</strong> ${profile.department}</p>` : ''}
+        <p style="color:#94a3b8;font-size:12px;margin:0;">This does not affect their attendance score — non-working days are never counted.</p>
+      </div>
+    </div>`,
+  })
+
+  localStorage.setItem(extraDayKey(userId, date), '1')
+  return true
+}
+
+// ── Early check-out ───────────────────────────────────────────────────────── //
+// Early means BOTH: left before the office end time (minus grace) AND put in
+// less than a full day. Someone who starts at 07:00 and leaves at 16:30 has
+// done their hours and is not flagged. Derived, not stored, so changing the
+// end time in Settings re-reads history consistently.
+
+const EARLY_ALERT_DELAY_MS = 2 * 60 * 1000
+const earlyKey = (userId, date) => `wt-early-sent-${userId}-${date}`
+
+export function isEarlyCheckout(rec, settings, holidayDates = new Set()) {
+  if (!rec?.check_in_time || !rec?.check_out_time) return false
+  if (rec.auto_checked_out) return false
+  if (isNonWorkingDate(rec.date, holidayDates)) return false
+
+  const [eh, em] = (settings?.office_end_time || '18:30').split(':').map(Number)
+  const grace    = parseInt(settings?.early_grace_minutes || '15', 10)
+  const p = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date(rec.check_out_time))
+  const outMin = parseInt(p.find(x => x.type === 'hour').value, 10) * 60
+               + parseInt(p.find(x => x.type === 'minute').value, 10)
+  if (outMin >= eh * 60 + em - grace) return false
+
+  const hours = (new Date(rec.check_out_time) - new Date(rec.check_in_time)) / 3600000
+  return hours < parseFloat(settings?.full_day_hours || '8')
+}
+
+export async function sendEarlyCheckoutAlert(userId, date) {
+  if (localStorage.getItem(earlyKey(userId, date))) return false
+
+  const [rec, profile, settings, holidayDates] = await Promise.all([
+    supabase.from('attendance').select('*').eq('user_id', userId).eq('date', date).maybeSingle().then(r => r.data),
+    supabase.from('profiles').select('full_name,employee_id,department').eq('id', userId).single().then(r => r.data),
+    getSettings(),
+    getHolidayDates(),
+  ])
+  if (!rec || !profile) return false
+  if (!isEarlyCheckout(rec, settings, holidayDates)) return false
+
+  const host = settings.smtp_host?.trim()
+  const user = settings.smtp_username?.trim()
+  const pass = settings.smtp_password?.trim()
+  if (!host || !user || !pass) return false
+
+  const to = (await getAdminsForDepartment(profile.department)).map(a => a.email).filter(Boolean)
+  if (!to.length) return false
+
+  const fmt   = t => new Date(t).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' })
+  const hours = (new Date(rec.check_out_time) - new Date(rec.check_in_time)) / 3600000
+  const worked = `${Math.floor(hours)}h ${Math.round((hours % 1) * 60)}m`
+
+  await window.api?.sendEmail({
+    host, port: settings.smtp_port || '587', user, pass,
+    fromName: settings.smtp_from_name || 'WorkTrack Pro',
+    to,
+    subject: `⏱ Early check-out — ${profile.full_name} left at ${fmt(rec.check_out_time)}`,
+    html: `<div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;">
+      <div style="background:#1e293b;padding:20px 24px;border-radius:10px 10px 0 0;">
+        <h2 style="color:#fff;margin:0;font-size:16px;">WorkTrack Pro — Early Check-out</h2>
+      </div>
+      <div style="background:#f8fafc;padding:20px 24px;border:1px solid #e2e8f0;border-radius:0 0 10px 10px;">
+        <p style="color:#334155;font-size:15px;margin:0 0 8px;">
+          <strong>${profile.full_name}</strong> (${profile.employee_id}) checked out before the end of the working day.
+        </p>
+        <p style="color:#64748b;font-size:14px;margin:0 0 4px;"><strong>Checked in:</strong> ${fmt(rec.check_in_time)}</p>
+        <p style="color:#64748b;font-size:14px;margin:0 0 4px;"><strong>Checked out:</strong> ${fmt(rec.check_out_time)} (office ends ${settings.office_end_time || '18:30'})</p>
+        <p style="color:#64748b;font-size:14px;margin:0 0 4px;"><strong>Time worked:</strong> ${worked}</p>
+        ${profile.department ? `<p style="color:#64748b;font-size:14px;margin:0 0 12px;"><strong>Team:</strong> ${profile.department}</p>` : ''}
+      </div>
+    </div>`,
+  })
+
+  localStorage.setItem(earlyKey(userId, date), '1')
+  return true
+}
+
+export function scheduleEarlyCheckoutAlert(userId, date) {
+  setTimeout(() => { sendEarlyCheckoutAlert(userId, date).catch(() => {}) }, EARLY_ALERT_DELAY_MS)
+}
+
+export function scheduleExtraDayRecognition(userId, date) {
+  setTimeout(() => { sendExtraDayRecognition(userId, date).catch(() => {}) }, EXTRA_DAY_DELAY_MS)
+}
+
+// Covers alerts whose timer never fired because the app was closed.
+export async function flushPendingAlerts(userId) {
+  const since = new Date()
+  since.setDate(since.getDate() - 7)
+  const [{ data }, holidayDates, settings] = await Promise.all([
+    supabase.from('attendance').select('*')
+      .eq('user_id', userId)
+      .gte('date', since.toLocaleDateString('sv-SE'))
+      .not('check_in_time', 'is', null),
+    getHolidayDates(),
+    getSettings(),
+  ])
+  const now = Date.now()
+  for (const r of data || []) {
+    if (isNonWorkingDate(r.date, holidayDates)) {
+      if (new Date(r.check_in_time).getTime() <= now - EXTRA_DAY_DELAY_MS) {
+        await sendExtraDayRecognition(userId, r.date).catch(() => {})
+      }
+      continue
+    }
+    if (isEarlyCheckout(r, settings, holidayDates)
+      && new Date(r.check_out_time).getTime() <= now - EARLY_ALERT_DELAY_MS) {
+      await sendEarlyCheckoutAlert(userId, r.date).catch(() => {})
+    }
+  }
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────── //
@@ -329,6 +508,9 @@ const DEFAULTS = {
   leave_planned_quota: '5',
   company_holidays:    '[]',
   wfh_neutral_scoring: 'false',
+  full_day_hours:      '8',
+  office_end_time:     '18:30',
+  early_grace_minutes: '15',
 }
 
 let settingsCache = null
@@ -375,7 +557,7 @@ export async function checkIn(userId, latitude, longitude, accuracy) {
     const mm = String(cM).padStart(2, '0')
     await Promise.all(stale.map(rec =>
       supabase.from('attendance')
-        .update({ check_out_time: `${rec.date}T${hh}:${mm}:00+05:30` })
+        .update({ check_out_time: `${rec.date}T${hh}:${mm}:00+05:30`, auto_checked_out: true })
         .eq('id', rec.id)
     ))
   }
@@ -432,6 +614,11 @@ export async function checkIn(userId, latitude, longitude, accuracy) {
     _sendWFHEmail(settings, userId, latitude, longitude).catch(e => console.warn('[WFH Email]', e.message))
   }
 
+  // Working on a weekend or company holiday — tell the team's admins in 30 min
+  if (isNonWorkingDate(today, await getHolidayDates())) {
+    scheduleExtraDayRecognition(userId, today)
+  }
+
   return data
 }
 
@@ -464,7 +651,7 @@ async function _sendWFHEmail(settings, userId, lat, lon) {
     .select('full_name,employee_id,department').eq('id', userId).single()
 
   const today   = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
-  const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+  const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' })
   const name    = profile?.full_name || 'An employee'
   const empId   = profile?.employee_id || ''
   const dept    = profile?.department  || ''
@@ -584,6 +771,12 @@ export async function checkOut(userId) {
     .update({ check_out_time: new Date().toISOString() })
     .eq('user_id', userId).eq('date', today).select().single()
   if (error) throw new Error(error.message)
+
+  const [settings, holidayDates] = await Promise.all([getSettings(), getHolidayDates()])
+  if (isEarlyCheckout(data, settings, holidayDates)) {
+    scheduleEarlyCheckoutAlert(userId, today)
+  }
+
   return data
 }
 
@@ -611,22 +804,74 @@ export async function getYearHistory(userId, year) {
   return data || []
 }
 
+// ── Working days ──────────────────────────────────────────────────────────── //
+// Weekends and company holidays are not working days. Attendance is scored only
+// over working days; anything done outside them is recognised, never counted.
+
+export function isWeekendDate(dateStr) {
+  const day = new Date(`${dateStr}T12:00:00`).getDay()
+  return day === 0 || day === 6
+}
+
+export async function getHolidayDates() {
+  return new Set((await getHolidays()).map(h => h.date))
+}
+
+export function isNonWorkingDate(dateStr, holidayDates) {
+  return isWeekendDate(dateStr) || holidayDates.has(dateStr)
+}
+
+export function countWorkingDays(year, month, lastDay, holidayDates) {
+  let n = 0
+  for (let d = 1; d <= lastDay; d++) {
+    const date = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    if (!isNonWorkingDate(date, holidayDates)) n++
+  }
+  return n
+}
+
+// Day Completion (25 pts) — replaces Office Presence when WFH is company-sanctioned.
+// 15 pts for closing the day yourself, 10 for the day having real hours in it.
+// Auto-closed days are excluded from the hours half: the 20:00 stamp isn't a real
+// finish time, so counting it would reward forgetting to check out.
+export function calcDayCompletion(records, fullDayHours = 8) {
+  const present = records.filter(r => ['in_office','wfh'].includes(r.status) && r.check_in_time)
+  if (!present.length) return 0
+
+  const selfClosed = present.filter(r => r.check_out_time && !r.auto_checked_out)
+  const discipline = selfClosed.length / present.length
+
+  const hours = selfClosed.length
+    ? selfClosed.reduce((acc, r) => {
+        const h = (new Date(r.check_out_time) - new Date(r.check_in_time)) / 3600000
+        return acc + Math.min(1, Math.max(0, h / fullDayHours))
+      }, 0) / selfClosed.length
+    : 0
+
+  return discipline * 15 + hours * 10
+}
+
 export async function getMonthSummary(userId, year, month) {
-  const records = await getMonthHistory(userId, year, month)
+  const [records, holidayDates] = await Promise.all([
+    getMonthHistory(userId, year, month),
+    getHolidayDates(),
+  ])
   const now = new Date()
   const isCurrentMonth = year === now.getFullYear() && month === (now.getMonth() + 1)
   const lastDay = isCurrentMonth ? now.getDate() : new Date(year, month, 0).getDate()
-  let workdays = 0
-  for (let d = 1; d <= lastDay; d++) {
-    const day = new Date(year, month - 1, d).getDay()
-    if (day !== 0 && day !== 6) workdays++
-  }
+  const workdays = countWorkingDays(year, month, lastDay, holidayDates)
+
+  const onWorkingDay = records.filter(r => !isNonWorkingDate(r.date, holidayDates))
+  const extraDays    = records.filter(r =>
+    isNonWorkingDate(r.date, holidayDates) && (r.status === 'in_office' || r.status === 'wfh'))
+
   return {
-    present:      records.filter(r => r.status === 'in_office' || r.status === 'wfh').length,
-    wfh:          records.filter(r => r.status === 'wfh').length,
-    absent:       records.filter(r => r.status === 'absent').length,
-    late:         records.filter(r => r.is_late).length,
+    present:      onWorkingDay.filter(r => r.status === 'in_office' || r.status === 'wfh').length,
+    wfh:          onWorkingDay.filter(r => r.status === 'wfh').length,
+    absent:       onWorkingDay.filter(r => r.status === 'absent').length,
+    late:         onWorkingDay.filter(r => r.is_late).length,
     working_days: workdays,
+    extra_days:   extraDays.length,
   }
 }
 
@@ -634,12 +879,12 @@ export async function getLiveOverview() {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Kolkata' })
 
   // Fetch non-admin active employees (admins have no check-in screen so exclude from stats)
-  const [{ data: att }, { data: allEmployees }, { data: todayHolidays }, { data: onLeaveToday }] = await Promise.all([
+  const [{ data: att }, { data: allEmployees }, holidayDates, { data: onLeaveToday }] = await Promise.all([
     supabase.from('attendance').select('*,profiles(full_name,employee_id,department,is_admin)')
       .eq('date', today).order('check_in_time'),
     supabase.from('profiles').select('id,full_name,employee_id,department')
       .eq('is_active', true).eq('is_admin', false),
-    supabase.from('holidays').select('date').eq('date', today),
+    getHolidayDates(),
     supabase.from('leave_requests').select('user_id').eq('status', 'approved')
       .lte('start_date', today).gte('end_date', today),
   ])
@@ -648,7 +893,7 @@ export async function getLiveOverview() {
   const employees   = allEmployees || []                   // non-admin employees only
   const empIds      = new Set(employees.map(e => e.id))
   const onLeaveIds  = new Set((onLeaveToday || []).map(l => l.user_id))
-  const isHoliday   = (todayHolidays || []).length > 0
+  const isHoliday   = holidayDates.has(today)
 
   // Only count non-admin check-ins in stats
   const empRecords  = records.filter(r => empIds.has(r.user_id))
@@ -794,7 +1039,7 @@ export async function runAutoCheckout(settings) {
   if (!data?.length) { localStorage.setItem(cacheK, '1'); return 0 }
 
   await supabase.from('attendance')
-    .update({ check_out_time: checkoutTime.toISOString() })
+    .update({ check_out_time: checkoutTime.toISOString(), auto_checked_out: true })
     .in('id', data.map(r => r.id))
 
   localStorage.setItem(cacheK, '1')
@@ -1317,6 +1562,29 @@ export async function sendBirthdayEmail(person, settings) {
 
 // ── Notification feed ─────────────────────────────────────────────────────── //
 
+const LEAVE_LABEL = Object.fromEntries(LEAVE_TYPES.map(t => [t.value, t.label]))
+const CORRECTION_LABEL = {
+  forgot_checkin:  'Missed check-in',
+  forgot_checkout: 'Missed check-out',
+  wrong_status:    'Incorrect status',
+  other:           'Other correction',
+}
+
+const fmtDay = (d, opts = { day: 'numeric', month: 'short' }) =>
+  new Date(`${d}T12:00:00`).toLocaleDateString('en-IN', opts)
+
+// "14 Oct" · "14–16 Oct" · "30 Sep – 2 Oct"
+function fmtDateRange(start, end) {
+  if (!start || !end) return ''
+  if (start === end) return fmtDay(start)
+  const sameMonth = start.slice(0, 7) === end.slice(0, 7)
+  return sameMonth
+    ? `${fmtDay(start, { day: 'numeric' })}–${fmtDay(end)}`
+    : `${fmtDay(start)} – ${fmtDay(end)}`
+}
+
+const fmtDays = n => `${n} ${n === 1 ? 'day' : 'days'}`
+
 export async function getNotifications(userId, isAdmin) {
   const since = new Date(); since.setDate(since.getDate() - 7)
   const sinceISO = since.toISOString()
@@ -1362,11 +1630,11 @@ export async function getNotifications(userId, isAdmin) {
   if (isAdmin) {
     const [{ data: lv }, { data: cr }, { data: late }, { data: wfhToday }] = await Promise.all([
       supabase.from('leave_requests')
-        .select('id,type,days,created_at,profiles:user_id(full_name)')
+        .select('id,type,days,start_date,end_date,created_at,profiles:user_id(full_name)')
         .eq('status','pending').gte('created_at', sinceISO)
         .order('created_at',{ascending:false}).limit(6),
       supabase.from('correction_requests')
-        .select('id,type,created_at,profiles:user_id(full_name)')
+        .select('id,type,date,created_at,profiles:user_id(full_name)')
         .eq('status','pending').gte('created_at', sinceISO)
         .order('created_at',{ascending:false}).limit(6),
       supabase.from('attendance')
@@ -1378,29 +1646,110 @@ export async function getNotifications(userId, isAdmin) {
         .eq('date',today).eq('status','wfh')
         .order('check_in_time',{ascending:false}).limit(10),
     ])
-    const LEAVE_LABEL = { sick:'Sick Leave', casual:'Casual Leave', planned:'Planned Leave', emergency:'Emergency Leave' }
-    for (const r of lv||[])       items.push({ id:`lv-${r.id}`,  icon:'📋', title:`${r.profiles?.full_name} requested ${r.days}d leave`, subtitle:`${LEAVE_LABEL[r.type]||r.type} · awaiting review`,                                                                                      time:r.created_at,         link:'/admin/leaves'      })
-    for (const r of cr||[])       items.push({ id:`cr-${r.id}`,  icon:'✏️',  title:`${r.profiles?.full_name} submitted a correction`,        subtitle:'Needs your review',                                                                                                                    time:r.created_at,         link:'/admin/corrections' })
-    for (const r of late||[])     items.push({ id:`lt-${r.id}`,  icon:'⏰',  title:`${r.profiles?.full_name} checked in late`,               subtitle:`Today · ${r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : ''}`,           time:r.check_in_time||today, link:'/admin/attendance'  })
-    for (const r of wfhToday||[]) items.push({ id:`wfh-${r.id}`, icon:'🏠',  title:`${r.profiles?.full_name} is working from home`,          subtitle:`Checked in at ${r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : 'today'}`, time:r.check_in_time||today, link:'/admin/map'         })
+
+    // Team-scoped: extra-mile work, and early check-outs
+    const sinceDate = since.toLocaleDateString('sv-SE')
+    const [{ data: extra }, holidays, admins, settings] = await Promise.all([
+      supabase.from('attendance')
+        .select('*,profiles(full_name,department,is_admin)')
+        .gte('date', sinceDate).not('check_in_time','is',null)
+        .order('date',{ascending:false}).limit(60),
+      getHolidays(),
+      getAdmins(),
+      getSettings(),
+    ])
+    const holidayDates = new Set(holidays.map(h => h.date))
+    const onMyTeam = dept => pickAdminsForDepartment(admins, dept).some(a => a.id === userId)
+
+    for (const r of extra||[]) {
+      if (r.profiles?.is_admin) continue
+      if (!isEarlyCheckout(r, settings, holidayDates)) continue
+      if (!onMyTeam(r.profiles?.department)) continue
+      const hrs = (new Date(r.check_out_time) - new Date(r.check_in_time)) / 3600000
+      items.push({
+        id:       `ec-${r.id}`,
+        icon:     '⏱',
+        title:    `${r.profiles?.full_name} checked out early`,
+        subtitle: `${fmtDay(r.date)} · left at ${new Date(r.check_out_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false})} after ${Math.floor(hrs)}h ${Math.round((hrs%1)*60)}m`,
+        time:     r.check_out_time,
+        link:     '/admin/attendance',
+      })
+    }
+    for (const r of extra||[]) {
+      if (r.profiles?.is_admin) continue
+      if (!isNonWorkingDate(r.date, holidayDates)) continue
+      if (!onMyTeam(r.profiles?.department)) continue
+      const label = holidays.find(h => h.date === r.date)?.name
+                 || new Date(`${r.date}T12:00:00`).toLocaleDateString('en-IN',{weekday:'long'})
+      items.push({
+        id:       `xd-${r.id}`,
+        icon:     '⭐',
+        title:    `${r.profiles?.full_name} worked on ${label}`,
+        subtitle: `Non-working day · ${fmtDay(r.date)} · does not affect their attendance score`,
+        time:     r.check_in_time || r.date,
+        link:     '/admin/attendance',
+      })
+    }
+
+    const fmtTime = t => t ? new Date(t).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false}) : ''
+    for (const r of lv||[]) items.push({
+      id: `lv-${r.id}`, icon: '📋',
+      title:    `${r.profiles?.full_name} requested leave`,
+      subtitle: `${LEAVE_LABEL[r.type]||r.type} · ${fmtDateRange(r.start_date, r.end_date)} · ${fmtDays(r.days)} · awaiting review`,
+      time: r.created_at, link: '/admin/leaves',
+    })
+    for (const r of cr||[]) items.push({
+      id: `cr-${r.id}`, icon: '✏️',
+      title:    `${r.profiles?.full_name} requested an attendance correction`,
+      subtitle: `${CORRECTION_LABEL[r.type]||'Correction'} · ${fmtDay(r.date)} · awaiting review`,
+      time: r.created_at, link: '/admin/corrections',
+    })
+    for (const r of late||[]) items.push({
+      id: `lt-${r.id}`, icon: '⏰',
+      title:    `${r.profiles?.full_name} checked in late`,
+      subtitle: `Today at ${fmtTime(r.check_in_time)}`,
+      time: r.check_in_time||today, link: '/admin/attendance',
+    })
+    for (const r of wfhToday||[]) items.push({
+      id: `wfh-${r.id}`, icon: '🏠',
+      title:    `${r.profiles?.full_name} is working from home`,
+      subtitle: `Checked in at ${fmtTime(r.check_in_time)}`,
+      time: r.check_in_time||today, link: '/admin/map',
+    })
   } else {
     const [{ data: lv }, { data: cr }] = await Promise.all([
       supabase.from('leave_requests')
-        .select('id,type,days,status,reviewed_at,admin_note')
+        .select('id,type,days,start_date,end_date,status,reviewed_at,admin_note')
         .eq('user_id',userId).in('status',['approved','rejected'])
         .gte('reviewed_at', sinceISO).order('reviewed_at',{ascending:false}).limit(6),
       supabase.from('correction_requests')
-        .select('id,type,status,reviewed_at,admin_note')
+        .select('id,type,date,status,reviewed_at,admin_note')
         .eq('user_id',userId).in('status',['approved','rejected'])
         .gte('reviewed_at', sinceISO).order('reviewed_at',{ascending:false}).limit(6),
     ])
     for (const r of lv||[]) {
-      const ok = r.status === 'approved'
-      items.push({ id:`lv-${r.id}`, icon: ok?'✅':'❌', title:`Your ${r.days}d leave was ${r.status}`, subtitle: r.admin_note || (ok?'Approved by admin':'Reach out to admin for details.'), time:r.reviewed_at, link:'/leaves' })
+      const ok      = r.status === 'approved'
+      const details = `${LEAVE_LABEL[r.type] || r.type} · ${fmtDateRange(r.start_date, r.end_date)} · ${fmtDays(r.days)}`
+      items.push({
+        id:       `lv-${r.id}`,
+        icon:     ok ? '✅' : '❌',
+        title:    `Leave request ${ok ? 'approved' : 'declined'}`,
+        subtitle: r.admin_note ? `${details} — “${r.admin_note}”` : details,
+        time:     r.reviewed_at,
+        link:     '/leaves',
+      })
     }
     for (const r of cr||[]) {
-      const ok = r.status === 'approved'
-      items.push({ id:`cr-${r.id}`, icon: ok?'✅':'❌', title:`Your correction was ${r.status}`, subtitle: r.admin_note || (ok?'Attendance updated.':'Reach out to admin for details.'), time:r.reviewed_at, link:'/corrections' })
+      const ok      = r.status === 'approved'
+      const details = `${CORRECTION_LABEL[r.type] || 'Correction'} · ${fmtDay(r.date)}`
+      items.push({
+        id:       `cr-${r.id}`,
+        icon:     ok ? '✅' : '❌',
+        title:    `Attendance correction ${ok ? 'approved' : 'declined'}`,
+        subtitle: r.admin_note ? `${details} — “${r.admin_note}”` : details,
+        time:     r.reviewed_at,
+        link:     '/corrections',
+      })
     }
   }
 
@@ -1442,8 +1791,7 @@ export async function sendCheckInReminders() {
   if (!host || !user || !pass) return 0
 
   // Skip on company holidays
-  const { data: todayHoliday } = await supabase.from('holidays').select('date').eq('date', today).limit(1)
-  if ((todayHoliday || []).length > 0) return 0
+  if ((await getHolidayDates()).has(today)) return 0
 
   const [{ data: allEmps }, { data: checkins }, { data: onLeave }] = await Promise.all([
     supabase.from('profiles').select('id,full_name,email').eq('is_active', true).eq('is_admin', false),

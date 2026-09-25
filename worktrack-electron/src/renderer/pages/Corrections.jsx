@@ -29,7 +29,7 @@ const STATUS_ACCENT = {
 
 function fmtTime(iso) {
   if (!iso) return null
-  try { return format(parseISO(iso), 'hh:mm a') } catch { return null }
+  try { return format(parseISO(iso), 'HH:mm') } catch { return null }
 }
 
 const STATUS_OPTIONS = [

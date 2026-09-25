@@ -87,7 +87,7 @@ function MapController({ focus, markerRefs }) {
 
 // ── Employee row in sidebar ────────────────────────────────────────────────── //
 function EmployeeRow({ r, onClick, active }) {
-  const fmt = iso => { try { return format(new Date(iso), 'hh:mm a') } catch { return '—' } }
+  const fmt = iso => { try { return format(new Date(iso), 'HH:mm') } catch { return '—' } }
   return (
     <div onClick={onClick}
       className={`flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.04] cursor-pointer transition-colors
@@ -266,7 +266,7 @@ export default function MapView() {
                       </p>
                       {r.check_in_time && (
                         <p style={{ fontSize: 10, color: '#94a3b8', margin: 0 }}>
-                          Check-in: {format(new Date(r.check_in_time), 'hh:mm a')}
+                          Check-in: {format(new Date(r.check_in_time), 'HH:mm')}
                         </p>
                       )}
                       {r.profiles?.department && (

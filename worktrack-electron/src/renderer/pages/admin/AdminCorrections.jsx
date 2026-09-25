@@ -18,7 +18,7 @@ const STATUS_LABELS = { in_office: 'In Office', wfh: 'Work From Home', auto_chec
 
 function fmtTime(iso) {
   if (!iso) return null
-  try { return format(parseISO(iso), 'hh:mm a') } catch { return null }
+  try { return format(parseISO(iso), 'HH:mm') } catch { return null }
 }
 function fmtDate(iso) {
   if (!iso) return null
