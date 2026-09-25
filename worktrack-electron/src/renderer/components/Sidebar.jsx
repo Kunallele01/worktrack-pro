@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { LayoutDashboard, Settings, BarChart3, Users, Calendar, Map, LogOut, Zap, Sun, Moon, CalendarCheck, ClipboardList, UserCircle, UserCog, Bell, Search as SearchIcon } from 'lucide-react'
+import { LayoutDashboard, Settings, BarChart3, Users, Calendar, Map, LogOut, Sun, Moon, CalendarCheck, ClipboardList, UserCircle, UserCog, Bell, Search as SearchIcon } from 'lucide-react'
 import { signOut, getAdminBadgeCounts, getEmployeeBadgeCounts, getNotifications } from '../lib/supabase'
 import { useStore } from '../lib/store'
 import { Avatar } from './ui'
+import BrandMark from './BrandMark'
 
 const EMP_NAV  = [
   { to: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
@@ -119,9 +120,10 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="px-4 pt-6 pb-4 border-b border-white/[0.06]">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-accent-500 flex items-center justify-center shrink-0">
-            <Zap size={16} className="text-white" />
-          </div>
+          {/* Ring tracks the real configured working day */}
+          <BrandMark size={34} pulse={false}
+            dayStart={settings?.office_start_time}
+            dayEnd={settings?.office_end_time} />
           <div className="min-w-0">
             <p className="text-sm font-bold text-gray-100 truncate">WorkTrack Pro</p>
             <p className="text-xs text-gray-500 truncate">{companyName}</p>

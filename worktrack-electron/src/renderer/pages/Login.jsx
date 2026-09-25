@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import gsap from 'gsap'
-import { AlertCircle, MapPin, LayoutDashboard, CalendarDays } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { signIn } from '../lib/supabase'
 import { useStore } from '../lib/store'
 import { Page, Button, Input, PasswordInput } from '../components/ui'
+import BrandMark from '../components/BrandMark'
+import { LAUNCH_QUOTE } from '../lib/quotes'
 
 // ── Odometer digit (rolls to its value) ─────────────────────────────────────
 function OdoDigit({ d, size }) {
@@ -24,27 +26,95 @@ function OdoDigit({ d, size }) {
   )
 }
 
-function LiveClock() {
+// The day is the headline; the time is a supporting detail. No seconds — an
+// orphaned counter on a login screen reads as a bug, not a feature.
+function DateBlock() {
   const [now, setNow] = useState(new Date())
-  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 30000); return () => clearInterval(t) }, [])
   const hh = String(now.getHours()).padStart(2, '0')
   const mm = String(now.getMinutes()).padStart(2, '0')
-  const ss = String(now.getSeconds()).padStart(2, '0')
-  const big = 72
-  const date = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const size = 26
+
   return (
-    <div className="text-center select-none">
-      <div className="flex items-center justify-center font-mono font-bold text-white leading-none" style={{ letterSpacing: '-3px' }}>
-        <OdoDigit d={+hh[0]} size={big} /><OdoDigit d={+hh[1]} size={big} />
-        <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity, ease: 'easeInOut' }}
-          className="text-white/70" style={{ fontSize: big * 0.5, margin: '0 4px' }}>:</motion.span>
-        <OdoDigit d={+mm[0]} size={big} /><OdoDigit d={+mm[1]} size={big} />
-      </div>
-      <div className="flex items-center justify-center font-mono font-light text-white/40 tabular-nums mt-3" style={{ letterSpacing: '-1px' }}>
-        <OdoDigit d={+ss[0]} size={34} /><OdoDigit d={+ss[1]} size={34} />
-      </div>
-      <p className="text-white/50 text-base font-light mt-4">{date}</p>
+    <div className="select-none">
+      <motion.p
+        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+        className="text-white font-light tracking-[-0.03em] leading-[0.95]"
+        style={{ fontSize: 'clamp(3rem, 5.2vw, 4.75rem)' }}
+      >
+        {now.toLocaleDateString('en-IN', { weekday: 'long' })}
+      </motion.p>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.28, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+        className="flex items-baseline gap-3 mt-4"
+      >
+        <p className="text-white/45 text-lg font-light tracking-wide">
+          {now.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+        </p>
+        <span className="w-1 h-1 rounded-full bg-white/20 self-center" />
+        <div className="flex items-center font-mono text-white/45 tabular-nums" style={{ letterSpacing: '-0.5px' }}>
+          <OdoDigit d={+hh[0]} size={size} /><OdoDigit d={+hh[1]} size={size} />
+          <span className="text-white/25" style={{ fontSize: size * 0.8, margin: '0 1px' }}>:</span>
+          <OdoDigit d={+mm[0]} size={size} /><OdoDigit d={+mm[1]} size={size} />
+        </div>
+      </motion.div>
     </div>
+  )
+}
+
+// A horizon to sit the sky on. Without it the scene has no floor and the lower
+// half reads as empty rather than open. Deterministic, so it never reflows.
+function Skyline({ phase, seed = 20260925, className = '', height = '38%' }) {
+  const buildings = React.useMemo(() => {
+    let s = seed
+    const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff
+    const out = []
+    let x = -40
+    while (x < 1200) {
+      const w = 38 + rnd() * 76
+      const h = 60 + rnd() * 190
+      const win = []
+      const cols = Math.max(1, Math.floor(w / 22))
+      const rows = Math.max(1, Math.floor(h / 26))
+      for (let c = 0; c < cols; c++) {
+        for (let r = 0; r < rows; r++) {
+          if (rnd() > 0.62) win.push({ x: x + 9 + c * 22, y: 300 - h + 14 + r * 26, lit: rnd() > 0.45 })
+        }
+      }
+      out.push({ x, w, h, win })
+      x += w + 3 + rnd() * 16
+    }
+    return out
+  }, [seed])
+
+  const glow = phase === 'day' ? 'rgba(190,215,255,0.5)' : '#FFA637'
+
+  return (
+    <svg viewBox="0 0 1200 300" preserveAspectRatio="none"
+      style={{ height }}
+      className={`absolute bottom-0 left-0 w-full pointer-events-none select-none ${className}`}>
+      <defs>
+        <linearGradient id="bldg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#0b1120" />
+          <stop offset="100%" stopColor="#050810" />
+        </linearGradient>
+      </defs>
+      {buildings.map((b, i) => (
+        <g key={i}>
+          <rect x={b.x} y={300 - b.h} width={b.w} height={b.h} fill="url(#bldg)" />
+          <rect x={b.x} y={300 - b.h} width={b.w} height="1" fill="rgba(255,255,255,0.05)" />
+          {b.win.map((w, j) => (
+            <rect key={j} x={w.x} y={w.y} width="7" height="11" rx="1"
+              fill={w.lit ? glow : 'rgba(255,255,255,0.035)'}
+              opacity={w.lit ? 0.45 + (j % 5) * 0.11 : 1}
+              style={w.lit ? { filter: `drop-shadow(0 0 3px ${glow})` } : undefined} />
+          ))}
+        </g>
+      ))}
+    </svg>
   )
 }
 
@@ -189,12 +259,6 @@ function AmbientSky() {
   )
 }
 
-const FEATURES = [
-  { Icon: MapPin,          title: 'Smart Location',       desc: 'Auto-detects WFH or in-office via WiFi' },
-  { Icon: LayoutDashboard, title: 'Real-time Overview',   desc: "See your whole team's status at a glance" },
-  { Icon: CalendarDays,    title: 'Leave Management',     desc: 'Apply, track, and approve time-off in one place' },
-]
-
 // Right panel echoes the sky's current phase so both halves share one light source
 const PHASE_TINT = {
   night: 'rgba(96,150,255,0.10)',
@@ -252,76 +316,74 @@ export default function Login() {
   }
 
   return (
-    <Page className="flex h-screen">
-      {/* Left panel */}
-      <div className="relative hidden lg:flex flex-col items-center justify-center w-[55%] overflow-hidden">
+    <Page className="relative flex h-screen overflow-hidden">
+      {/* One scene across the whole window — no panel behind the card, so the
+          sky and the city run unbroken from edge to edge. */}
+      <div className="absolute inset-0 pointer-events-none">
         <AmbientSky />
-        <div className="relative z-10 flex flex-col items-center gap-10 px-12 w-full">
-          {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="relative w-10 h-10 rounded-2xl bg-accent-500 flex items-center justify-center shadow-lg shadow-accent-500/30">
-              <div className="absolute inset-0 rounded-2xl bg-accent-400 blur-lg opacity-50 animate-pulse" />
-              <span className="relative text-white font-black text-lg">W</span>
-            </div>
+        <Skyline phase={phase} height="34%" />
+        {/* Deepen the base so type and card always have something solid behind them */}
+        <div className="absolute bottom-0 inset-x-0 h-1/2"
+          style={{ background: 'linear-gradient(to top, rgba(3,6,14,0.92), transparent)' }} />
+      </div>
+
+      {/* Left column — content only; the scene behind it is shared */}
+      <div className="relative hidden lg:flex w-[62%]">
+
+        <div className="relative z-10 flex flex-col justify-between w-full px-16 py-14">
+          {/* Brand */}
+          <motion.div
+            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="flex items-center gap-3"
+          >
+            <BrandMark size={50} />
             <div>
-              <p className="text-white font-bold text-lg leading-tight">WorkTrack Pro</p>
-              <p className="text-white/40 text-xs">Attendance Intelligence</p>
+              <p className="text-white font-semibold text-lg leading-tight tracking-tight">WorkTrack Pro</p>
+              <p className="text-white/35 text-xs tracking-wide">Attendance Intelligence</p>
+            </div>
+          </motion.div>
+
+          {/* Weight sits low against the horizon, sky breathes above it */}
+          <div className="flex items-end gap-5">
+            <motion.span
+              initial={{ scaleY: 0 }} animate={{ scaleY: 1 }}
+              transition={{ delay: 0.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className="w-px self-stretch origin-bottom shrink-0"
+              style={{ background: 'linear-gradient(to top, rgba(79,134,247,0.55), transparent)' }}
+            />
+            <div>
+              <DateBlock />
+              <motion.figure
+                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+                className="mt-8 max-w-[26rem]"
+              >
+                <blockquote className="text-white/55 text-sm leading-relaxed italic">
+                  “{LAUNCH_QUOTE.text}”
+                </blockquote>
+                <figcaption className="text-white/30 text-xs mt-2 not-italic tracking-wide">
+                  — {LAUNCH_QUOTE.author}
+                </figcaption>
+              </motion.figure>
             </div>
           </div>
-
-          <LiveClock />
-
-          {/* Feature highlights */}
-          <div className="flex flex-col gap-4 w-full max-w-xs">
-            {FEATURES.map(({ Icon, title, desc }, i) => (
-              <motion.div
-                key={title}
-                initial={{ opacity: 0, x: -16 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 + i * 0.12, duration: 0.5, ease: [0.16,1,0.3,1] }}
-                className="flex items-center gap-3"
-              >
-                <div className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0">
-                  <Icon size={16} className="text-accent-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-white/75 leading-tight">{title}</p>
-                  <p className="text-xs text-white/30 leading-snug">{desc}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          <p className="text-white/20 text-xs text-center max-w-xs">
-            Built for teams who value time — yours and everyone else's.
-          </p>
         </div>
       </div>
 
-      {/* Divider */}
-      <div className="auth-divider hidden lg:block w-px bg-gradient-to-b from-transparent via-white/[0.08] to-transparent" />
-
-      {/* Right panel */}
-      <div className="login-panel flex-1 flex items-center justify-center relative overflow-hidden px-8">
-        {/* Subtle background that echoes the sky's current phase */}
-        <div className="absolute inset-0" style={{ background: '#0a0e1a' }} />
+      {/* Right column — the card sits directly on the shared scene */}
+      <div className="login-panel flex-1 flex items-center justify-center relative px-8">
+        {/* Only a soft pool of light under the card, so it separates from the
+            city without a panel edge */}
         <div className="absolute inset-0 pointer-events-none"
-          style={{ background: `linear-gradient(to bottom right, transparent 30%, ${PHASE_TINT[phase]})`, transition: 'background 3s ease' }} />
-        <svg className="absolute inset-0 w-full h-full opacity-[0.025] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="rdots" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
-              <circle cx="1" cy="1" r="1" fill="white"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#rdots)"/>
-        </svg>
+          style={{ background: `radial-gradient(52% 46% at 50% 48%, rgba(3,6,14,0.82), transparent 72%)` }} />
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-sm relative z-10 rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-2xl px-8 py-9
-                     shadow-[0_24px_70px_-20px_rgba(0,0,0,0.7)] overflow-hidden"
+          className="w-full max-w-[24rem] relative z-10 rounded-2xl border border-white/[0.14] bg-white/[0.07] backdrop-blur-2xl px-8 py-8
+                     shadow-[0_40px_90px_-28px_rgba(0,0,0,0.95),0_0_0_1px_rgba(255,255,255,0.04)_inset] overflow-hidden"
         >
           {/* Hairline top edge lit by the sky's phase colour */}
           <div className="absolute top-0 inset-x-6 h-px pointer-events-none"
@@ -336,11 +398,11 @@ export default function Login() {
           </div>
 
           <motion.div {...fadeUp(0.10)}>
-            <h1 className="text-2xl font-bold text-gray-50 mb-1">{greeting}</h1>
-            <p className="text-sm text-gray-400 mb-8">Sign in to your account</p>
+            <h1 className="text-[1.6rem] font-semibold text-white tracking-tight leading-none">{greeting}</h1>
+            <p className="text-sm text-white/40 mt-2 mb-7">Sign in to continue</p>
           </motion.div>
 
-          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3.5">
             <motion.div {...fadeUp(0.18)}>
               <Input
                 label="Email or Employee ID"
@@ -359,8 +421,8 @@ export default function Login() {
               />
             </motion.div>
 
-            <motion.div {...fadeUp(0.32)} className="flex justify-end -mt-1">
-              <Link to="/forgot" className="text-xs text-accent-400 hover:text-accent-300 transition-colors">
+            <motion.div {...fadeUp(0.32)} className="flex justify-end -mt-1.5">
+              <Link to="/forgot" className="text-xs text-white/35 hover:text-white/70 transition-colors">
                 Forgot password?
               </Link>
             </motion.div>
@@ -377,15 +439,17 @@ export default function Login() {
             )}
 
             <motion.div {...fadeUp(0.38)}>
-              <Button type="submit" loading={loading} className="w-full h-11 mt-1">
+              <Button type="submit" loading={loading}
+                className="w-full h-11 mt-1.5 shadow-[0_8px_24px_-6px_rgba(79,134,247,0.6)]">
                 {loading ? 'Signing in…' : 'Sign In'}
               </Button>
             </motion.div>
           </form>
 
-          <motion.p {...fadeUp(0.46)} className="text-center text-sm text-gray-500 mt-8">
+          {/* Kept quiet on purpose — it shouldn't compete with the primary action */}
+          <motion.p {...fadeUp(0.46)} className="text-center text-xs text-white/30 mt-7">
             Don't have an account?{' '}
-            <Link to="/register" className="text-accent-400 hover:text-accent-300 font-medium transition-colors">
+            <Link to="/register" className="text-white/60 hover:text-white underline underline-offset-4 decoration-white/20 hover:decoration-white/60 transition-colors">
               Register
             </Link>
           </motion.p>
