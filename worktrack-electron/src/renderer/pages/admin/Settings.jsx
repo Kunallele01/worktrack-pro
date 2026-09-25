@@ -68,9 +68,8 @@ export default function AdminSettings() {
 
   return (
     <div className="h-full flex flex-col p-6 gap-5">
-      <AnimatePresence>
-        {routingOpen && <LeaveRoutingOverlay onClose={() => setRoutingOpen(false)} />}
-      </AnimatePresence>
+      {/* Not in AnimatePresence — see Employees.jsx */}
+      {routingOpen && <LeaveRoutingOverlay onClose={() => setRoutingOpen(false)} />}
 
       <h1 className="text-xl font-bold text-gray-100">Admin Settings</h1>
 

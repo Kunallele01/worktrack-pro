@@ -388,13 +388,13 @@ function LeaveInner() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {applying && (
-          <ApplyModal user={user} holidays={holidays} quotas={quotas}
-            onClose={() => setApplying(false)}
-            onSuccess={() => { setApplying(false); load() }} />
-        )}
-      </AnimatePresence>
+      {/* Not in AnimatePresence — a stalled exit would leave an invisible
+          full-screen backdrop swallowing every click. */}
+      {applying && (
+        <ApplyModal user={user} holidays={holidays} quotas={quotas}
+          onClose={() => setApplying(false)}
+          onSuccess={() => { setApplying(false); load() }} />
+      )}
     </>
   )
 }

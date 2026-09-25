@@ -21,7 +21,7 @@ class ErrorBoundary extends Component {
 }
 
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useStore } from './lib/store'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -64,13 +64,15 @@ function AnimatedRoutes() {
   const segment = location.pathname.split('/')[1] || ''
   const segmentKey = EMPLOYEE_SEGMENTS.has(segment) ? '/employee' : ('/' + segment)
 
+  // No AnimatePresence here on purpose. Switching between the admin and
+  // employee trees is a mode="wait" swap of the entire app: if the outgoing
+  // tree's exit stalls, the incoming one never mounts and the window goes
+  // blank. Keying the mount keeps the entrance animation with nothing to hang on.
   return (
-    <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={segmentKey}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{    opacity: 0, y: -6 }}
         transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
         style={{ width: '100%', height: '100vh', overflow: 'hidden' }}
       >
@@ -104,7 +106,6 @@ function AnimatedRoutes() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </motion.div>
-    </AnimatePresence>
   )
 }
 

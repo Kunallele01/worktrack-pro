@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Download, RefreshCw, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { AnimatePresence, motion } from 'framer-motion'
 import { getAllAttendance, getUsers, getSettings, getAllLeaveRequests, getMonthHistory, getMyLeaves, getHolidays, isNonWorkingDate, calcDayCompletion } from '../../lib/supabase'
@@ -1074,8 +1075,10 @@ function EmployeeDeepDive({ row, workdays, month, year, settings, holidays = [],
 export default function Reports() {
   const now   = new Date()
   const toast = useToast()
-  const [month,       setMonth      ] = useState(now.getMonth() + 1)
-  const [year,        setYear       ] = useState(now.getFullYear())
+  // Opened from the Ask palette? Start on the month that was asked about.
+  const [params] = useSearchParams()
+  const [month,       setMonth      ] = useState(Number(params.get('month')) || now.getMonth() + 1)
+  const [year,        setYear       ] = useState(Number(params.get('year'))  || now.getFullYear())
   const [preview,     setPreview    ] = useState(null)
   const [loadingPrev, setLoadingPrev] = useState(false)
   const [busyKind,    setBusyKind   ] = useState(null)
@@ -1455,8 +1458,9 @@ export default function Reports() {
       </div>
 
       {/* Employee deep-dive panel */}
-      <AnimatePresence>
-        {deepDive && (
+      {/* Not in AnimatePresence — a stalled exit would leave the backdrop
+          covering the page and swallowing every click. */}
+      {deepDive && (
           <EmployeeDeepDive
             key={deepDive.id}
             row={deepDive}
@@ -1467,8 +1471,7 @@ export default function Reports() {
             holidays={preview?.holidays || []}
             onClose={() => setDeepDive(null)}
           />
-        )}
-      </AnimatePresence>
+      )}
 
     </div>
   )

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import { Download, Search } from 'lucide-react'
 import { getAllAttendance, getSettings, getHolidayDates, isEarlyCheckout } from '../../lib/supabase'
@@ -28,11 +29,13 @@ function fmtHours(ci, co) {
 export default function Attendance() {
   const toast   = useToast()
   const today   = new Date().toLocaleDateString('sv-SE')
-  const [start, setStart]   = useState(today)
-  const [end,   setEnd  ]   = useState(today)
+  // Opened from the Ask palette? Start on the period and person that was asked about.
+  const [params] = useSearchParams()
+  const [start, setStart]   = useState(params.get('start') || today)
+  const [end,   setEnd  ]   = useState(params.get('end')   || today)
   const [status, setStatus] = useState('')
   const [dept,   setDept  ] = useState('')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(params.get('q') || '')
   const [rows,  setRows ]   = useState([])
   const [depts,  setDepts ] = useState([])
   const [loading, setLoading] = useState(false)

@@ -33,9 +33,11 @@ export default function ForgotPassword() {
         transition={{ duration: 0.35 }} className="w-full max-w-sm">
         <Link to="/" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 mb-8 transition-colors">← Back to Sign In</Link>
 
-        <AnimatePresence mode="wait">
+        {/* No AnimatePresence: a stalled exit would leave the next step unmounted,
+            stranding someone mid password reset. */}
+        <>
           {stage === 'email' && (
-            <motion.div key="email" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div key="email" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <h1 className="text-2xl font-bold text-gray-50 mb-1">Reset password</h1>
               <p className="text-sm text-gray-400 mb-8">We'll send a one-time code to your email.</p>
               <form onSubmit={sendOtp} className="flex flex-col gap-4">
@@ -49,7 +51,7 @@ export default function ForgotPassword() {
             </motion.div>
           )}
           {stage === 'otp' && (
-            <motion.div key="otp" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div key="otp" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <h1 className="text-2xl font-bold text-gray-50 mb-1">Check your inbox</h1>
               <p className="text-sm text-gray-400 mb-8">Enter the code sent to <span className="text-accent-400">{email}</span></p>
               <form onSubmit={resetPw} className="flex flex-col gap-4">
@@ -75,7 +77,7 @@ export default function ForgotPassword() {
               <Link to="/"><Button className="w-full h-11">Back to Sign In</Button></Link>
             </motion.div>
           )}
-        </AnimatePresence>
+        </>
       </motion.div>
     </Page>
   )

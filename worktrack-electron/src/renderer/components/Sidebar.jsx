@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { LayoutDashboard, Settings, BarChart3, Users, Calendar, Map, LogOut, Zap, Sun, Moon, CalendarCheck, ClipboardList, UserCircle, UserCog, Bell } from 'lucide-react'
+import { LayoutDashboard, Settings, BarChart3, Users, Calendar, Map, LogOut, Zap, Sun, Moon, CalendarCheck, ClipboardList, UserCircle, UserCog, Bell, Search as SearchIcon } from 'lucide-react'
 import { signOut, getAdminBadgeCounts, getEmployeeBadgeCounts, getNotifications } from '../lib/supabase'
 import { useStore } from '../lib/store'
 import { Avatar } from './ui'
@@ -128,6 +128,20 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
+
+      {/* Ask — admins only; the palette is keyboard-first but nobody finds Ctrl+K unaided */}
+      {isAdmin && (
+        <div className="px-2 pt-3">
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('worktrack:open-ask'))}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-gray-500 hover:text-gray-200 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] transition-all"
+          >
+            <SearchIcon size={14} className="shrink-0" />
+            <span className="flex-1 text-left">Ask…</span>
+            <kbd className="text-[10px] font-mono text-gray-600">Ctrl K</kbd>
+          </button>
+        </div>
+      )}
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">

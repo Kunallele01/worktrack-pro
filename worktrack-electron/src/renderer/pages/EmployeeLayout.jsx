@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useStore } from '../lib/store'
 import { flushPendingAlerts } from '../lib/supabase'
 import Sidebar from '../components/Sidebar'
+import ErrorBoundary from '../components/ErrorBoundary'
 import { Page, ToastProvider } from '../components/ui'
 import { BirthdayManager } from '../components/BirthdayEffects'
 
@@ -23,18 +24,18 @@ export default function EmployeeLayout() {
         <BirthdayManager user={user} />
         <Sidebar />
         <main className="flex-1 overflow-hidden" style={{ position: 'relative' }}>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{    opacity: 0, x: -10 }}
-              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-              style={{ height: '100%' }}
-            >
+          {/* No AnimatePresence: a stalled exit would leave the page unmounted. */}
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            style={{ height: '100%' }}
+          >
+            <ErrorBoundary resetKey={location.pathname}>
               <Outlet />
-            </motion.div>
-          </AnimatePresence>
+            </ErrorBoundary>
+          </motion.div>
         </main>
       </ToastProvider>
     </Page>

@@ -241,13 +241,12 @@ export default function LeaveRequests() {
         )}
       </div>
 
-      <AnimatePresence>
-        {reviewing && (
-          <ReviewModal req={{ ...reviewing, _reviewerId: user?.id }}
-            onClose={() => setReviewing(null)}
-            onDone={() => { setReviewing(null); load() }} />
-        )}
-      </AnimatePresence>
+      {/* Not in AnimatePresence — see Employees.jsx */}
+      {reviewing && (
+        <ReviewModal req={{ ...reviewing, _reviewerId: user?.id }}
+          onClose={() => setReviewing(null)}
+          onDone={() => { setReviewing(null); load() }} />
+      )}
     </div>
   )
 }

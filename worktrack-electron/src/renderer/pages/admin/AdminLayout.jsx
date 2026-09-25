@@ -1,9 +1,11 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { getSettings, sendCheckInReminders } from '../../lib/supabase'
 import { useStore } from '../../lib/store'
 import Sidebar from '../../components/Sidebar'
+import CommandPalette from '../../components/CommandPalette'
+import ErrorBoundary from '../../components/ErrorBoundary'
 import { Page, ToastProvider } from '../../components/ui'
 import { BirthdayManager } from '../../components/BirthdayEffects'
 
@@ -36,6 +38,23 @@ export default function AdminLayout() {
   const setSettings = useStore(s => s.setSettings)
   const user        = useStore(s => s.user)
   const location    = useLocation()
+  const [askOpen, setAskOpen] = useState(false)
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setAskOpen(o => !o)
+      }
+    }
+    const onAsk = () => setAskOpen(true)
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('worktrack:open-ask', onAsk)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('worktrack:open-ask', onAsk)
+    }
+  }, [])
 
   useEffect(() => {
     getSettings(true).then(s => {
@@ -56,20 +75,23 @@ export default function AdminLayout() {
     <Page className="flex h-screen bg-surface-900 overflow-hidden">
       <ToastProvider>
         <BirthdayManager user={user} />
+        {/* Deliberately not in AnimatePresence: a stalled exit leaves a
+            full-screen invisible backdrop that eats every click. */}
+        {askOpen && <CommandPalette open onClose={() => setAskOpen(false)} />}
         <Sidebar />
         <main className="flex-1 overflow-hidden" style={{ position: 'relative' }}>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{    opacity: 0, x: -10 }}
-              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-              style={{ height: '100%' }}
-            >
+          {/* No AnimatePresence: a stalled exit would leave the page unmounted. */}
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            style={{ height: '100%' }}
+          >
+            <ErrorBoundary resetKey={location.pathname}>
               <Outlet />
-            </motion.div>
-          </AnimatePresence>
+            </ErrorBoundary>
+          </motion.div>
         </main>
       </ToastProvider>
     </Page>

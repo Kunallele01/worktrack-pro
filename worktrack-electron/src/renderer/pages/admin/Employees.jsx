@@ -278,14 +278,14 @@ export default function Employees() {
   return (
     <div className="h-full flex flex-col p-6 gap-4">
       {Dialog}
-      <AnimatePresence>
-        {idTarget && (
-          <EmployeeIdModal user={idTarget} onClose={() => setIdTarget(null)} onSaved={load} />
-        )}
-        {bdayTarget && (
-          <BirthdayModal user={bdayTarget} onClose={() => setBdayTarget(null)} onSaved={load} />
-        )}
-      </AnimatePresence>
+      {/* Not in AnimatePresence: a stalled exit leaves an invisible full-screen
+          backdrop that swallows every click. */}
+      {idTarget && (
+        <EmployeeIdModal user={idTarget} onClose={() => setIdTarget(null)} onSaved={load} />
+      )}
+      {bdayTarget && (
+        <BirthdayModal user={bdayTarget} onClose={() => setBdayTarget(null)} onSaved={load} />
+      )}
 
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-100">
